@@ -198,7 +198,7 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
                 (
                     "streamlit_version",
                     "WARN",
-                    f"{st.__version__} (fluxlit declares streamlit>=1.33; upgrade recommended)",
+                    f"{st.__version__} (fluxlit declares streamlit>=1.36; upgrade recommended)",
                 )
             )
         else:

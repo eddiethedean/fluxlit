@@ -549,7 +549,7 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=4.0" },
-    { name = "fastapi", specifier = ">=0.110" },
+    { name = "fastapi", specifier = ">=0.111" },
     { name = "furo", marker = "extra == 'docs'", specifier = ">=2024.1" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
@@ -563,7 +563,7 @@ requires-dist = [
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'docs'", specifier = ">=2.0" },
     { name = "starlette", specifier = ">=0.37" },
-    { name = "streamlit", specifier = ">=1.33" },
+    { name = "streamlit", specifier = ">=1.36" },
     { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
     { name = "tomli", marker = "extra == 'dev'", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.12" },
