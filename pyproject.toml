@@ -48,12 +48,19 @@ fluxlit = "fluxlit.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/odosmatthews/fluxlit"
+Documentation = "https://github.com/odosmatthews/fluxlit#readme"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fluxlit"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/fluxlit", "README.md", "pyproject.toml"]
+include = [
+  "src/fluxlit",
+  "README.md",
+  "FLUXLIT_PLAN.md",
+  "FLUXLIT_ROADMAP.md",
+  "pyproject.toml",
+]
 
 [tool.ruff]
 line-length = 100

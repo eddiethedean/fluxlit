@@ -1,44 +1,50 @@
-
 # FluxLit (`fluxlit`)
 
-Production-grade unified runtime for FastAPI + Streamlit applications.
+Production-oriented unified runtime for **FastAPI** and **Streamlit**: one public port, one CLI, and a single `FluxLit` app object for APIs plus UI pages.
+
+**Docs in this repo:** [Product & architecture plan](FLUXLIT_PLAN.md) · [Development roadmap](FLUXLIT_ROADMAP.md)
 
 ---
 
-# Overview
+## Overview
 
-FluxLit combines:
-- FastAPI
-- Streamlit
-- authentication
-- routing
-- configuration
-- deployment
-
-into a single coherent application framework.
-
-The goal is to make building Python-first production web applications dramatically simpler.
+FluxLit targets teams that want FastAPI for HTTP APIs and Streamlit for interactive UIs without wiring separate ports, ad hoc reverse proxies, and brittle dev scripts. The runtime uses a **sidecar model**: Streamlit runs in a subprocess; a **Starlette ASGI gateway** fronts both the API and the UI.
 
 ---
 
-# Why FluxLit?
+## Requirements
 
-Combining FastAPI and Streamlit manually usually requires:
-- multiple processes
-- reverse proxies
-- separate ports
-- custom auth plumbing
-- fragile deployment setups
-
-FluxLit solves this with:
-- one app object
-- one CLI
-- one deployment model
-- one runtime experience
+- Python **3.10+**
+- Dependencies are declared in [`pyproject.toml`](pyproject.toml) (FastAPI, Uvicorn, Streamlit, Typer, httpx, websockets, etc.).
 
 ---
 
-# Example
+## Install
+
+```bash
+pip install fluxlit
+```
+
+For local development of FluxLit itself:
+
+```bash
+git clone https://github.com/odosmatthews/fluxlit.git
+cd fluxlit
+pip install -e ".[dev]"
+```
+
+---
+
+## Quick start
+
+Create a project (optional):
+
+```bash
+fluxlit new my-app
+cd my-app
+```
+
+Define a `FluxLit` app (e.g. `app.py`):
 
 ```python
 from fluxlit import FluxLit
@@ -47,7 +53,7 @@ app = FluxLit(title="Admin Portal")
 
 @app.api.get("/users")
 def users():
-    return [{"name": "Odos"}]
+    return [{"name": "Ada"}]
 
 @app.page("/")
 def home(st, client):
@@ -55,107 +61,133 @@ def home(st, client):
     st.write(client.get("/users").json())
 ```
 
-Run:
+Run the unified server (default import path `app:app`):
 
 ```bash
 fluxlit dev app:app
 ```
 
----
+- **Browser:** open the URL shown by Uvicorn (default `http://127.0.0.1:8000`).
+- **API:** routes are mounted under **`/api`** (e.g. `GET /api/users`).
+- **OpenAPI / docs:** `http://127.0.0.1:8000/api/docs` (Swagger) and `/api/openapi.json`.
 
-# Features
-
-## Unified Runtime
-- FastAPI + Streamlit together
-- one exposed port
-- managed orchestration
-
-## Production Focused
-- reverse proxy support
-- Docker compatible
-- Kubernetes compatible
-- health checks
-- structured logging
-
-## Authentication
-- JWT auth
-- session auth
-- proxy header auth
-- OAuth integrations
-
-## Developer Experience
-- typed APIs
-- page discovery
-- hot reload
-- app scaffolding
+From Streamlit code, `ApiClient` calls the API using a base URL that includes `/api` (set automatically as `FLUXLIT_INTERNAL_API_BASE` when using `fluxlit dev` / `fluxlit run`). Use paths like `client.get("/users")`, not `client.get("/api/users")`.
 
 ---
 
-# Proposed Project Structure
+## How routing works
+
+```text
+Browser
+   │
+   ▼
+┌──────────────────────────────────────┐
+│  FluxLit gateway (Uvicorn, one port)  │
+├──────────────────────────────────────┤
+│  /api/*     → FastAPI (path prefix    │
+│               stripped inside the app) │
+│  /*         → Streamlit (HTTP + WS    │
+│               proxy to subprocess)     │
+└──────────────────────────────────────┘
+```
+
+Anything that is **not** under `/api` is forwarded to Streamlit (including WebSockets used by Streamlit). Reserve **`/api`** for your HTTP API.
+
+---
+
+## CLI
+
+| Command | Description |
+|--------|-------------|
+| `fluxlit dev [target]` | Development server: Streamlit subprocess + gateway. Default `target` is `app:app`. |
+| `fluxlit run [target]` | Same stack without auto-reload. |
+| `fluxlit new <name>` | Scaffold a minimal `app.py` in a new directory. |
+| `python -m fluxlit` | Equivalent entry to the `fluxlit` console script. |
+
+Options for `dev` / `run` include `--host`, `--port`. `fluxlit dev` also supports `--reload` (experimental; API gateway reload may not restart Streamlit).
+
+---
+
+## Configuration
+
+`FluxlitSettings` ([`src/fluxlit/config.py`](src/fluxlit/config.py)) loads from environment variables prefixed with **`FLUXLIT_`** and from a **`.env`** file if present.
+
+| Variable | Role |
+|----------|------|
+| `FLUXLIT_TITLE` | App title (default for FastAPI / UX). |
+| `FLUXLIT_GATEWAY_HOST` / `FLUXLIT_GATEWAY_PORT` | Defaults for binding (also used in settings; CLI overrides bind for dev/run). |
+| `FLUXLIT_ROOT_PATH` | ASGI root path behind a reverse proxy (passed through to FastAPI). |
+| `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side `ApiClient` (includes `/api`). |
+
+---
+
+## Suggested project layout
 
 ```text
 my_app/
-├── app.py
-├── pages/
-├── api/
+├── app.py              # FluxLit instance, @app.api routes, @app.page handlers
+├── pages/              # Optional: extra Streamlit modules if you extend beyond @app.page
 ├── services/
 ├── static/
-└── fluxlit.toml
+└── .env                # FLUXLIT_* and secrets (do not commit)
 ```
+
+A committed **`fluxlit.toml`** (or similar) config file is on the [roadmap](FLUXLIT_ROADMAP.md); today, prefer env / `.env` and CLI flags.
 
 ---
 
-# CLI
+## Package layout (`src/fluxlit`)
+
+| Module | Purpose |
+|--------|---------|
+| `app` | `FluxLit` application object |
+| `cli` | Typer CLI |
+| `client` | `ApiClient` (httpx) for server-side API calls |
+| `config` | `FluxlitSettings` |
+| `gateway` | ASGI router + HTTP/WebSocket proxy |
+| `runtime` | Subprocess orchestration, Uvicorn entry |
+| `streamlit_main` | Streamlit entry script (`FLUXLIT_APP`) |
+| `api` | Optional `APIRouter` helpers |
+| `auth` | Placeholder / future shared auth hooks |
+
+---
+
+## Development (contributors)
 
 ```bash
-fluxlit new my-app
-fluxlit dev app:app
-fluxlit run app:app
+pip install -e ".[dev]"
+ruff check src tests && ruff format src tests
+python -m pytest
+python -m mypy src/fluxlit
 ```
 
 ---
 
-# Architecture
+## Features: today vs planned
 
-Browser
-↓
-FluxLit Gateway
-├── /api/* → FastAPI
-├── /app/* → Streamlit
-├── /auth/* → Auth/session
-└── /static/* → Assets
+**Available in current alphas**
 
----
+- Single public port; managed Streamlit subprocess
+- Gateway: `/api` → FastAPI; HTTP + WebSocket proxy to Streamlit
+- `@app.page` + `st.navigation` integration
+- `fluxlit new`, `dev`, `run`
+- Typed package; Ruff + Mypy + Pytest in-tree
 
-# Roadmap
+**Planned** (see [roadmap](FLUXLIT_ROADMAP.md))
 
-## Initial Release
-- unified runtime
-- CLI
-- reverse proxy
-- shared config
-
-## Future
-- native ASGI mode
-- plugin system
-- realtime support
-- deployment adapters
+- CI, hardened reload/shutdown, first-class health/metrics
+- Auth (JWT, sessions, proxy headers, OAuth)
+- Docker/Kubernetes examples, `doctor` / `build` CLI
+- Richer config file and optional page discovery
 
 ---
 
-# Philosophy
+## Philosophy
 
-FluxLit aims to become the production runtime for Python-first web applications.
-
-The framework prioritizes:
-- simplicity
-- strong typing
-- operational stability
-- enterprise deployment compatibility
-- Python-native workflows
+FluxLit should stay **Pythonic** (explicit, typed, easy to reason about), **production-minded** (proxy-safe, observable, deployable), and **honest** about Streamlit’s process/WebSocket model until a native ASGI path is proven.
 
 ---
 
-# Status
+## License
 
-Alpha: unified dev server (`fluxlit dev`), ASGI gateway (`/api` → FastAPI, everything else → Streamlit), and scaffolding (`fluxlit new`).
+MIT — see [`pyproject.toml`](pyproject.toml) metadata.
