@@ -35,3 +35,6 @@
 - **Security:** opt-in `FluxlitSettings.enable_security_headers` and CORS (`cors_allow_origins`, `cors_allow_credentials`); `public_base_url` for OAuth redirects.
 - **CLI:** `fluxlit doctor` JWT clock-skew note, OAuth/CORS guidance.
 - **Docs:** security architecture, migration guide, reference example under `examples/reference_auth/`.
+- **Tests:** broader JWT/OIDC/BFF/error-path coverage, Streamlit auth helpers, security middleware, and `ApiClient` header merging / request-id propagation.
+- **UX:** `FluxlitSettings` gains `FLUXLIT_JWT_*` and `FLUXLIT_OIDC_BFF_SECRET`; `JWTBearer.from_fluxlit_settings`, `FluxLit.make_jwt_bearer`, `FluxLit.attach_oidc_login`, and `prepare_streamlit_api_client` for less boilerplate (docs updated).
+- **Docs / README:** Docs table and new README section on calling secured APIs from Streamlit; quickstart + docs index explain injected `client` vs `for_fluxlit` / `prepare_streamlit_api_client`; features list and package table reflect shipped auth modules; auth-recipes and security cross-link the reference example.

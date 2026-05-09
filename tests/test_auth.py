@@ -55,6 +55,25 @@ def test_trusted_proxy_user_trusted_client_hosts() -> None:
     assert r.status_code == 200
 
 
+def test_trusted_proxy_user_allows_empty_header_when_optional() -> None:
+    app = FastAPI()
+    dep = TrustedProxyUser(
+        TrustedProxyUserConfig(
+            header_name="X-User",
+            require_non_empty_user=False,
+        )
+    )
+
+    @app.get("/me")
+    def me(user: str = Depends(dep)) -> dict[str, str]:  # noqa: B008
+        return {"user": user}
+
+    client = TestClient(app)
+    r = client.get("/me")
+    assert r.status_code == 200
+    assert r.json() == {"user": ""}
+
+
 def test_trusted_proxy_user_rejects_untrusted_client_host() -> None:
     app = FastAPI()
     dep = TrustedProxyUser(TrustedProxyUserConfig(trusted_client_hosts=frozenset({"127.0.0.1"})))

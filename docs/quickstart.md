@@ -63,6 +63,25 @@ fluxlit dev app:app
 
 For Pydantic-validated JSON, use {meth}`~fluxlit.client.ApiClient.get_model` and {meth}`~fluxlit.client.ApiClient.post_model`.
 
+### Secured routes (JWT and similar)
+
+The `client` injected into `@app.page` handlers has **no** `Authorization` header. Use it for public endpoints or for logging in; for routes protected with {class}`~fluxlit.jwt_auth.JWTBearer` (or your own dependency), create a client that adds the bearer on every request:
+
+```python
+from fluxlit.client import ApiClient
+
+@app.page("/account")
+def account(st, client):
+    token = st.session_state.get("access_token")
+    if not token:
+        st.info("Sign in first.")
+        return
+    with ApiClient.for_fluxlit(bearer_token=token) as api:
+        st.write(api.get("/me").json())
+```
+
+Install **`fluxlit[auth]`** for JWT/OIDC helpers. Full patterns (env-driven `make_jwt_bearer`, OIDC BFF, `prepare_streamlit_api_client`, `auth_header_factory`) are in {doc}`auth-recipes` and {doc}`migration-auth`. A small runnable demo lives in the repo under `examples/reference_auth/`.
+
 ## Project layout
 
 ```text

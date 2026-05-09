@@ -44,6 +44,58 @@ def test_api_client_merges_auth_factory_headers(monkeypatch: pytest.MonkeyPatch)
     assert captured.get("authorization") == "Bearer secret"
 
 
+def test_api_client_for_fluxlit_rejects_both_factory_and_token() -> None:
+    with pytest.raises(TypeError, match="only one"):
+        ApiClient.for_fluxlit(bearer_token="a", auth_header_factory=lambda: {})
+
+
+def test_api_client_propagates_request_id_when_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(dict(request.headers))
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    from fluxlit.logging_context import REQUEST_ID_HEADER, set_request_id
+
+    token = set_request_id("req-xyz")
+    try:
+        with ApiClient(
+            base_url="http://127.0.0.1:8000/api",
+            propagate_request_id=True,
+        ) as client:
+            client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+            client.get("/ping")
+    finally:
+        from fluxlit.logging_context import reset_request_id
+
+        reset_request_id(token)
+    assert captured.get(REQUEST_ID_HEADER) == "req-xyz"
+
+
+def test_api_client_default_headers_merged_and_overridden(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update({k.lower(): v for k, v in request.headers.items()})
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(
+        base_url="http://127.0.0.1:8000/api",
+        default_headers={"X-App": "1", "X-Shared": "from-default"},
+    ) as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        client.get("/r", headers={"X-Shared": "from-call"})
+    assert captured.get("x-app") == "1"
+    assert captured.get("x-shared") == "from-call"
+
+
 def test_api_client_for_fluxlit_bearer(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
     captured: dict[str, str] = {}

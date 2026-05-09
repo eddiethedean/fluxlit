@@ -79,3 +79,34 @@ class FluxlitSettings(BaseSettings):
             "If empty, derive from request.url_for / X-Forwarded-* in route handlers."
         ),
     )
+    jwt_issuer: str = Field(
+        default="",
+        description=(
+            "JWT ``iss`` claim; used by ``JWTBearer.from_fluxlit_settings`` when validating."
+        ),
+    )
+    jwt_audience: str = Field(
+        default="",
+        description=(
+            "JWT ``aud`` claim (single string); used by ``JWTBearer.from_fluxlit_settings``."
+        ),
+    )
+    jwt_hs256_secret: str = Field(
+        default="",
+        description="HS256 signing secret for dev/small deployments; leave empty if using JWKS.",
+    )
+    jwt_jwks_url: str = Field(
+        default="",
+        description="JWKS URL for RS256 validation; leave empty if using ``jwt_hs256_secret``.",
+    )
+    jwt_leeway_seconds: int = Field(
+        default=0,
+        description="Clock skew leeway (seconds) passed to PyJWT when validating tokens.",
+    )
+    oidc_bff_secret: str = Field(
+        default="",
+        description=(
+            "Secret for first-party JWTs after OIDC callback; "
+            "used by ``FluxLit.attach_oidc_login``."
+        ),
+    )

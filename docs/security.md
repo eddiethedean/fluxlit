@@ -2,6 +2,8 @@
 
 FluxLit serves **one public origin**: the gateway forwards `/api` to FastAPI and everything else (including WebSockets) to Streamlit. Authentication must account for **two execution contexts** — API route handlers and **server-side** Streamlit code — plus whatever runs in the user’s browser.
 
+Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recipes`; upgrading an existing app is covered in {doc}`migration-auth`.
+
 ## Threat model (high level)
 
 | Risk | Mitigation direction |
@@ -18,8 +20,75 @@ FluxLit serves **one public origin**: the gateway forwards `/api` to FastAPI and
 - **Access tokens for `ApiClient`:** Prefer a factory (`auth_header_factory`) or session state populated **only** after a server-side exchange; TTL should be short.
 - **Internal API base:** `FLUXLIT_INTERNAL_API_BASE` points at your mounted API (e.g. `http://127.0.0.1:8000/api`). Keep it loopback or private-network in deployment guides.
 
+## End-to-end sketch (same origin)
+
+This ties together the gateway split: browser hits **one host**; APIs live under **`/api`**; Streamlit uses **`ApiClient`** server-side.
+
+```python
+from __future__ import annotations
+
+import os
+from typing import Annotated
+
+from fastapi import Depends
+from fluxlit import FluxLit
+from fluxlit.client import ApiClient
+from fluxlit.config import FluxlitSettings
+from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
+from fluxlit.streamlit_auth import bearer_headers_from_session
+
+settings = FluxlitSettings(
+    enable_security_headers=True,
+    public_base_url=os.environ.get("FLUXLIT_PUBLIC_BASE_URL", "http://127.0.0.1:8000"),
+)
+app = FluxLit(title="Secure FluxLit", settings=settings)
+
+# Or: _bearer = app.make_jwt_bearer() with FLUXLIT_JWT_* set on FluxlitSettings
+_bearer = JWTBearer(
+    JWTAuthConfig(
+        issuer="https://example.internal",
+        audience="example-api",
+        algorithms=["HS256"],
+        hs256_secret=os.environ["JWT_HS256_SECRET"],
+    )
+)
+
+
+@app.api.get("/me")
+def me(claims: Annotated[StandardClaims, Depends(_bearer)]) -> dict[str, str | None]:
+    return {"sub": claims.sub}
+
+
+@app.api.post("/login/dev")
+def login_dev() -> dict[str, str]:
+    """Replace with real OIDC / corporate IdP before production."""
+    token = issue_hs256_access_token(
+        subject="ada",
+        issuer="https://example.internal",
+        audience="example-api",
+        secret=os.environ["JWT_HS256_SECRET"],
+        ttl_seconds=900,
+        extra_claims={"scope": "read"},
+    )
+    return {"access_token": token}
+
+
+@app.page("/")
+def home(st, client: ApiClient) -> None:
+    _ = client
+    if "access_token" not in st.session_state:
+        st.info("POST /api/login/dev or your IdP flow, then store access_token in session.")
+        return
+
+    hdr = lambda: bearer_headers_from_session(st, session_key="access_token")
+    with ApiClient(auth_header_factory=hdr) as api:
+        st.write(api.get("/me").json())
+```
+
+Run with `fluxlit dev app:app`. The browser calls **`/api/me`** with `Authorization: Bearer …` only from trusted code (here, the Streamlit server via `ApiClient`), not from arbitrary browser JavaScript on the same page.
+
 ## Related topics
 
 - {doc}`migration-auth` — incremental adoption of JWT and OIDC.
-- {doc}`auth-recipes` — OIDC, API keys, forward-auth patterns.
+- {doc}`auth-recipes` — full examples: JWKS, OIDC BFF, forward-auth, API keys, CORS.
 - {doc}`configuration` — `FLUXLIT_ENABLE_SECURITY_HEADERS`, CORS, `FLUXLIT_PUBLIC_BASE_URL`.

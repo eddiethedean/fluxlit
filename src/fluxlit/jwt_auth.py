@@ -12,6 +12,8 @@ from typing import Any, cast
 from fastapi import HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from fluxlit.config import FluxlitSettings
+
 _MISSING_AUTH_EXTRA_MSG = (
     "JWT support requires optional dependencies. Install with: pip install 'fluxlit[auth]'"
 )
@@ -72,6 +74,50 @@ class JWTBearer:
         else:
             msg = "Either hs256_secret (HS256) or jwks_url (asymmetric) must be set"
             raise ValueError(msg)
+
+    @classmethod
+    def from_fluxlit_settings(cls, settings: FluxlitSettings) -> JWTBearer:
+        """Build a bearer dependency from settings / ``FLUXLIT_JWT_*``.
+
+        Uses :class:`~fluxlit.config.FluxlitSettings`. Provide **either** ``jwt_hs256_secret``
+        (development) **or** ``jwt_jwks_url`` (RS256 /
+        JWKS), plus ``jwt_issuer`` and ``jwt_audience``. Error messages name the env vars.
+        """
+        issuer = (settings.jwt_issuer or "").strip()
+        audience = (settings.jwt_audience or "").strip()
+        secret = (settings.jwt_hs256_secret or "").strip()
+        jwks = (settings.jwt_jwks_url or "").strip()
+        if secret and jwks:
+            msg = "Set only one of FLUXLIT_JWT_HS256_SECRET or FLUXLIT_JWT_JWKS_URL, not both"
+            raise ValueError(msg)
+        if not issuer or not audience:
+            msg = (
+                "JWT via settings needs FLUXLIT_JWT_ISSUER and FLUXLIT_JWT_AUDIENCE "
+                "(or set jwt_issuer / jwt_audience on FluxlitSettings)"
+            )
+            raise ValueError(msg)
+        if secret:
+            return cls(
+                JWTAuthConfig(
+                    issuer=issuer,
+                    audience=audience,
+                    algorithms=["HS256"],
+                    hs256_secret=secret,
+                    leeway_seconds=settings.jwt_leeway_seconds,
+                )
+            )
+        if jwks:
+            return cls(
+                JWTAuthConfig(
+                    issuer=issuer,
+                    audience=audience,
+                    algorithms=["RS256"],
+                    jwks_url=jwks,
+                    leeway_seconds=settings.jwt_leeway_seconds,
+                )
+            )
+        msg = "JWT via settings needs FLUXLIT_JWT_HS256_SECRET or FLUXLIT_JWT_JWKS_URL"
+        raise ValueError(msg)
 
     async def __call__(self, request: Request) -> StandardClaims:
         auth = request.headers.get("authorization")

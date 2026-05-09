@@ -9,7 +9,7 @@ from collections.abc import Callable
 from types import FunctionType
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -17,12 +17,14 @@ from starlette.responses import Response
 
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
+from fluxlit.jwt_auth import JWTBearer
 from fluxlit.logging_context import (
     REQUEST_ID_HEADER,
     new_request_id,
     reset_request_id,
     set_request_id,
 )
+from fluxlit.oidc import GenericOIDCClient, OIDCBFFConfig, register_oidc_bff_routes
 from fluxlit.security_middleware import SecurityHeadersMiddleware
 
 _api_log = logging.getLogger("fluxlit.api")
@@ -35,6 +37,11 @@ class FluxLit:
     :attr:`~fluxlit.config.FluxlitSettings.api_mount_path` on the public gateway).
     Use :meth:`page` or :meth:`discover_pages` to register Streamlit UI; the runtime
     builds ``st.navigation`` from registered pages.
+
+    **Security (optional):** :meth:`make_jwt_bearer` reads ``FLUXLIT_JWT_*`` from
+    :attr:`settings`; :meth:`attach_oidc_login` registers OIDC BFF routes using
+    ``FLUXLIT_PUBLIC_BASE_URL`` and ``FLUXLIT_OIDC_BFF_SECRET`` when you do not pass
+    secrets explicitly.
 
     A minimal ``GET /healthz`` route is registered on :attr:`api` (hidden from OpenAPI).
 
@@ -186,6 +193,51 @@ class FluxLit:
         Uses ``FLUXLIT_INTERNAL_API_BASE`` when set (as in the managed runtime).
         """
         return ApiClient()
+
+    def make_jwt_bearer(self) -> JWTBearer:
+        """JWT :class:`~fluxlit.jwt_auth.JWTBearer` from :attr:`settings` (``FLUXLIT_JWT_*``).
+
+        Requires ``jwt_issuer``, ``jwt_audience``, and either ``jwt_hs256_secret`` or
+        ``jwt_jwks_url``. Raises :class:`ValueError` with env-oriented hints if misconfigured.
+        """
+        return JWTBearer.from_fluxlit_settings(self.settings)
+
+    def attach_oidc_login(
+        self,
+        oidc: GenericOIDCClient,
+        *,
+        first_party_secret: str | None = None,
+        **bff_overrides: Any,
+    ) -> APIRouter:
+        """Register OIDC login / callback / token-exchange routes on :attr:`api`.
+
+        Uses :attr:`~fluxlit.config.FluxlitSettings.public_base_url` for redirects unless
+        you pass ``public_base_url=...`` in ``bff_overrides``. The first-party JWT signing
+        secret comes from ``first_party_secret`` or
+        :attr:`~fluxlit.config.FluxlitSettings.oidc_bff_secret` (``FLUXLIT_OIDC_BFF_SECRET``).
+
+        Returns the :class:`fastapi.APIRouter` that was included (same as
+        :func:`fluxlit.oidc.register_oidc_bff_routes`).
+        """
+        secret = (first_party_secret or self.settings.oidc_bff_secret or "").strip()
+        if not secret:
+            msg = (
+                "OIDC BFF needs a signing secret: pass first_party_secret=... or set "
+                "FLUXLIT_OIDC_BFF_SECRET on FluxlitSettings"
+            )
+            raise ValueError(msg)
+        public_raw = bff_overrides.pop("public_base_url", None)
+        if public_raw is not None:
+            public_base = str(public_raw).strip()
+        else:
+            public_base = (self.settings.public_base_url or "").strip()
+        cfg = OIDCBFFConfig(
+            oidc=oidc,
+            first_party_secret=secret,
+            public_base_url=public_base,
+            **bff_overrides,
+        )
+        return register_oidc_bff_routes(self.api, cfg)
 
     @property
     def pages(self) -> list[tuple[str, str, Callable[..., None]]]:

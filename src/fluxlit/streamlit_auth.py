@@ -62,3 +62,44 @@ def bearer_headers_from_session(
     if not token:
         return {}
     return {"Authorization": f"Bearer {token}"}
+
+
+def prepare_streamlit_api_client(
+    st_module: Any,
+    *,
+    exchange_path: str = "/auth/exchange",
+    session_key: str = "fluxlit_access_token",
+    **client_options: Any,
+) -> ApiClient:
+    """One-step Streamlit helper: exchange ``auth_code`` (if present), return an ``ApiClient``.
+
+    If a bearer token exists in ``session_key`` after the exchange (or was already there),
+    returns :meth:`ApiClient.for_fluxlit` so ``GET /me`` and other protected routes work.
+    Otherwise returns an **unauthenticated** client (public routes only).
+
+    The internal exchange call uses a short-lived unauthenticated client, then closes it
+    when upgrading to a bearer client so you do not leak two open connections.
+
+    Typical page body::
+
+        api = prepare_streamlit_api_client(st)
+        r = api.get(\"/me\")
+        if r.status_code == 401:
+            st.info(\"Open /api/auth/login\")
+            return
+    """
+    existing = st_module.session_state.get(session_key)
+    if existing:
+        return ApiClient.for_fluxlit(bearer_token=str(existing), **client_options)
+    bootstrap = ApiClient(**client_options)
+    exchange_auth_code_from_query(
+        st_module,
+        bootstrap,
+        exchange_path=exchange_path,
+        session_key=session_key,
+    )
+    raw = st_module.session_state.get(session_key)
+    if not raw:
+        return bootstrap
+    bootstrap.close()
+    return ApiClient.for_fluxlit(bearer_token=str(raw), **client_options)
