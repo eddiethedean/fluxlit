@@ -4,7 +4,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.1.x)
+## Current status (0.2.x)
 
 **Done**
 
@@ -21,6 +21,82 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - Reload is gateway-only (`fluxlit dev --reload`); Streamlit lifecycle on reload is not orchestrated.
 - Auth, metrics, and hardened Docker/K8s beyond `fluxlit build` templates are not implemented.
 - **Browser refresh continuity** for Streamlit (cookie-free, URL + server store) is specified under **Phase 2 follow-on** in this file but not implemented yet.
+
+**Next: 0.3.x**
+
+- Primary focus: **security and identity** — JWT/OAuth/OIDC, safe patterns for Streamlit calling FastAPI, and operational guardrails (see **Version 0.3** below).
+
+---
+
+## Version 0.3 — Security, identity, and cross-layer trust (planned)
+
+**Theme:** Make **industry-standard auth** easy to wire correctly, with **one mental model** for both FastAPI routes and Streamlit pages — and **no accidental token leaks** through the browser, logs, or the Streamlit subprocess.
+
+### Design principles
+
+| Principle | What it means for FluxLit |
+|-----------|---------------------------|
+| **Server-side secrets** | Long-lived credentials (client secrets, API keys, refresh tokens) never touch `st.session_state` or the browser; they stay in FastAPI deps, env, or a secrets backend. |
+| **Short-lived, scoped tokens** | Streamlit code receives **access tokens** (or opaque session handles) with tight **TTL**, **audience**, and **scopes** — ideally minted or exchanged via FastAPI, not hand-rolled in widgets. |
+| **Explicit forwarding** | `ApiClient` gains first-class hooks for **Authorization**, **correlation IDs**, and optional **mTLS** / custom headers — with docs on what must **not** be forwarded to Streamlit’s origin. |
+| **Gateway-aware URLs** | OAuth redirects, JWKS URLs, and post-logout redirects respect **`root_path`** and `X-Forwarded-*` so deployments behind proxies don’t break silently. |
+| **Pythonic, composable APIs** | FastAPI dependencies you can `Depends()` on; small builders for OIDC discovery and JWKS; Streamlit helpers that read the **same** typed claims object as your API. |
+
+### FastAPI layer — standards-first building blocks
+
+| Feature | Description |
+|---------|-------------|
+| **JWT validation** | `Depends()`-style helpers: verify **iss**, **aud**, **exp**, **nbf**, **jti**; support **HS256** (dev) and **RS256/ES256** via **JWKS** with caching and **`kid`** rotation. |
+| **OIDC / OAuth2** | Optional integrations: **Authorization Code + PKCE** for user login; **client credentials** for service accounts; provider presets (generic OIDC, Auth0-style, Azure AD, Google, GitHub) behind a small **protocol interface** so new IdPs don’t fork core. |
+| **Token exchange & BFF-style** | Pattern: browser never holds opaque IdP refresh tokens; **FastAPI** exchanges codes and issues **first-party access tokens** (or session cookies) scoped to your API **audience** — Streamlit only sees what the BFF allows. |
+| **RBAC / ABAC helpers** | Reusable dependencies: `require_scopes(...)`, `require_roles(...)`, claim-based predicates; same checks callable from Streamlit-facing helpers for parity. |
+| **API keys & mTLS** | Documented patterns for machine clients: header-based keys, optional client certificate hints for enterprise front doors. |
+| **Security middleware** | Opt-in baseline: **HSTS**, **X-Content-Type-Options**, **frame-ancestors** / CSP notes for Streamlit-typical layouts; **CORS** presets that fail closed in production. |
+| **CSRF** | If cookie-based sessions are introduced: **double-submit** or **SameSite=strict** defaults + FastAPI helpers; document Streamlit limitations and recommended BFF flows. |
+
+### Streamlit layer — calling FastAPI safely
+
+| Feature | Description |
+|---------|-------------|
+| **Authenticated `ApiClient`** | Constructors/factory that bind a **callable** or **ContextVar** for the current access token (or use **server-side session** IDs that FastAPI resolves — no raw refresh tokens in Streamlit). |
+| **Claims in page functions** | Optional `st`-safe DTO: same **Pydantic model** (or TypedDict) as FastAPI route dependencies so UI logic doesn’t parse JWTs manually. |
+| **Header & cookie policy** | Clear rules: which headers `ApiClient` sends on **internal** `FLUXLIT_INTERNAL_API_BASE` calls; how to avoid echoing **Authorization** into Streamlit debug or `st.write`. |
+| **Token refresh without leaking** | Background refresh delegated to FastAPI (`/auth/refresh` or opaque cookie); Streamlit only requests a new short-lived token through that channel. |
+| **User identity for widgets** | Helpers: “current user” display name / id from validated claims — never from unverified JWT payload strings in the browser. |
+
+### Gateway & runtime — operational safety
+
+| Feature | Description |
+|---------|-------------|
+| **Request correlation** | Propagate **X-Request-ID** (already present) into internal API calls and optional **OpenTelemetry** trace context later (align with Phase 4). |
+| **Log redaction** | Central guidance + helpers to **redact** `Authorization`, cookies, and sensitive query params in access logs (pairs with Phase 2 follow-on URL tokens). |
+| **Rate limiting hooks** | Optional integration points (e.g. Starlette middleware or external sidecar) documented for the single public port. |
+| **`fluxlit doctor` extensions** | Checks: auth env vars present, **HTTPS** in production templates, clock skew warnings for JWT, `FLUXLIT_INTERNAL_API_BASE` still loopback-safe. |
+
+### Documentation & examples
+
+| Deliverable | Purpose |
+|-------------|---------|
+| **Security architecture page** | Diagram: browser → gateway → FastAPI vs Streamlit; where tokens live; threat model (XSS, CSRF, token replay). |
+| **Reference recipes** | “OIDC login + Streamlit dashboard”, “Machine API key + internal ApiClient”, “Forward-auth headers from nginx”. |
+| **Migration guide** | From no-auth apps to JWT — incremental steps without breaking `fluxlit run`. |
+
+### Testing & quality bar
+
+- Contract tests with **fake OIDC** (JWKS server fixture) and clock control for **exp** / **nbf**.
+- Regression tests: `ApiClient` never logs tokens; internal base URL doesn’t strip auth incorrectly.
+- **Optional** dependency group `auth` (e.g. `PyJWT` / `httpx` + JOSE stack) so minimal installs stay lean.
+
+### Relation to other roadmap items
+
+- **Phase 2 follow-on (URL-bound session):** complementary — use **opaque sid** for Streamlit continuity; bind **JWT subject** to sid server-side rather than putting JWT in the query string.
+- **Phase 4 (production):** metrics and tracing must **label** routes without leaking PII; security headers middleware aligns with hardened Docker/K8s.
+
+### Success criteria (0.3)
+
+- A **single reference app** demonstrates login → JWT (or first-party token) → Streamlit page calling FastAPI with **the same identity** and **no duplicate auth logic**.
+- Docs include a **security checklist** (cookies, CSRF, `root_path`, token storage, HTTPS).
+- Optional **`fluxlit[auth]`** (name TBD) installs audited auth dependencies with pinned lower bounds.
 
 ---
 
@@ -152,23 +228,26 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 ### Goals
 
 - Production-safe patterns that work behind corporate reverse proxies and modern IdPs.
+- **Version 0.3** delivers the first concrete slice of this phase; later 0.x releases deepen observability (Phase 4) and ecosystem plugins (Phase 6).
 
-### Features
+### Features (summary — detail under **Version 0.3** above)
 
 - **Proxy trust:** headers (e.g. `X-Remote-User`) with explicit allowlists and tests.
-- **Sessions:** signed cookies, optional Redis/session store interface.
-- **JWT:** validate bearer tokens; optional JWKS rotation.
-- **OAuth2/OIDC:** provider plugins (Azure AD, Okta, Google, GitHub) behind a small abstraction.
-- **RBAC:** dependency helpers for FastAPI; Streamlit-side checks via shared session/JWT claims.
+- **Sessions:** signed cookies or opaque server sessions; optional Redis/session store interface; **no long-lived secrets in Streamlit state**.
+- **JWT:** validate bearer tokens; **JWKS** with **kid** rotation and caching; **aud** / **iss** enforcement.
+- **OAuth2/OIDC:** Authorization Code + **PKCE**, token exchange, provider presets behind a small abstraction.
+- **Streamlit ↔ FastAPI:** authenticated **`ApiClient`**, shared claim models, documented header/cookie policy.
+- **RBAC:** dependency helpers for FastAPI; Streamlit-side checks via the same claims DTOs.
 
 ### Enterprise
 
 - Document forward-auth / SSO front door patterns; CAC / smart-card flows where identity arrives via headers.
+- **mTLS** and enterprise IdP notes where identity is asserted by the edge, not the app.
 
 ### Success criteria
 
-- Reference app: login → API + Streamlit both see the same identity claims.
-- Security review checklist in docs (cookies, CSRF, `root_path`, secure headers).
+- Reference app: login → API + Streamlit both see the **same validated identity** without duplicating JWT logic.
+- Security review checklist in docs (cookies, CSRF, `root_path`, secure headers, token storage).
 
 ---
 
@@ -237,7 +316,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 | Gateway HTTP | Partial (routing) | Proxy integration with mock upstream |
 | Gateway WebSocket | Manual | Automated stability / reconnect cases |
 | Runtime orchestration | Manual | CI smoke or subprocess contract tests |
-| Auth (Phase 3) | — | Unit + integration with fake IdP |
+| Auth (Phase 3 / v0.3) | — | Unit + integration with fake OIDC / JWKS; ApiClient redaction tests |
 | `root_path` / forwards | — | Regression tests with TestClient + headers |
 | Streamlit URL-bound session (Phase 2 follow-on) | — | AppTest: re-run with same query params + store contract |
 
