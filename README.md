@@ -1,6 +1,11 @@
 # FluxLit (`fluxlit`)
 
 [![Documentation Status](https://readthedocs.org/projects/fluxlit/badge/?version=stable)](https://fluxlit.readthedocs.io/en/stable/?badge=stable)
+[![PyPI version](https://img.shields.io/pypi/v/fluxlit)](https://pypi.org/project/fluxlit/)
+[![Python versions](https://img.shields.io/pypi/pyversions/fluxlit.svg)](https://pypi.org/project/fluxlit/)
+[![CI](https://github.com/eddiethedean/fluxlit/actions/workflows/ci.yml/badge.svg)](https://github.com/eddiethedean/fluxlit/actions/workflows/ci.yml)
+[![Release](https://github.com/eddiethedean/fluxlit/actions/workflows/release.yml/badge.svg)](https://github.com/eddiethedean/fluxlit/actions/workflows/release.yml)
+[![License](https://img.shields.io/pypi/l/fluxlit)](https://github.com/eddiethedean/fluxlit/blob/main/LICENSE)
 
 Production-oriented unified runtime for **FastAPI** and **Streamlit**: one public port, one CLI, and a single `FluxLit` app object for APIs plus UI pages.
 
