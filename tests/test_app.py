@@ -62,3 +62,13 @@ def test_enable_request_logging_emits_api_log(
     client = TestClient(gateway)
     client.get("/api/echo")
     assert any(r.name == "fluxlit.api" and "GET" in r.getMessage() for r in caplog.records)
+
+
+def test_enable_security_headers_adds_x_content_type_options() -> None:
+    settings = FluxlitSettings(enable_security_headers=True)
+    fl = FluxLit(title="T", settings=settings)
+    gateway = build_gateway(fl.api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    r = client.get("/api/healthz")
+    assert r.status_code == 200
+    assert r.headers.get("x-content-type-options") == "nosniff"

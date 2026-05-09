@@ -48,6 +48,22 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
+.. automodule:: fluxlit.jwt_auth
+   :members:
+   :show-inheritance:
+
+.. automodule:: fluxlit.oidc
+   :members:
+   :show-inheritance:
+
+.. automodule:: fluxlit.streamlit_auth
+   :members:
+   :show-inheritance:
+
+.. automodule:: fluxlit.security_middleware
+   :members:
+   :show-inheritance:
+
 .. automodule:: fluxlit.page
    :members:
    :show-inheritance:

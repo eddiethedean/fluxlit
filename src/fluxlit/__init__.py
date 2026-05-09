@@ -11,7 +11,44 @@ The ``fluxlit`` console script (see :mod:`fluxlit.cli`) runs the combined dev/pr
 from fluxlit.app import FluxLit
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
+from fluxlit.jwt_auth import (
+    JWTAuthConfig,
+    JWTBearer,
+    RequireRoles,
+    RequireScopes,
+    StandardClaims,
+    issue_hs256_access_token,
+)
+from fluxlit.oidc import (
+    GenericOIDCClient,
+    GenericOIDCClientConfig,
+    OIDCBFFConfig,
+    OIDCProvider,
+    pkce_pair,
+    register_oidc_bff_routes,
+)
+from fluxlit.streamlit_auth import bearer_headers_from_session, exchange_auth_code_from_query
 from fluxlit.testing import FluxLitTestClient
 
-__all__ = ["ApiClient", "FluxLitTestClient", "FluxlitSettings", "FluxLit", "__version__"]
+__all__ = [
+    "ApiClient",
+    "FluxLitTestClient",
+    "FluxlitSettings",
+    "FluxLit",
+    "JWTAuthConfig",
+    "JWTBearer",
+    "OIDCBFFConfig",
+    "OIDCProvider",
+    "GenericOIDCClient",
+    "GenericOIDCClientConfig",
+    "RequireRoles",
+    "RequireScopes",
+    "StandardClaims",
+    "bearer_headers_from_session",
+    "exchange_auth_code_from_query",
+    "issue_hs256_access_token",
+    "pkce_pair",
+    "register_oidc_bff_routes",
+    "__version__",
+]
 __version__ = "0.2.0"

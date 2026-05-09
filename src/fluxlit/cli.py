@@ -261,6 +261,34 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
             )
         )
 
+    rows.append(
+        (
+            "jwt_clock_skew",
+            "WARN",
+            "If using JWT or OIDC, keep host clocks synchronized (NTP); validation uses exp/nbf.",
+        )
+    )
+
+    if fl is not None and fl.settings.root_path and not fl.settings.public_base_url.strip():
+        rows.append(
+            (
+                "oauth_public_base_url",
+                "WARN",
+                "root_path set but public_base_url empty — set FLUXLIT_PUBLIC_BASE_URL for OAuth",
+            )
+        )
+
+    cors_on = fl is not None and bool(fl.settings.cors_allow_origins)
+    sec_off = fl is not None and not fl.settings.enable_security_headers
+    if cors_on and sec_off:
+        rows.append(
+            (
+                "security_headers",
+                "WARN",
+                "CORS on, security headers off — consider FLUXLIT_ENABLE_SECURITY_HEADERS=1",
+            )
+        )
+
     return rows
 
 

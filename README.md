@@ -46,6 +46,12 @@ FluxLit targets teams that want FastAPI for HTTP APIs and Streamlit for interact
 pip install fluxlit
 ```
 
+JWT validation, JWKS, and OIDC/BFF helpers require the optional extra:
+
+```bash
+pip install "fluxlit[auth]"
+```
+
 For local development of FluxLit itself:
 
 ```bash

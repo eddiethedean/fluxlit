@@ -37,6 +37,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+auth = [
+  "PyJWT[crypto]>=2.8.0",
+  "cryptography>=42.0.0",
+]
 dev = [
   "mypy>=1.8",
   "pytest>=8.0",
@@ -45,6 +49,9 @@ dev = [
   "pytest-xdist>=3.8.0",
   "ruff>=0.4",
   "tomli>=2.0",
+  # JWT/OIDC tests and type-checking import PyJWT
+  "PyJWT[crypto]>=2.8.0",
+  "cryptography>=42.0.0",
 ]
 docs = [
   "furo>=2024.1",
@@ -67,6 +74,7 @@ packages = ["src/fluxlit"]
 [tool.hatch.build.targets.sdist]
 include = [
   "src/fluxlit",
+  "examples",
   "docs",
   "LICENSE",
   "README.md",

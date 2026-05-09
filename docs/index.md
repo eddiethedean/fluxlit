@@ -20,6 +20,9 @@ caption: User guide
 quickstart
 architecture
 configuration
+security
+migration-auth
+auth-recipes
 cli
 testing
 contributing

@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
@@ -22,6 +23,7 @@ from fluxlit.logging_context import (
     reset_request_id,
     set_request_id,
 )
+from fluxlit.security_middleware import SecurityHeadersMiddleware
 
 _api_log = logging.getLogger("fluxlit.api")
 
@@ -63,6 +65,17 @@ class FluxLit:
 
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
+
+        if self.settings.enable_security_headers:
+            self.api.add_middleware(SecurityHeadersMiddleware)
+        if self.settings.cors_allow_origins:
+            self.api.add_middleware(
+                CORSMiddleware,
+                allow_origins=list(self.settings.cors_allow_origins),
+                allow_credentials=self.settings.cors_allow_credentials,
+                allow_methods=["*"],
+                allow_headers=["*"],
+            )
 
         if self.settings.enable_request_logging:
 

@@ -27,4 +27,11 @@
 
 ## Unreleased
 
-_No changes yet._
+- **Auth (optional `fluxlit[auth]`):** JWT bearer validation with HS256 (dev) or JWKS (RS256/ES256), `RequireScopes` / `RequireRoles`, first-party HS256 minting for BFF flows.
+- **OIDC:** `GenericOIDCClient` (OpenID discovery + Authorization Code with PKCE), `register_oidc_bff_routes` with one-time `auth_code` exchange for Streamlit-safe token handoff.
+- **Forward auth:** `TrustedProxyUser` / `TrustedProxyUserConfig` with optional HTTPS and client-host checks.
+- **Client:** `ApiClient` `default_headers`, `auth_header_factory`, `propagate_request_id`, and `ApiClient.for_fluxlit(bearer_token=...)`.
+- **Streamlit:** `exchange_auth_code_from_query`, `bearer_headers_from_session`.
+- **Security:** opt-in `FluxlitSettings.enable_security_headers` and CORS (`cors_allow_origins`, `cors_allow_credentials`); `public_base_url` for OAuth redirects.
+- **CLI:** `fluxlit doctor` JWT clock-skew note, OAuth/CORS guidance.
+- **Docs:** security architecture, migration guide, reference example under `examples/reference_auth/`.

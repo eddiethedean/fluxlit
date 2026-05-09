@@ -26,6 +26,39 @@ def test_api_client_uses_env_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
         }
 
 
+def test_api_client_merges_auth_factory_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(dict(request.headers))
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(
+        base_url="http://127.0.0.1:8000/api",
+        auth_header_factory=lambda: {"Authorization": "Bearer secret"},
+    ) as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        client.get("/ping")
+    assert captured.get("authorization") == "Bearer secret"
+
+
+def test_api_client_for_fluxlit_bearer(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(dict(request.headers))
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient.for_fluxlit(bearer_token="tok", base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        client.get("/x")
+    assert captured.get("authorization") == "Bearer tok"
+
+
 def test_api_client_default_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
     with ApiClient() as c:

@@ -58,3 +58,24 @@ class FluxlitSettings(BaseSettings):
         default=False,
         description="Log API requests with X-Request-ID (or generated id) at INFO.",
     )
+    enable_security_headers: bool = Field(
+        default=False,
+        description="If True, add baseline security headers (HSTS, X-Content-Type-Options, etc.).",
+    )
+    cors_allow_origins: list[str] = Field(
+        default_factory=list,
+        description=(
+            "If non-empty, enable CORS for these origins. Empty list disables CORS middleware."
+        ),
+    )
+    cors_allow_credentials: bool = Field(
+        default=False,
+        description="Set Access-Control-Allow-Credentials when CORS is enabled.",
+    )
+    public_base_url: str = Field(
+        default="",
+        description=(
+            "Public origin for OAuth redirects (e.g. https://app.example.com). "
+            "If empty, derive from request.url_for / X-Forwarded-* in route handlers."
+        ),
+    )
