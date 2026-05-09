@@ -1,0 +1,74 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fluxlit"
+version = "0.1.0"
+description = "Production-oriented unified runtime for FastAPI + Streamlit"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "FluxLit contributors" }]
+keywords = ["fastapi", "streamlit", "asgi", "web"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Typing :: Typed",
+]
+dependencies = [
+  "anyio>=4.0",
+  "fastapi>=0.110",
+  "httpx>=0.27",
+  "pydantic-settings>=2.0",
+  "starlette>=0.37",
+  "streamlit>=1.33",
+  "typer>=0.12",
+  "uvicorn[standard]>=0.29",
+  "websockets>=12",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.8",
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.4",
+]
+
+[project.scripts]
+fluxlit = "fluxlit.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/odosmatthews/fluxlit"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fluxlit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/fluxlit", "README.md", "pyproject.toml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+packages = ["fluxlit"]
+mypy_path = ["src"]
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
