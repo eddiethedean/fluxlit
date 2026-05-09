@@ -1,6 +1,6 @@
 # Roadmap
 
-```{include} ../FLUXLIT_ROADMAP.md
+```{include} ../ROADMAP.md
 :relative-docs: docs/
 :relative-images:
 ```

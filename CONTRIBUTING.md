@@ -50,4 +50,4 @@ Open `docs/_build/html/index.html` in a browser. Configuration lives in [`docs/c
 ## Pull requests
 
 - Include tests when changing routing/runtime behavior.
-- Update docs (`README.md`, `docs/`, `FLUXLIT_PLAN.md`, `FLUXLIT_ROADMAP.md`) when you change public behavior.
+- Update docs (`README.md`, `docs/`, `PLAN.md`, `ROADMAP.md`) when you change public behavior.

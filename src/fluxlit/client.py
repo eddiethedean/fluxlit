@@ -64,7 +64,7 @@ class ApiClient:
         Args:
             path: Relative API path.
             model: Pydantic model type for the response body.
-            **kwargs: Forwarded to :meth:`get`.
+            kwargs: Forwarded to :meth:`get`.
         """
         response = self.get(path, **kwargs)
         response.raise_for_status()
@@ -84,7 +84,7 @@ class ApiClient:
             path: Relative API path.
             response_model: Pydantic model type for the response body.
             body: Request JSON (from ``model_dump()`` if a :class:`~pydantic.BaseModel`).
-            **kwargs: Forwarded to :meth:`post`.
+            kwargs: Forwarded to :meth:`post`.
         """
         json_body = body.model_dump() if isinstance(body, BaseModel) else body
         response = self.post(path, json=json_body, **kwargs)

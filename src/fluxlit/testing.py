@@ -20,16 +20,12 @@ from fluxlit.gateway import build_gateway
 class FluxLitTestClient:
     """Test harness that mirrors production routing (API prefix + gateway).
 
-    **API:** :attr:`api` is a Starlette :class:`~starlette.testclient.TestClient` wired
+    **API** — :attr:`api` is a Starlette :class:`~starlette.testclient.TestClient` wired
     through :func:`fluxlit.gateway.build_gateway`, so paths include the configured
     ``api_prefix`` and ``/healthz`` behaves like production.
 
-    **Streamlit:** :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit_main`
+    **Streamlit** — :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit_main`
     with the same environment variables the runtime sets.
-
-    Attributes:
-        app: :class:`~fluxlit.app.FluxLit` instance under test.
-        api_prefix: Public API mount path for :func:`~fluxlit.gateway.build_gateway`.
     """
 
     app: FluxLit

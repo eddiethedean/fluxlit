@@ -71,8 +71,8 @@ include = [
   "README.md",
   "CHANGELOG.md",
   "CONTRIBUTING.md",
-  "FLUXLIT_PLAN.md",
-  "FLUXLIT_ROADMAP.md",
+  "PLAN.md",
+  "ROADMAP.md",
   "pyproject.toml",
   ".readthedocs.yaml",
 ]

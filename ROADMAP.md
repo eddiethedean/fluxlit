@@ -129,7 +129,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 | Item | Notes |
 |------|--------|
-| **Architecture note** | Short section in [FLUXLIT_PLAN.md](FLUXLIT_PLAN.md) tying this to the sidecar model. |
+| **Architecture note** | Short section in [PLAN.md](PLAN.md) tying this to the sidecar model. |
 | **User guide** | README pattern: minimal example (memory store + query param + hydrate on run). |
 | **Optional API** | `fluxlit.streamlit_session` (name TBD): `SessionStore` protocol, in-memory implementation, Redis adapter later; helper to “ensure sid in URL + hydrate”. |
 | **Tests** | Streamlit **AppTest**: two runs with identical `st.query_params` assert restored state; contract tests for store. |
@@ -275,4 +275,4 @@ Roadmap phases do not map 1:1 to semver. Expect **0.x** to move quickly; **1.0**
 ## Related documentation
 
 - [README.md](README.md) — install, quick start, CLI, configuration, routing
-- [FLUXLIT_PLAN.md](FLUXLIT_PLAN.md) — product vision, architecture, risks, deployment goals
+- [PLAN.md](PLAN.md) — product vision, architecture, risks, deployment goals

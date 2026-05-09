@@ -33,4 +33,4 @@ This matches Streamlit’s supported deployment model, avoids unsupported deep e
 - **Production-minded:** proxy-friendly (`root_path`, forwarded headers where configured), observable hooks (request ids, optional API access logging).
 - **Honest about Streamlit:** subprocess + WebSocket proxy until a native single-process model is proven.
 
-Further product context: see the [architecture and product plan](https://github.com/odosmatthews/fluxlit/blob/main/FLUXLIT_PLAN.md) in the repository.
+Further product context: see the [architecture and product plan](https://github.com/odosmatthews/fluxlit/blob/main/PLAN.md) in the repository.

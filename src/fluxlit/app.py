@@ -29,12 +29,12 @@ _api_log = logging.getLogger("fluxlit.api")
 class FluxLit:
     """Combine a FastAPI application and registered Streamlit pages in one object.
 
-    - Use ``.api`` for HTTP routes, dependencies, and OpenAPI (mounted under
-      ``FluxlitSettings.api_mount_path`` on the public gateway).
-    - Use :meth:`page` or :meth:`discover_pages` to register Streamlit UI; the runtime
-      builds ``st.navigation`` from ``.pages``.
+    Use :attr:`api` for HTTP routes, dependencies, and OpenAPI (mounted under
+    :attr:`~fluxlit.config.FluxlitSettings.api_mount_path` on the public gateway).
+    Use :meth:`page` or :meth:`discover_pages` to register Streamlit UI; the runtime
+    builds ``st.navigation`` from registered pages.
 
-    A minimal ``GET /healthz`` route is registered on ``.api`` (hidden from OpenAPI).
+    A minimal ``GET /healthz`` route is registered on :attr:`api` (hidden from OpenAPI).
 
     Args:
         title: If set, overrides ``FluxlitSettings.title`` for this instance.

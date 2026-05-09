@@ -1,6 +1,6 @@
 # FluxLit — Product & Architecture Plan
 
-This document is the **product and architecture** companion to the [development roadmap](FLUXLIT_ROADMAP.md). It describes what FluxLit (`fluxlit`) is for, how the runtime is structured today, and where it is headed.
+This document is the **product and architecture** companion to the [development roadmap](ROADMAP.md). It describes what FluxLit (`fluxlit`) is for, how the runtime is structured today, and where it is headed.
 
 ---
 
@@ -78,11 +78,11 @@ Streamlit continues to use its normal URL space (`/_stcore/...`, etc.) on the **
 
 ### Future: native ASGI (research)
 
-The [roadmap](FLUXLIT_ROADMAP.md) Phase 5 covers optional single-process or embedded modes if Streamlit and ASGI semantics align without breaking websocket behavior.
+The [roadmap](ROADMAP.md) Phase 5 covers optional single-process or embedded modes if Streamlit and ASGI semantics align without breaking websocket behavior.
 
 ### Browser refresh and session continuity (no cookies)
 
-Full page reload can drop Streamlit’s in-process session unless state is **rehydrated** from somewhere else. FluxLit’s preferred direction—documented as **Phase 2 follow-on** in the [roadmap](FLUXLIT_ROADMAP.md)—is an **opaque token in the URL query string** (`st.query_params`) plus a **server-side store** (memory for single-worker dev, Redis or similar for production). That avoids **HTTP cookies** while keeping refresh continuity explicit and shareable links treated as secrets over HTTPS.
+Full page reload can drop Streamlit’s in-process session unless state is **rehydrated** from somewhere else. FluxLit’s preferred direction—documented as **Phase 2 follow-on** in the [roadmap](ROADMAP.md)—is an **opaque token in the URL query string** (`st.query_params`) plus a **server-side store** (memory for single-worker dev, Redis or similar for production). That avoids **HTTP cookies** while keeping refresh continuity explicit and shareable links treated as secrets over HTTPS.
 
 ---
 
@@ -159,4 +159,4 @@ Broader possibilities (post–1.0): plugins, shared UI patterns, background jobs
 ## Related documentation
 
 - [README](README.md) — install, quick start, CLI, configuration
-- [FLUXLIT_ROADMAP.md](FLUXLIT_ROADMAP.md) — phased delivery and current status
+- [ROADMAP.md](ROADMAP.md) — phased delivery and current status

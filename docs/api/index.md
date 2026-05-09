@@ -5,6 +5,7 @@ Generated from docstrings with Sphinx autodoc. Public modules:
 ```{eval-rst}
 .. automodule:: fluxlit
    :members:
+   :exclude-members: ApiClient, FluxLit, FluxlitSettings, FluxLitTestClient
    :show-inheritance:
 
 .. automodule:: fluxlit.app

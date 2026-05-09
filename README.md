@@ -18,7 +18,7 @@ Production-oriented unified runtime for **FastAPI** and **Streamlit**: one publi
 | Changelog | [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) |
 | Roadmap | [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
 
-**Also in the repo:** [Product & architecture plan](https://github.com/odosmatthews/fluxlit/blob/main/FLUXLIT_PLAN.md) (source for long-form product context; overview is on Read the Docs under [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html)).
+**Also in the repo:** [Product & architecture plan](https://github.com/odosmatthews/fluxlit/blob/main/PLAN.md) (source for long-form product context; overview is on Read the Docs under [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html)).
 
 ---
 
