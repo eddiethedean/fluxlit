@@ -1,0 +1,2 @@
+# Consistent LF in the working tree on all platforms (avoids Ruff/format CI failures on Windows).
+* text=auto eol=lf
