@@ -158,6 +158,11 @@ def run_unified(
         os.environ["FLUXLIT_API_PREFIX"] = api_prefix
 
         if reload:
+            sys.stderr.write(
+                "[fluxlit] --reload restarts the API gateway only; the Streamlit process "
+                "does not reload. Restart fluxlit to apply Streamlit page changes.\n"
+            )
+            sys.stderr.flush()
             config = uvicorn.Config(
                 "fluxlit.runtime:create_gateway_app",
                 host=host,

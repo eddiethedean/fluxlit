@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
+from pydantic import BaseModel, TypeAdapter
+
+T = TypeVar("T")
 
 
 class ApiClient:
@@ -34,6 +37,24 @@ class ApiClient:
 
     def delete(self, path: str, **kwargs: Any) -> httpx.Response:
         return self.request("DELETE", path, **kwargs)
+
+    def get_model(self, path: str, model: type[T], **kwargs: Any) -> T:
+        response = self.get(path, **kwargs)
+        response.raise_for_status()
+        return TypeAdapter(model).validate_json(response.content)
+
+    def post_model(
+        self,
+        path: str,
+        response_model: type[T],
+        *,
+        body: BaseModel | dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> T:
+        json_body = body.model_dump() if isinstance(body, BaseModel) else body
+        response = self.post(path, json=json_body, **kwargs)
+        response.raise_for_status()
+        return TypeAdapter(response_model).validate_json(response.content)
 
     def close(self) -> None:
         self._client.close()

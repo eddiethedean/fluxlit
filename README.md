@@ -61,9 +61,11 @@ def home(st, client):
     st.write(client.get("/users").json())
 ```
 
-Run the unified server (default import path `app:app`):
+Run the unified server (default import path `app:app`, or `target` from `fluxlit.toml` / `[tool.fluxlit]`):
 
 ```bash
+fluxlit dev
+# or explicitly:
 fluxlit dev app:app
 ```
 
@@ -73,6 +75,8 @@ fluxlit dev app:app
 - **Health:** `http://127.0.0.1:8000/api/healthz` (hidden from OpenAPI).
 
 From Streamlit code, `ApiClient` calls the API using a base URL that includes `/api` (set automatically as `FLUXLIT_INTERNAL_API_BASE` when using `fluxlit dev` / `fluxlit run`). Use paths like `client.get("/users")`, not `client.get("/api/users")`.
+
+For typed JSON responses, use `ApiClient.get_model` / `post_model` with Pydantic models.
 
 ---
 
@@ -102,19 +106,41 @@ Note: the API prefix is configurable via `FluxlitSettings.api_mount_path` (defau
 
 | Command | Description |
 |--------|-------------|
-| `fluxlit dev [target]` | Development server: Streamlit subprocess + gateway. Default `target` is `app:app`. |
+| `fluxlit dev [target]` | Development server: Streamlit subprocess + gateway. Default `target`: CLI arg → `fluxlit.toml` / `pyproject.toml` `[tool.fluxlit]` → `app:app`. |
 | `fluxlit run [target]` | Same stack without auto-reload. |
+| `fluxlit doctor [target]` | Environment checks (import, bind, deps, `FLUXLIT_INTERNAL_API_BASE`). Exits non-zero on failures unless `--warnings-only`. |
+| `fluxlit build [target]` | Write a starter `Dockerfile` and `.dockerignore` (use `--output` / `-o`, `--force` to overwrite). |
 | `fluxlit new <name>` | Scaffold a minimal `app.py` in a new directory. |
 | `python -m fluxlit` | Equivalent entry to the `fluxlit` console script. |
 
 Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-headers`, `--forwarded-allow-ips`.
-`fluxlit dev` also supports `--reload` (experimental; API gateway reload may not restart Streamlit).
+`fluxlit dev --reload` reloads the **API gateway process only** via Uvicorn; the Streamlit subprocess is **not** restarted. Use `--reload-scope=gateway` (default) or restart `fluxlit` to pick up Streamlit UI changes.
 
 ---
 
 ## Configuration
 
-`FluxlitSettings` ([`src/fluxlit/config.py`](src/fluxlit/config.py)) loads from environment variables prefixed with **`FLUXLIT_`** and from a **`.env`** file if present.
+**Precedence:** CLI flags override environment variables; environment overrides project file defaults; then `FluxlitSettings` field defaults.
+
+### Project file
+
+- **`fluxlit.toml`** in the current working directory (top-level keys), or
+- **`[tool.fluxlit]`** in **`pyproject.toml`** if `fluxlit.toml` is absent.
+
+If both exist, **`fluxlit.toml` wins**. Supported keys include `target`, `gateway_host`, `gateway_port`, `log_level`, `api_mount_path`, and `root_path`.
+
+Example `fluxlit.toml`:
+
+```toml
+target = "app:app"
+gateway_host = "127.0.0.1"
+gateway_port = 8000
+log_level = "info"
+```
+
+### Environment (`FluxlitSettings`)
+
+[`src/fluxlit/config.py`](src/fluxlit/config.py) loads variables prefixed with **`FLUXLIT_`** and from a **`.env`** file if present.
 
 | Variable | Role |
 |----------|------|
@@ -122,6 +148,7 @@ Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-he
 | `FLUXLIT_GATEWAY_HOST` / `FLUXLIT_GATEWAY_PORT` | Defaults for binding (also used in settings; CLI overrides bind for dev/run). |
 | `FLUXLIT_ROOT_PATH` | ASGI root path behind a reverse proxy (passed through to FastAPI). |
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side `ApiClient` (includes `/api`). |
+| `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log each API request (method, path, status) at INFO with request id context. |
 
 ---
 
@@ -130,13 +157,18 @@ Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-he
 ```text
 my_app/
 ├── app.py              # FluxLit instance, @app.api routes, @app.page handlers
-├── pages/              # Optional: extra Streamlit modules if you extend beyond @app.page
+├── pkg/                # Optional: Python package for discover_pages
+│   ├── __init__.py
+│   └── pages/          # call discover_pages("pages", package="pkg")
+│       ├── __init__.py
+│       └── reports.py  # def register(app): @app.page(...) ...
 ├── services/
 ├── static/
+├── fluxlit.toml        # Optional defaults for CLI
 └── .env                # FLUXLIT_* and secrets (do not commit)
 ```
 
-A committed **`fluxlit.toml`** (or similar) config file is on the [roadmap](FLUXLIT_ROADMAP.md); today, prefer env / `.env` and CLI flags.
+**Optional page packages:** each `pkg/pages/*.py` module may define `register(app: FluxLit) -> None` that attaches `@app.page` handlers; call `app.discover_pages("pages", package="pkg")` after constructing `FluxLit`.
 
 ---
 
@@ -148,7 +180,9 @@ A committed **`fluxlit.toml`** (or similar) config file is on the [roadmap](FLUX
 | `cli` | Typer CLI |
 | `client` | `ApiClient` (httpx) for server-side API calls |
 | `config` | `FluxlitSettings` |
-| `gateway` | ASGI router + HTTP/WebSocket proxy |
+| `gateway` | ASGI router + HTTP/WebSocket proxy (request id context + debug logs) |
+| `project_config` | `fluxlit.toml` / `[tool.fluxlit]` loading |
+| `logging_context` | Request id `ContextVar` for gateway / API |
 | `runtime` | Subprocess orchestration, Uvicorn entry |
 | `streamlit_main` | Streamlit entry script (`FLUXLIT_APP`) |
 | `testing` | `FluxLitTestClient` (FluxLit-native API + Streamlit test helpers) |
@@ -200,16 +234,18 @@ python -m mypy src/fluxlit
 
 - Single public port; managed Streamlit subprocess
 - Gateway: `/api` → FastAPI; HTTP + WebSocket proxy to Streamlit
-- `@app.page` + `st.navigation` integration
-- `fluxlit new`, `dev`, `run`
-- Typed package; Ruff + Mypy + Pytest in-tree
+- `@app.page` + `st.navigation` integration; optional `discover_pages` for package layouts
+- `fluxlit new`, `dev`, `run`, `doctor`, `build`
+- `fluxlit.toml` / `[tool.fluxlit]` project defaults; `ApiClient.get_model` / `post_model`
+- Request id propagation (`X-Request-ID`) and optional API access logging
+- Typed package; Ruff + Mypy + Pytest in-tree; CI on GitHub Actions
 
 **Planned** (see [roadmap](FLUXLIT_ROADMAP.md))
 
-- CI, hardened reload/shutdown, first-class health/metrics
+- Hardened reload (Streamlit lifecycle), first-class health/metrics
 - Auth (JWT, sessions, proxy headers, OAuth)
-- Docker/Kubernetes examples, `doctor` / `build` CLI
-- Richer config file and optional page discovery
+- Official Docker/Kubernetes examples beyond `fluxlit build` templates
+- OpenAPI-generated client (optional)
 
 ---
 

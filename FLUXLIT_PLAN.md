@@ -80,6 +80,10 @@ Streamlit continues to use its normal URL space (`/_stcore/...`, etc.) on the **
 
 The [roadmap](FLUXLIT_ROADMAP.md) Phase 5 covers optional single-process or embedded modes if Streamlit and ASGI semantics align without breaking websocket behavior.
 
+### Browser refresh and session continuity (no cookies)
+
+Full page reload can drop Streamlit’s in-process session unless state is **rehydrated** from somewhere else. FluxLit’s preferred direction—documented as **Phase 2 follow-on** in the [roadmap](FLUXLIT_ROADMAP.md)—is an **opaque token in the URL query string** (`st.query_params`) plus a **server-side store** (memory for single-worker dev, Redis or similar for production). That avoids **HTTP cookies** while keeping refresh continuity explicit and shareable links treated as secrets over HTTPS.
+
 ---
 
 ## Package modules (`fluxlit`)
@@ -87,16 +91,18 @@ The [roadmap](FLUXLIT_ROADMAP.md) Phase 5 covers optional single-process or embe
 | Area | Module | Responsibility |
 |------|--------|----------------|
 | App | `fluxlit.app` | `FluxLit`, `@app.page`, FastAPI instance |
-| CLI | `fluxlit.cli` | `fluxlit dev`, `run`, `new` |
+| CLI | `fluxlit.cli` | `fluxlit dev`, `run`, `new`, `doctor`, `build` |
 | Config | `fluxlit.config` | `FluxlitSettings` / `FLUXLIT_*` |
+| Project file | `fluxlit.project_config` | `fluxlit.toml` / `[tool.fluxlit]` defaults |
 | Client | `fluxlit.client` | `ApiClient` for server-side calls into `/api` |
 | Testing | `fluxlit.testing` | `FluxLitTestClient` (API gateway TestClient + Streamlit AppTest helper) |
 | Gateway | `fluxlit.gateway` | ASGI dispatch and reverse proxy |
+| Logging | `fluxlit.logging_context` | Request id context for gateway / API |
 | Runtime | `fluxlit.runtime` | Load `FluxLit` by import path, spawn Streamlit, run Uvicorn |
 | Streamlit | `fluxlit.streamlit_main` | Streamlit script; reads `FLUXLIT_APP`, builds navigation |
 | Helpers | `fluxlit.api`, `fluxlit.auth` | Router helpers; auth placeholders |
 
-There is no `fluxlit.deploy` module yet; deployment artifacts are planned (Docker/K8s examples, docs).
+`fluxlit build` emits starter container files; a dedicated `fluxlit.deploy` module and richer K8s examples remain future work.
 
 ---
 

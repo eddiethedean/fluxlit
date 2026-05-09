@@ -18,8 +18,9 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 **Gaps vs “production”**
 
 - CI workflow (Linux / macOS / Windows matrix) exists; expand with higher-signal integration tests over time.
-- Reload is experimental (`fluxlit dev --reload`); Streamlit lifecycle on reload is not fully orchestrated.
-- Auth, metrics, Docker/K8s artifacts, and `fluxlit build` are not implemented.
+- Reload is gateway-only (`fluxlit dev --reload`); Streamlit lifecycle on reload is not orchestrated.
+- Auth, metrics, and hardened Docker/K8s beyond `fluxlit build` templates are not implemented.
+- **Browser refresh continuity** for Streamlit (cookie-free, URL + server store) is specified under **Phase 2 follow-on** in this file but not implemented yet.
 
 ---
 
@@ -37,8 +38,8 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | Lint + format (Ruff)        | Done   |
 | Typing (Mypy strict)        | Done   |
 | Tests (Pytest)              | Done   |
-| CI (install, test, lint)    | **Todo** |
-| Contributor docs / changelog | Todo   |
+| CI (install, test, lint)    | Done   |
+| Contributor docs / changelog | Done   |
 
 ### Stack (locked for 0.x)
 
@@ -80,20 +81,69 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 ### Planned features
 
-| Feature | Notes |
-|--------|--------|
-| **Config file** | e.g. `fluxlit.toml` / `[tool.fluxlit]` — default target, host/port, log level. |
-| **Page discovery** | Optional convention: auto-register `pages/*.py` alongside explicit `@app.page`. |
-| **Typed client** | Pydantic models or OpenAPI-generated client for `ApiClient` (sync first). |
-| **Hot reload** | Stable story: reload API only vs full stack; document limits with Streamlit. |
-| **Logging** | Structured logging context (request id, route) shared across gateway and app hooks. |
-| **`fluxlit doctor`** | Check Python version, deps, ports, `FLUXLIT_*`, Streamlit version. |
-| **`fluxlit build`** | Define scope: Docker context only vs wheel + lockfile export. |
+| Feature | Notes | Status |
+|--------|-------|--------|
+| **Config file** | `fluxlit.toml` (top-level keys) / `[tool.fluxlit]` in `pyproject.toml`; `fluxlit.toml` wins if both exist. | **Done** |
+| **Page discovery** | Opt-in `FluxLit.discover_pages("pages", package="pkg")` + `register(app)` per module. | **Done** |
+| **Typed client** | `ApiClient.get_model` / `post_model` (Pydantic). OpenAPI codegen deferred. | **Done** (sync helpers) |
+| **Hot reload** | Documented gateway-only reload; stderr warning; `--reload-scope=gateway`. | **Done** |
+| **Logging** | Request id `ContextVar`, gateway DEBUG line, optional `enable_request_logging` on FastAPI. | **Done** |
+| **`fluxlit doctor`** | Import, bind, deps, `FLUXLIT_INTERNAL_API_BASE`, Streamlit version WARN; `--warnings-only`. | **Done** |
+| **`fluxlit build`** | Starter `Dockerfile` + `.dockerignore` (wheel/lockfile export still future). | **Done** (Docker template) |
 
 ### Success criteria
 
-- `fluxlit doctor` catches the top three “it won’t start” issues before runtime.
-- Reload path documented; no silent partial updates.
+- `fluxlit doctor` catches common “it won’t start” issues before runtime. **Met** (import, bind, env shape).
+- Reload path documented; no silent partial updates. **Met** (warning + docs).
+
+---
+
+## Phase 2 follow-on — Streamlit survives browser refresh (no cookies)
+
+### Goals
+
+- After a **full browser reload** (F5 / reopen tab to the same app URL), restore meaningful **application state** without relying on **HTTP cookies** (`Set-Cookie` / browser cookie jar).
+
+### Why this is non-trivial
+
+- Streamlit ties **`st.session_state`** to a **server session** tied to the live WebSocket/script run. A hard refresh often starts a **new** session, so in-memory state appears “lost” unless something **outside** that default session rehydrates it.
+
+### Constraint
+
+- **No cookies** for session binding or continuity. (Other storage mechanisms such as `localStorage` are intentionally **out of scope for v1** of this item to keep the contract simple: **URL + server store only**.)
+
+### Recommended design: URL-bound opaque key + server-side store
+
+| Piece | Detail |
+|--------|--------|
+| **Client-visible binding** | Stable **query parameter** on the public URL (e.g. `?fluxlit_sid=<opaque_token>`), readable via Streamlit **`st.query_params`**. Optional: configurable parameter name via `FluxlitSettings` / app helper. |
+| **Token** | Cryptographically random (e.g. **≥128 bits**), unguessable; treat as a **secret** (same class as a bearer link). |
+| **Store** | **Server-side** map: `token → serialized state blob` (or structured dict). Implementations: **in-memory** (single-worker dev only), **Redis** / similar (production, multi-worker), behind a small **`SessionStore` protocol** so apps can inject a backend. |
+| **Hydration flow** | First visit without a token: mint token, persist initial state (or empty), **set query params** so the URL includes the token (`st.query_params` / navigation preserves params). On every run: if param present, **load** from store into `st.session_state` (merge vs replace is an app policy; FluxLit can document a default). |
+| **Multipage** | With **`st.navigation`**, every linked page must **preserve** the same query string (helper API or wrapper pattern in docs) so refresh on any page still resolves the same token. |
+| **Gateway** | No cookie logic required; proxy already forwards path + query to Streamlit. Optional future: strip token from logs / metrics for privacy. |
+| **Security / UX** | **HTTPS** in production; document **link leakage** (bookmarks, Referer, shared URLs). Offer **TTL** and optional **rotation** in the store API; never log raw tokens at INFO. |
+| **What “state” means** | Not Streamlit widget object identity—**serializable app state** the product cares about (filters, wizard step, draft form dict). Apps opt in to what gets persisted. |
+
+### Deliverables (proposed)
+
+| Item | Notes |
+|------|--------|
+| **Architecture note** | Short section in [FLUXLIT_PLAN.md](FLUXLIT_PLAN.md) tying this to the sidecar model. |
+| **User guide** | README pattern: minimal example (memory store + query param + hydrate on run). |
+| **Optional API** | `fluxlit.streamlit_session` (name TBD): `SessionStore` protocol, in-memory implementation, Redis adapter later; helper to “ensure sid in URL + hydrate”. |
+| **Tests** | Streamlit **AppTest**: two runs with identical `st.query_params` assert restored state; contract tests for store. |
+
+### Success criteria
+
+- Documented pattern works for **single-user** continuity on refresh with **no cookies**, on **one** supported Streamlit minor (pin in docs).
+- Clear **security** guidance (secret URL, HTTPS, TTL).
+- Multi-worker production path documented (**Redis** or equivalent), not just in-memory.
+
+### Relation to other phases
+
+- **Phase 3 (sessions):** may later **combine** URL sid with signed cookies or JWT for **identity**; this item is **continuity**, not authentication.
+- **Phase 4:** observability must **redact** session query params in access logs where possible.
 
 ---
 
@@ -189,6 +239,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 | Runtime orchestration | Manual | CI smoke or subprocess contract tests |
 | Auth (Phase 3) | — | Unit + integration with fake IdP |
 | `root_path` / forwards | — | Regression tests with TestClient + headers |
+| Streamlit URL-bound session (Phase 2 follow-on) | — | AppTest: re-run with same query params + store contract |
 
 ### CI targets
 

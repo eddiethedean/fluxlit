@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from pydantic import BaseModel
 
 from fluxlit.client import ApiClient
+
+
+class _User(BaseModel):
+    name: str
 
 
 def test_api_client_uses_explicit_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -41,3 +46,30 @@ def test_api_client_adds_leading_slash(monkeypatch: pytest.MonkeyPatch) -> None:
     transport = httpx.MockTransport(handler)
     client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
     client.get("users")
+
+
+def test_get_model_parses_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"name": "Ada"})
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        user = client.get_model("/users", _User)
+    assert user.name == "Ada"
+
+
+def test_post_model_parses_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.method == "POST"
+        return httpx.Response(200, json={"name": "Bob"})
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        user = client.post_model("/users", _User, body={"name": "ignored"})
+    assert user.name == "Bob"

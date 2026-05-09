@@ -24,3 +24,7 @@ class FluxlitSettings(BaseSettings):
         default="",
         description="ASGI root path when served behind a reverse proxy (e.g. /myapp).",
     )
+    enable_request_logging: bool = Field(
+        default=False,
+        description="Log API requests with X-Request-ID (or generated id) at INFO.",
+    )

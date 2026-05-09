@@ -1,13 +1,27 @@
 from __future__ import annotations
 
+import importlib
+import logging
+import pkgutil
 from collections.abc import Callable
 from types import FunctionType
 from typing import Any
 
 from fastapi import FastAPI
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.requests import Request
+from starlette.responses import Response
 
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
+from fluxlit.logging_context import (
+    REQUEST_ID_HEADER,
+    new_request_id,
+    reset_request_id,
+    set_request_id,
+)
+
+_api_log = logging.getLogger("fluxlit.api")
 
 
 class FluxLit:
@@ -34,9 +48,63 @@ class FluxLit:
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
 
+        if self.settings.enable_request_logging:
+
+            @self.api.middleware("http")
+            async def _fluxlit_request_log(
+                request: Request, call_next: RequestResponseEndpoint
+            ) -> Response:
+                rid = request.headers.get(REQUEST_ID_HEADER) or new_request_id()
+                token = set_request_id(rid)
+                try:
+                    response = await call_next(request)
+                    _api_log.info(
+                        "%s %s -> %s",
+                        request.method,
+                        request.url.path,
+                        response.status_code,
+                    )
+                    return response
+                finally:
+                    reset_request_id(token)
+
         @self.api.get("/healthz", include_in_schema=False)
         def _healthz() -> dict[str, str]:
             return {"status": "ok"}
+
+    def discover_pages(self, directory: str, *, package: str) -> FluxLit:
+        """Import ``<package>.<directory>.*`` modules and call ``register(app)`` when present.
+
+        Each module (except ``_``-prefixed) may define ``register(app: FluxLit) -> None`` and
+        use ``@app.page`` inside that function.
+        """
+        parent = importlib.import_module(package)
+        paths = getattr(parent, "__path__", None)
+        if paths is None:
+            msg = f"{package!r} must be a package to discover pages"
+            raise TypeError(msg)
+        subpkg = f"{package}.{directory}"
+        try:
+            importlib.import_module(subpkg)
+        except ImportError as e:
+            msg = f"Cannot import page package {subpkg!r}: {e}"
+            raise ImportError(msg) from e
+
+        pkg = importlib.import_module(subpkg)
+        for modinfo in sorted(
+            pkgutil.iter_modules(pkg.__path__, f"{subpkg}."),
+            key=lambda m: m.name,
+        ):
+            if modinfo.ispkg or modinfo.name.rpartition(".")[-1].startswith("_"):
+                continue
+            mod = importlib.import_module(modinfo.name)
+            register = getattr(mod, "register", None)
+            if register is None:
+                continue
+            register(self)
+
+        self._pages.sort(key=lambda t: (t[0], t[1]))
+        return self
 
     def page(
         self, path: str, *, title: str | None = None

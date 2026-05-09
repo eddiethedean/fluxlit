@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
@@ -58,3 +60,13 @@ def test_healthz_not_in_openapi() -> None:
     client = TestClient(gateway)
     body = client.get("/api/openapi.json").json()
     assert "/healthz" not in body.get("paths", {})
+
+
+def test_gateway_log_includes_request_id(api: FastAPI, caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level(logging.DEBUG, logger="fluxlit.gateway")
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    client.get("/api/ping", headers={"X-Request-ID": "unit-test-rid"})
+    assert any(
+        "unit-test-rid" in r.getMessage() for r in caplog.records if r.name == "fluxlit.gateway"
+    )

@@ -1,12 +1,32 @@
 from __future__ import annotations
 
+import logging
 import urllib.parse
 from collections.abc import AsyncIterator
+from typing import cast
 
 import anyio
 import httpx
 import websockets
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from fluxlit.logging_context import (
+    REQUEST_ID_HEADER,
+    new_request_id,
+    reset_request_id,
+    set_request_id,
+)
+
+_gateway_log = logging.getLogger("fluxlit.gateway")
+
+
+def _request_id_from_scope(scope: Scope) -> str:
+    raw = scope.get("headers") or []
+    want = REQUEST_ID_HEADER.lower().encode("latin-1")
+    for k, v in raw:
+        if k.lower() == want:
+            return v.decode("latin-1").strip() or new_request_id()
+    return new_request_id()
 
 
 def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/api") -> ASGIApp:
@@ -21,18 +41,30 @@ def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/a
         if scope["type"] == "lifespan":
             await api_app(scope, receive, send)
             return
-        path = scope.get("path") or ""
-        if path == prefix or path.startswith(f"{prefix}/"):
-            api_scope = _strip_prefix_scope(scope, prefix)
-            await api_app(api_scope, receive, send)
-            return
-        if scope["type"] == "websocket":
-            await _proxy_websocket(scope, receive, send, upstream)
-            return
-        if scope["type"] == "http":
-            await _proxy_http(scope, receive, send, upstream)
-            return
-        await _not_found(send)
+        rid = _request_id_from_scope(scope)
+        token = set_request_id(rid)
+        try:
+            method_or_type = scope.get("method") or scope["type"]
+            path = scope.get("path") or ""
+            _gateway_log.debug(
+                "gateway %s %s request_id=%s",
+                method_or_type,
+                path,
+                rid,
+            )
+            if path == prefix or path.startswith(f"{prefix}/"):
+                api_scope = _strip_prefix_scope(scope, prefix)
+                await api_app(api_scope, receive, send)
+                return
+            if scope["type"] == "websocket":
+                await _proxy_websocket(scope, receive, send, upstream)
+                return
+            if scope["type"] == "http":
+                await _proxy_http(scope, receive, send, upstream)
+                return
+            await _not_found(send)
+        finally:
+            reset_request_id(token)
 
     return app
 
@@ -160,7 +192,7 @@ def _parse_ws_target(scope: Scope, upstream: str) -> str:
     netloc = f"{host}:{port}" if port else host
     base_path = parsed.path.rstrip("/")
     full_path = f"{base_path}{path}" if base_path else path
-    return urllib.parse.urlunparse((scheme, netloc, full_path, "", "", ""))
+    return cast(str, urllib.parse.urlunparse((scheme, netloc, full_path, "", "", "")))
 
 
 async def _proxy_websocket(scope: Scope, receive: Receive, send: Send, upstream: str) -> None:

@@ -30,6 +30,10 @@ python -m mypy src/fluxlit
 - Avoid adding opinionated “magic” around FastAPI and Streamlit—prefer small, composable helpers.
 - Treat WebSocket proxy stability as a first-class requirement.
 
+## Reload behavior
+
+`fluxlit dev --reload` uses Uvicorn’s reloader on the gateway factory only. The Streamlit child process is **not** restarted automatically; document this when changing runtime or UX code paths.
+
 ## Pull requests
 
 - Include tests when changing routing/runtime behavior.
