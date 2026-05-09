@@ -34,13 +34,10 @@ def test_api_client_adds_leading_slash(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
     client = ApiClient(base_url="http://127.0.0.1:8000/api")
 
-    captured = {}
-
-    def fake_request(method: str, url: str, **kwargs: object) -> httpx.Response:
-        captured["method"] = method
-        captured["url"] = url
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/users"
         return httpx.Response(200)
 
-    client._client.request = fake_request  # type: ignore[method-assign]
+    transport = httpx.MockTransport(handler)
+    client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
     client.get("users")
-    assert captured["url"] == "/users"

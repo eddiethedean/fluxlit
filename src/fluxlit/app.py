@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from types import FunctionType
 from typing import Any
 
 from fastapi import FastAPI
@@ -43,7 +44,10 @@ class FluxLit:
         """Register a Streamlit page reachable at `path` (Streamlit `url_path`)."""
 
         def decorator(fn: Callable[..., None]) -> Callable[..., None]:
-            self._pages.append((path, title or fn.__name__.replace("_", " ").title(), fn))
+            default_title = "Page"
+            if isinstance(fn, FunctionType):
+                default_title = fn.__name__.replace("_", " ").title()
+            self._pages.append((path, title or default_title, fn))
             return fn
 
         return decorator

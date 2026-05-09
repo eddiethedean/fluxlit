@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import urllib.parse
 from collections.abc import AsyncIterator
-from typing import cast
 
 import anyio
 import httpx
@@ -161,7 +160,7 @@ def _parse_ws_target(scope: Scope, upstream: str) -> str:
     netloc = f"{host}:{port}" if port else host
     base_path = parsed.path.rstrip("/")
     full_path = f"{base_path}{path}" if base_path else path
-    return cast(str, urllib.parse.urlunparse((scheme, netloc, full_path, "", "", "")))
+    return urllib.parse.urlunparse((scheme, netloc, full_path, "", "", ""))
 
 
 async def _proxy_websocket(scope: Scope, receive: Receive, send: Send, upstream: str) -> None:
