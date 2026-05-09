@@ -1,3 +1,9 @@
+"""Typer CLI: ``fluxlit dev``, ``run``, ``doctor``, ``build``, ``new``.
+
+The ``fluxlit`` setuptools entrypoint calls :func:`main`. Commands resolve defaults from
+:func:`fluxlit.project_config.load_project_config` and :class:`~fluxlit.config.FluxlitSettings`.
+"""
+
 from __future__ import annotations
 
 import os
@@ -73,7 +79,11 @@ def dev(
         help="Only 'gateway' is supported: reloads the ASGI app, not Streamlit.",
     ),
 ) -> None:
-    """Run FastAPI + Streamlit behind a single ASGI gateway (development)."""
+    """Run the unified stack for local development (Streamlit subprocess + Uvicorn gateway).
+
+    Resolves ``target``, bind address, port, and log level from CLI, project file, and
+    :class:`~fluxlit.config.FluxlitSettings`. See :func:`fluxlit.runtime.run_unified`.
+    """
     if reload and reload_scope != "gateway":
         typer.echo(
             "Only --reload-scope=gateway is supported (Streamlit never reloads).",
@@ -123,7 +133,11 @@ def run_cmd(
         help="Comma-separated IPs to trust for forwarded headers (uvicorn forwarded_allow_ips).",
     ),
 ) -> None:
-    """Run the unified gateway without auto-reload."""
+    """Run the unified stack for production-style use (no Uvicorn reload).
+
+    Same resolution rules as :func:`dev`; always calls :func:`fluxlit.runtime.run_unified`
+    with ``reload=False``.
+    """
     from fluxlit.runtime import load_fluxlit
 
     pc = load_project_config()
@@ -150,6 +164,7 @@ def run_cmd(
 
 
 def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
+    """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``."""
     from fluxlit.runtime import load_fluxlit
 
     rows: list[tuple[str, CheckStatus, str]] = []
@@ -252,7 +267,10 @@ def doctor(
         help="Always exit 0 (still print FAIL lines).",
     ),
 ) -> None:
-    """Validate environment and app wiring before runtime."""
+    """Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).
+
+    Exits with code ``1`` if any check fails, unless ``--warnings-only`` is set.
+    """
     pc = load_project_config()
     resolved_target = resolve_target(target, pc)
 
@@ -289,7 +307,11 @@ def build(
         help="Overwrite existing Dockerfile / .dockerignore.",
     ),
 ) -> None:
-    """Write a starter Dockerfile and .dockerignore for fluxlit run."""
+    """Emit a minimal ``Dockerfile`` and ``.dockerignore`` for container deployment.
+
+    Refuses to overwrite existing files unless ``--force``. Adjust generated files for
+    your layout (dependencies, non-root user, etc.).
+    """
     pc = load_project_config()
     resolved_target = resolve_target(target, pc)
     out_dir = output or Path(".")
@@ -310,7 +332,7 @@ def build(
 
 @app.command()
 def new(name: str = typer.Argument(..., help="Project directory name.")) -> None:
-    """Scaffold a minimal FluxLit application."""
+    """Create ``<name>/app.py`` with a sample API route and Streamlit home page."""
     root = Path(name)
     if root.exists():
         typer.echo(f"Destination already exists: {root}", err=True)
@@ -348,4 +370,5 @@ if __name__ == "__main__":
 
 
 def main() -> None:
+    """Invoke the root Typer application (console script entrypoint)."""
     app()

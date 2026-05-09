@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from starlette.testclient import TestClient
 
 from fluxlit import FluxLit
@@ -70,3 +70,26 @@ def test_gateway_log_includes_request_id(api: FastAPI, caplog: pytest.LogCapture
     assert any(
         "unit-test-rid" in r.getMessage() for r in caplog.records if r.name == "fluxlit.gateway"
     )
+
+
+def test_non_api_path_returns_502_when_upstream_unreachable(api: FastAPI) -> None:
+    """Proxy targets a closed port → httpx.RequestError → 502 Bad Gateway."""
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    res = client.get("/some-streamlit-path")
+    assert res.status_code == 502
+    assert b"Bad Gateway" in res.content
+
+
+def test_api_accepts_post_json_body(api: FastAPI) -> None:
+    @api.post("/echo")
+    async def echo(request: Request) -> dict[str, str]:
+        data = await request.json()
+        got = data.get("k", "") if isinstance(data, dict) else ""
+        return {"got": str(got)}
+
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    res = client.post("/api/echo", json={"k": "v"})
+    assert res.status_code == 200
+    assert res.json() == {"got": "v"}

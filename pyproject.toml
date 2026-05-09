@@ -41,7 +41,9 @@ dev = [
   "mypy>=1.8",
   "pytest>=8.0",
   "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
   "ruff>=0.4",
+  "tomli>=2.0",
 ]
 docs = [
   "furo>=2024.1",
@@ -88,6 +90,15 @@ strict = true
 packages = ["fluxlit"]
 mypy_path = ["src"]
 explicit_package_bases = true
+
+# Streamlit depends on pyarrow; pyarrow vendors code that imports sphinx.ext.autodoc,
+# which pulls Sphinx sources using syntax above our python_version target.
+[[tool.mypy.overrides]]
+module = "pyarrow.*"
+follow_imports = "skip"
+
+[tool.coverage.run]
+source = ["src/fluxlit"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -1,4 +1,4 @@
-"""Streamlit page registration types."""
+"""Typing helpers for Streamlit page callables."""
 
 from __future__ import annotations
 
@@ -9,4 +9,12 @@ if TYPE_CHECKING:
 
 
 class PageFn(Protocol):
-    def __call__(self, st: Any, client: ApiClient, /) -> None: ...
+    """Protocol for functions registered with :meth:`fluxlit.app.FluxLit.page`.
+
+    Streamlit passes the ``streamlit`` module as ``st`` and an :class:`~fluxlit.client.ApiClient`
+    bound to the internal API base.
+    """
+
+    def __call__(self, st: Any, client: ApiClient, /) -> None:
+        """Render the page; may use ``st`` widgets and ``client`` for HTTP calls."""
+        ...

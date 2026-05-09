@@ -1,3 +1,5 @@
+"""Load optional project defaults from ``fluxlit.toml`` or ``pyproject.toml``."""
+
 from __future__ import annotations
 
 import sys
@@ -8,12 +10,19 @@ from typing import Any
 if sys.version_info >= (3, 11):
     import tomllib
 else:
-    import tomli as tomllib  # type: ignore[import-not-found]
+    import tomli as tomllib
 
 
 @dataclass
 class ProjectConfig:
-    """Defaults from ``fluxlit.toml`` or ``pyproject.toml`` ``[tool.fluxlit]``."""
+    """Structured defaults read from a project file (not environment).
+
+    Populated from top-level keys in ``fluxlit.toml`` or from ``[tool.fluxlit]`` in
+    ``pyproject.toml``. Only known keys are stored; others are ignored.
+
+    Fields mirror CLI-related settings: ``target`` (e.g. ``app:app``), bind defaults,
+    ``log_level``, and optional ``api_mount_path`` / ``root_path``.
+    """
 
     target: str | None = None
     gateway_host: str | None = None
@@ -51,9 +60,16 @@ def _parse_table(raw: dict[str, Any]) -> ProjectConfig:
 
 
 def load_project_config(cwd: Path | None = None) -> ProjectConfig | None:
-    """Load ``fluxlit.toml`` (root keys) or ``[tool.fluxlit]`` from ``pyproject.toml``.
+    """Parse ``fluxlit.toml`` or ``[tool.fluxlit]`` in ``pyproject.toml``.
 
-    If both exist, ``fluxlit.toml`` wins.
+    If both files exist, ``fluxlit.toml`` takes precedence. Returns ``None`` if
+    neither file exists or the relevant section is missing / invalid.
+
+    Args:
+        cwd: Directory to search; defaults to :func:`pathlib.Path.cwd`.
+
+    Returns:
+        Parsed config, or ``None`` when no project file applies.
     """
     root = cwd or Path.cwd()
     fluxlit_path = root / "fluxlit.toml"
@@ -79,6 +95,7 @@ def load_project_config(cwd: Path | None = None) -> ProjectConfig | None:
 
 
 def resolve_target(cli_target: str | None, pc: ProjectConfig | None) -> str:
+    """Pick the app import target: CLI argument, then project file, then ``app:app``."""
     if cli_target is not None:
         return cli_target
     if pc and pc.target:
@@ -96,7 +113,11 @@ def resolve_binding(
     settings_gateway_port: int,
     settings_log_level: str,
 ) -> tuple[str, int, str]:
-    """CLI > project file > FluxLit settings (env-backed)."""
+    """Resolve host, port, and log level: CLI > project file > ``FluxlitSettings``.
+
+    ``settings_*`` arguments should come from the loaded :class:`~fluxlit.app.FluxLit`
+    instance (already merged with environment).
+    """
     host = cli_host
     if host is None and pc and pc.gateway_host is not None:
         host = pc.gateway_host

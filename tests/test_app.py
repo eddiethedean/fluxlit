@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import sys
+import types
 
 import pytest
 from starlette.testclient import TestClient
@@ -19,6 +21,30 @@ def test_page_registration() -> None:
 
     paths = {p[0]: p[1] for p in app.pages}
     assert paths["/dash"] == "Dash"
+
+
+def test_discover_pages_requires_package() -> None:
+    fl = FluxLit(title="T")
+    bare = types.ModuleType("fluxlit_test_bare_mod")
+    sys.modules["fluxlit_test_bare_mod"] = bare
+    try:
+        with pytest.raises(TypeError, match="must be a package"):
+            fl.discover_pages("pages", package="fluxlit_test_bare_mod")
+    finally:
+        sys.modules.pop("fluxlit_test_bare_mod", None)
+
+
+def test_discover_pages_import_error_for_missing_subpackage(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pkg = tmp_path / "pkg_pages"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    fl = FluxLit(title="T")
+    with pytest.raises(ImportError, match="Cannot import page package"):
+        fl.discover_pages("missing_pages", package="pkg_pages")
 
 
 def test_enable_request_logging_emits_api_log(

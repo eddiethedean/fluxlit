@@ -1,3 +1,5 @@
+"""Process orchestration: load ``FluxLit`` by import path, spawn Streamlit, run Uvicorn."""
+
 from __future__ import annotations
 
 import contextlib
@@ -21,12 +23,20 @@ if TYPE_CHECKING:
 
 
 def find_free_port() -> int:
+    """Bind to ``127.0.0.1:0`` and return the assigned ephemeral port."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
 
 
 def load_fluxlit(target: str) -> FluxLit:
+    """Import ``module:attribute`` and ensure the object is a :class:`~fluxlit.app.FluxLit`.
+
+    Raises:
+        ValueError: If ``target`` is not a ``module:attr`` string.
+        ImportError: If ``module`` cannot be imported.
+        TypeError: If ``attr`` is not a :class:`~fluxlit.app.FluxLit` instance.
+    """
     from fluxlit.app import FluxLit as FluxLitCls
 
     mod_name, sep, attr = target.partition(":")
@@ -42,6 +52,7 @@ def load_fluxlit(target: str) -> FluxLit:
 
 
 def _wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
+    """Block until ``host:port`` accepts a TCP connection or ``timeout_s`` elapses."""
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         try:
@@ -54,6 +65,7 @@ def _wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
 
 
 def _build_streamlit_env(*, target: str, api_prefix: str, internal_api_base: str) -> dict[str, str]:
+    """Clone ``os.environ`` and set ``FLUXLIT_*`` variables for the Streamlit subprocess."""
     env = os.environ.copy()
     env["FLUXLIT_APP"] = target
     env["FLUXLIT_API_PREFIX"] = api_prefix
@@ -62,6 +74,7 @@ def _build_streamlit_env(*, target: str, api_prefix: str, internal_api_base: str
 
 
 def _build_streamlit_cmd(*, runner: Path, port: int) -> list[str]:
+    """Command line: ``python -m streamlit run <runner>`` with headless bind on ``port``."""
     return [
         sys.executable,
         "-m",
@@ -109,7 +122,15 @@ def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -
 
 
 def create_gateway_app() -> object:
-    """Uvicorn factory (`--factory`): reads `FLUXLIT_APP` and `FLUXLIT_STREAMLIT_UPSTREAM`."""
+    """ASGI factory for Uvicorn ``--factory`` reload mode.
+
+    Reads ``FLUXLIT_APP`` (import target), ``FLUXLIT_STREAMLIT_UPSTREAM`` (Streamlit base URL),
+    and ``FLUXLIT_API_PREFIX`` from the environment, then returns
+    :func:`fluxlit.gateway.build_gateway` over the loaded FastAPI app.
+
+    Returns:
+        An ASGI3 callable (same contract as :func:`~fluxlit.gateway.build_gateway`).
+    """
     target = os.environ["FLUXLIT_APP"]
     upstream = os.environ["FLUXLIT_STREAMLIT_UPSTREAM"]
     api_prefix = os.environ.get("FLUXLIT_API_PREFIX", "/api")
@@ -127,6 +148,22 @@ def run_unified(
     proxy_headers: bool = False,
     forwarded_allow_ips: str | None = None,
 ) -> None:
+    """Start Streamlit on a free localhost port and Uvicorn on ``host:port``.
+
+    Sets process environment so ``create_gateway_app`` / Streamlit entry can resolve
+    the app and internal API base (``http://{host}:{port}{api_prefix}``). If Streamlit
+    exits, the gateway is stopped. On shutdown, the Streamlit child receives SIGINT /
+    terminate / kill (platform-dependent).
+
+    Args:
+        target: ``module:fluxlit_instance`` import path.
+        host: Uvicorn bind host.
+        port: Uvicorn bind port (public).
+        reload: If True, use Uvicorn reload with :func:`create_gateway_app` (gateway only).
+        log_level: Uvicorn log level.
+        proxy_headers: Forwarded to :class:`uvicorn.Config`.
+        forwarded_allow_ips: Forwarded to :class:`uvicorn.Config`.
+    """
     streamlit_port = find_free_port()
     runner = Path(__file__).resolve().parent / "streamlit_main.py"
 

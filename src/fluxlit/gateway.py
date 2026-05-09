@@ -1,3 +1,10 @@
+"""ASGI gateway: dispatch ``api_prefix`` to FastAPI, proxy everything else to Streamlit.
+
+HTTP requests and WebSockets are forwarded to an upstream base URL (the Streamlit
+server). Request IDs are taken from ``X-Request-ID`` or generated, and stored in
+:mod:`fluxlit.logging_context` for the duration of each request.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -21,6 +28,7 @@ _gateway_log = logging.getLogger("fluxlit.gateway")
 
 
 def _request_id_from_scope(scope: Scope) -> str:
+    """Return the client ``X-Request-ID`` header value or a new UUID string."""
     raw = scope.get("headers") or []
     want = REQUEST_ID_HEADER.lower().encode("latin-1")
     for k, v in raw:
@@ -30,9 +38,22 @@ def _request_id_from_scope(scope: Scope) -> str:
 
 
 def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/api") -> ASGIApp:
-    """ASGI app: forwards `api_prefix` to `api_app`.
+    """Build the composite ASGI application used as Uvicorn's entrypoint.
 
-    Everything else is proxied to `upstream_base` (Streamlit).
+    Routes whose path equals ``api_prefix`` or starts with ``api_prefix/`` are
+    forwarded to ``api_app`` with that prefix stripped from ``path`` and ``raw_path``.
+    All other HTTP traffic and WebSockets are reverse-proxied to ``upstream_base``
+    (typically the internal Streamlit origin).
+
+    Lifespan events are delegated only to ``api_app``.
+
+    Args:
+        api_app: Inner FastAPI / Starlette app (mount path not included in its routes).
+        upstream_base: Base URL for Streamlit, e.g. ``http://127.0.0.1:8501``.
+        api_prefix: Public URL prefix for the API (default ``/api``).
+
+    Returns:
+        A callable ASGI3 application.
     """
     upstream = upstream_base.rstrip("/")
     prefix = api_prefix.rstrip("/") or "/api"
@@ -192,6 +213,7 @@ def _parse_ws_target(scope: Scope, upstream: str) -> str:
     netloc = f"{host}:{port}" if port else host
     base_path = parsed.path.rstrip("/")
     full_path = f"{base_path}{path}" if base_path else path
+    # urlunparse is typed loosely in some stubs; keep str contract for mypy.
     return cast(str, urllib.parse.urlunparse((scheme, netloc, full_path, "", "", "")))
 
 

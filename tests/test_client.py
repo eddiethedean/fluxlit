@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from fluxlit.client import ApiClient
 
@@ -73,3 +73,58 @@ def test_post_model_parses_response(monkeypatch: pytest.MonkeyPatch) -> None:
         client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
         user = client.post_model("/users", _User, body={"name": "ignored"})
     assert user.name == "Bob"
+
+
+def test_get_model_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "missing"})
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        with pytest.raises(httpx.HTTPStatusError):
+            client.get_model("/nope", _User)
+
+
+def test_get_model_raises_validation_error_on_bad_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"not_name": "x"})
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        with pytest.raises(ValidationError):
+            client.get_model("/users", _User)
+
+
+def test_put_delete_requests_use_correct_method(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.method)
+        return httpx.Response(204)
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        client.put("items/1", json={"a": 1})
+        client.delete("items/1")
+    assert seen == ["PUT", "DELETE"]
+
+
+def test_post_model_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(422, json={"detail": []})
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        with pytest.raises(httpx.HTTPStatusError):
+            client.post_model("/users", _User, body={})

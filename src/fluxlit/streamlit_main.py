@@ -1,4 +1,16 @@
-"""Streamlit entrypoint driven by `FLUXLIT_APP=module:attr` (a `FluxLit` instance)."""
+"""Streamlit process entrypoint (run via ``streamlit run`` from :mod:`fluxlit.runtime`).
+
+Environment variables (set by the parent process):
+
+- ``FLUXLIT_APP`` — import path ``module:attr`` resolving to a :class:`~fluxlit.app.FluxLit`.
+- ``FLUXLIT_API_PREFIX`` — API mount path (e.g. ``/api``).
+- ``FLUXLIT_INTERNAL_API_BASE`` — base URL for :class:`~fluxlit.client.ApiClient`.
+
+At import time this module loads the app, configures Streamlit pages from ``.pages``,
+and runs :func:`streamlit.navigation` (or shows a hint if no pages are registered).
+
+Do not import this module in library code; it executes Streamlit UI on import.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +25,7 @@ from fluxlit.app import FluxLit
 
 
 def _load_fluxlit(spec: str) -> FluxLit:
+    """Import ``spec`` as ``module:attribute`` and validate the attribute is :class:`FluxLit`."""
     mod_name, sep, attr = spec.partition(":")
     if not sep or not attr:
         msg = "FLUXLIT_APP must look like 'my_module:app'"
@@ -40,6 +53,8 @@ def _bind_page(
     st_mod: Any,
     client: Any,
 ) -> Callable[[], None]:
+    """Wrap a ``(st, client)`` page function as a zero-arg callable for :class:`streamlit.Page`."""
+
     def inner() -> None:
         fn(st_mod, client)
 

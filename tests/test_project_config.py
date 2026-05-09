@@ -50,6 +50,26 @@ def test_resolve_target_precedence() -> None:
     assert resolve_target(None, None) == "app:app"
 
 
+def test_load_project_config_none_when_no_files(tmp_path: Path) -> None:
+    assert load_project_config(tmp_path) is None
+
+
+def test_load_project_config_none_when_tool_fluxlit_missing(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[tool.other]\nx = 1\n", encoding="utf-8")
+    assert load_project_config(tmp_path) is None
+
+
+def test_gateway_port_bool_is_ignored(tmp_path: Path) -> None:
+    (tmp_path / "fluxlit.toml").write_text(
+        'target = "a:b"\ngateway_port = true\n',
+        encoding="utf-8",
+    )
+    pc = load_project_config(tmp_path)
+    assert pc is not None
+    assert pc.target == "a:b"
+    assert pc.gateway_port is None
+
+
 def test_resolve_binding_precedence() -> None:
     host, port, log = resolve_binding(
         cli_host=None,

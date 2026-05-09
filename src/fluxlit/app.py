@@ -1,3 +1,5 @@
+"""The :class:`FluxLit` application object: FastAPI (``.api``) plus Streamlit pages."""
+
 from __future__ import annotations
 
 import importlib
@@ -25,7 +27,21 @@ _api_log = logging.getLogger("fluxlit.api")
 
 
 class FluxLit:
-    """Single app object combining FastAPI routes and Streamlit pages."""
+    """Combine a FastAPI application and registered Streamlit pages in one object.
+
+    - Use ``.api`` for HTTP routes, dependencies, and OpenAPI (mounted under
+      ``FluxlitSettings.api_mount_path`` on the public gateway).
+    - Use :meth:`page` or :meth:`discover_pages` to register Streamlit UI; the runtime
+      builds ``st.navigation`` from ``.pages``.
+
+    A minimal ``GET /healthz`` route is registered on ``.api`` (hidden from OpenAPI).
+
+    Args:
+        title: If set, overrides ``FluxlitSettings.title`` for this instance.
+        settings: Explicit settings; default is :class:`~fluxlit.config.FluxlitSettings`
+            loaded from env / ``.env``.
+        fastapi_kwargs: Extra keyword arguments forwarded to :class:`fastapi.FastAPI`.
+    """
 
     def __init__(
         self,
@@ -73,10 +89,25 @@ class FluxLit:
             return {"status": "ok"}
 
     def discover_pages(self, directory: str, *, package: str) -> FluxLit:
-        """Import ``<package>.<directory>.*`` modules and call ``register(app)`` when present.
+        """Load Streamlit page modules and call ``register(self)`` on each.
 
-        Each module (except ``_``-prefixed) may define ``register(app: FluxLit) -> None`` and
-        use ``@app.page`` inside that function.
+        Imports the subpackage ``{package}.{directory}``, then every submodule
+        (skipping packages and names starting with ``_``). If a module defines
+        ``register(app: FluxLit) -> None``, it is invoked; implementations typically
+        attach handlers with :meth:`page` inside ``register``.
+
+        Registered pages are sorted by ``(path, title)`` for stable navigation order.
+
+        Args:
+            directory: Subpackage name under ``package`` (e.g. ``"pages"``).
+            package: Importable parent package (must have ``__path__``).
+
+        Returns:
+            ``self`` for chaining.
+
+        Raises:
+            TypeError: If ``package`` is not a package.
+            ImportError: If ``{package}.{directory}`` cannot be imported.
         """
         parent = importlib.import_module(package)
         paths = getattr(parent, "__path__", None)
@@ -109,7 +140,19 @@ class FluxLit:
     def page(
         self, path: str, *, title: str | None = None
     ) -> Callable[[Callable[..., None]], Callable[..., None]]:
-        """Register a Streamlit page reachable at `path` (Streamlit `url_path`)."""
+        """Decorator registering a Streamlit page at a URL path.
+
+        The decorated callable should accept ``(st, client)`` where ``st`` is the
+        Streamlit module and ``client`` is an :class:`~fluxlit.client.ApiClient` for
+        your mounted API.
+
+        Args:
+            path: URL path segment for Streamlit (e.g. ``"/"``, ``"/reports"``).
+            title: Sidebar / navigation title; defaults from the function name.
+
+        Returns:
+            Decorator that registers the function and returns it unchanged.
+        """
 
         def decorator(fn: Callable[..., None]) -> Callable[..., None]:
             default_title = "Page"
@@ -121,8 +164,13 @@ class FluxLit:
         return decorator
 
     def get_client(self) -> ApiClient:
+        """Return an :class:`~fluxlit.client.ApiClient` for server-side API calls.
+
+        Uses ``FLUXLIT_INTERNAL_API_BASE`` when set (as in the managed runtime).
+        """
         return ApiClient()
 
     @property
     def pages(self) -> list[tuple[str, str, Callable[..., None]]]:
+        """``(path, title, handler)`` tuples for registered Streamlit pages."""
         return list(self._pages)

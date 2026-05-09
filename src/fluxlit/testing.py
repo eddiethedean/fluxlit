@@ -1,3 +1,5 @@
+"""Test helpers: gateway-scoped HTTP client and Streamlit ``AppTest`` integration."""
+
 from __future__ import annotations
 
 import contextlib
@@ -16,13 +18,18 @@ from fluxlit.gateway import build_gateway
 
 @dataclass(frozen=True)
 class FluxLitTestClient:
-    """
-    FluxLit-native test client.
+    """Test harness that mirrors production routing (API prefix + gateway).
 
-    - **API**: a FastAPI/Starlette `TestClient` that talks to the app through the FluxLit gateway
-      using the configured `api_prefix`.
-    - **UI** (optional): a helper to run Streamlit's built-in `AppTest` against FluxLit's
-      `streamlit_main.py` entrypoint.
+    **API:** :attr:`api` is a Starlette :class:`~starlette.testclient.TestClient` wired
+    through :func:`fluxlit.gateway.build_gateway`, so paths include the configured
+    ``api_prefix`` and ``/healthz`` behaves like production.
+
+    **Streamlit:** :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit_main`
+    with the same environment variables the runtime sets.
+
+    Attributes:
+        app: :class:`~fluxlit.app.FluxLit` instance under test.
+        api_prefix: Public API mount path for :func:`~fluxlit.gateway.build_gateway`.
     """
 
     app: FluxLit
@@ -30,19 +37,22 @@ class FluxLitTestClient:
 
     @property
     def api(self) -> TestClient:
-        # Upstream is unused for /api routes; it just needs to be a valid URL.
+        """HTTP test client; non-API routes hit a dummy upstream (unused for ``/api`` tests)."""
         gateway = build_gateway(self.app.api, "http://127.0.0.1:9", api_prefix=self.api_prefix)
         return TestClient(gateway)
 
     def api_get(self, path: str, **kwargs: Any) -> httpx.Response:
+        """``GET`` relative to ``api_prefix`` (leading slash optional on ``path``)."""
         p = path if path.startswith("/") else f"/{path}"
         return self.api.get(f"{self.api_prefix}{p}", **kwargs)
 
     def api_post(self, path: str, **kwargs: Any) -> httpx.Response:
+        """``POST`` relative to ``api_prefix``."""
         p = path if path.startswith("/") else f"/{path}"
         return self.api.post(f"{self.api_prefix}{p}", **kwargs)
 
     def openapi(self) -> dict[str, Any]:
+        """Fetch and parse ``GET {api_prefix}/openapi.json``; raises if not a JSON object."""
         data = self.api_get("/openapi.json").json()
         if not isinstance(data, dict):
             msg = "OpenAPI response was not a JSON object."
@@ -56,10 +66,19 @@ class FluxLitTestClient:
         internal_api_base: str | None = None,
         extra_sys_path: str | Path | None = None,
     ) -> Any:
-        """
-        Run Streamlit's built-in `AppTest` against FluxLit's Streamlit entrypoint.
+        """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit_main`.
 
-        `target` is an import string like `my_module:app` resolving to a FluxLit instance.
+        Requires Streamlit >= 1.30 for ``AppTest``. Patches ``FLUXLIT_APP``,
+        ``FLUXLIT_INTERNAL_API_BASE``, and ``FLUXLIT_API_PREFIX`` for the duration of the run.
+
+        Args:
+            target: Import path ``module:FluxLit`` (same as CLI).
+            internal_api_base: Override internal API URL; default is a placeholder with
+                the correct ``api_prefix`` suffix.
+            extra_sys_path: Optional directory prepended to ``sys.path`` (e.g. project root).
+
+        Returns:
+            The result of ``AppTest.from_file(...).run()`` (Streamlit type).
         """
         streamlit = _import_streamlit()
         if tuple(int(x) for x in streamlit.__version__.split(".")[:2]) < (1, 30):
