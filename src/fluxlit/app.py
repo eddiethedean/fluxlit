@@ -33,6 +33,10 @@ class FluxLit:
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
 
+        @self.api.get("/healthz", include_in_schema=False)
+        def _healthz() -> dict[str, str]:
+            return {"status": "ok"}
+
     def page(
         self, path: str, *, title: str | None = None
     ) -> Callable[[Callable[..., None]], Callable[..., None]]:

@@ -33,6 +33,8 @@ if not spec:
 _fluxlit = _load_fluxlit(spec)
 st.set_page_config(page_title=_fluxlit.settings.title)
 _client = _fluxlit.get_client()
+
+
 def _bind_page(
     fn: Callable[[Any, Any], None],
     st_mod: Any,

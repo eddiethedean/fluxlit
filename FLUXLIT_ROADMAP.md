@@ -10,16 +10,16 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 - **Foundation:** `src/` layout, `pyproject.toml`, Hatchling build, Ruff, Mypy (strict), Pytest.
 - **Unified dev/prod entry:** `fluxlit dev` / `fluxlit run` with a single public port; Streamlit runs in a managed subprocess with an internal port.
-- **Gateway:** `/api/*` → FastAPI (path prefix stripped for the inner app); HTTP + WebSocket proxy to Streamlit for all other paths.
+- **Gateway:** configurable API prefix (default `/api`); path prefix stripped for the inner FastAPI app; HTTP + WebSocket proxy to Streamlit for all other paths.
 - **App model:** `FluxLit` holds `FastAPI` on `.api`, `@app.page` registers Streamlit pages; `ApiClient` for server-side calls with `FLUXLIT_INTERNAL_API_BASE`.
 - **Scaffold:** `fluxlit new <name>` minimal app.
-- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation.
+- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client.
 
 **Gaps vs “production”**
 
-- No CI workflow yet (Linux / macOS / Windows matrix).
+- CI workflow (Linux / macOS / Windows matrix) exists; expand with higher-signal integration tests over time.
 - Reload is experimental (`fluxlit dev --reload`); Streamlit lifecycle on reload is not fully orchestrated.
-- Auth, metrics, Docker/K8s artifacts, and `fluxlit doctor` / `fluxlit build` are not implemented.
+- Auth, metrics, Docker/K8s artifacts, and `fluxlit build` are not implemented.
 
 ---
 
@@ -60,8 +60,8 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 ### Remaining / hardening
 
-- **Graceful shutdown:** ensure Streamlit and Uvicorn exit cleanly on SIGINT/SIGTERM (timeouts, kill fallback documented).
-- **Health:** minimal `/api/health`-style hook or documented pattern (official router helper optional).
+- **Graceful shutdown:** ensure Streamlit and Uvicorn exit cleanly on SIGINT/SIGTERM (timeouts, kill fallback documented). **Done** (best-effort interrupt → terminate → kill).
+- **Health:** minimal `/api/health`-style hook or documented pattern (official router helper optional). **Done** (`/healthz` on the FastAPI app; available at `/<api_prefix>/healthz`).
 - **Proxy edge cases:** large uploads, streaming responses, cookie/path edge cases behind `root_path` / subpaths (see Phase 4).
 - **CI integration tests:** smoke test `fluxlit run` with a tiny app (optional; may be slow).
 

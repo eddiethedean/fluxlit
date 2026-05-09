@@ -4,6 +4,7 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
+from fluxlit import FluxLit
 from fluxlit.gateway import build_gateway
 
 
@@ -19,7 +20,7 @@ def api() -> FastAPI:
 
 
 def test_api_routes_are_prefixed_with_api(api: FastAPI) -> None:
-    gateway = build_gateway(api, "http://127.0.0.1:9")
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
     client = TestClient(gateway)
     res = client.get("/api/ping")
     assert res.status_code == 200
@@ -27,9 +28,33 @@ def test_api_routes_are_prefixed_with_api(api: FastAPI) -> None:
 
 
 def test_openapi_available_under_api_prefix(api: FastAPI) -> None:
-    gateway = build_gateway(api, "http://127.0.0.1:9")
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
     client = TestClient(gateway)
     res = client.get("/api/openapi.json")
     assert res.status_code == 200
     body = res.json()
     assert "/ping" in body.get("paths", {})
+
+
+def test_custom_api_prefix(api: FastAPI) -> None:
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/x")
+    client = TestClient(gateway)
+    assert client.get("/x/ping").status_code == 200
+    assert client.get("/api/ping").status_code != 200
+
+
+def test_healthz_available_under_api_prefix() -> None:
+    fl = FluxLit(title="T")
+    gateway = build_gateway(fl.api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    res = client.get("/api/healthz")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+
+def test_healthz_not_in_openapi() -> None:
+    fl = FluxLit(title="T")
+    gateway = build_gateway(fl.api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    body = client.get("/api/openapi.json").json()
+    assert "/healthz" not in body.get("paths", {})

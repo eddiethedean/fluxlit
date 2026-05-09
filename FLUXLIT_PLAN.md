@@ -90,6 +90,7 @@ The [roadmap](FLUXLIT_ROADMAP.md) Phase 5 covers optional single-process or embe
 | CLI | `fluxlit.cli` | `fluxlit dev`, `run`, `new` |
 | Config | `fluxlit.config` | `FluxlitSettings` / `FLUXLIT_*` |
 | Client | `fluxlit.client` | `ApiClient` for server-side calls into `/api` |
+| Testing | `fluxlit.testing` | `FluxLitTestClient` (API gateway TestClient + Streamlit AppTest helper) |
 | Gateway | `fluxlit.gateway` | ASGI dispatch and reverse proxy |
 | Runtime | `fluxlit.runtime` | Load `FluxLit` by import path, spawn Streamlit, run Uvicorn |
 | Streamlit | `fluxlit.streamlit_main` | Streamlit script; reads `FLUXLIT_APP`, builds navigation |

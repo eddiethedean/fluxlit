@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import contextlib
 import importlib
 import os
+import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import uvicorn
 
@@ -50,29 +53,16 @@ def _wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
     raise TimeoutError(msg)
 
 
-def create_gateway_app() -> object:
-    """Uvicorn factory (`--factory`): reads `FLUXLIT_APP` and `FLUXLIT_STREAMLIT_UPSTREAM`."""
-    target = os.environ["FLUXLIT_APP"]
-    upstream = os.environ["FLUXLIT_STREAMLIT_UPSTREAM"]
-    fl = load_fluxlit(target)
-    return build_gateway(fl.api, upstream)
-
-
-def run_unified(
-    target: str,
-    *,
-    host: str = "127.0.0.1",
-    port: int = 8000,
-    reload: bool = False,
-) -> None:
-    streamlit_port = find_free_port()
-    runner = Path(__file__).resolve().parent / "streamlit_main.py"
-
+def _build_streamlit_env(*, target: str, api_prefix: str, internal_api_base: str) -> dict[str, str]:
     env = os.environ.copy()
     env["FLUXLIT_APP"] = target
-    env["FLUXLIT_INTERNAL_API_BASE"] = f"http://{host}:{port}/api"
+    env["FLUXLIT_API_PREFIX"] = api_prefix
+    env["FLUXLIT_INTERNAL_API_BASE"] = internal_api_base
+    return env
 
-    cmd = [
+
+def _build_streamlit_cmd(*, runner: Path, port: int) -> list[str]:
+    return [
         sys.executable,
         "-m",
         "streamlit",
@@ -81,31 +71,123 @@ def run_unified(
         "--server.headless",
         "true",
         "--server.port",
-        str(streamlit_port),
+        str(port),
         "--browser.gatherUsageStats",
         "false",
     ]
-    proc = subprocess.Popen(cmd, env=env)
+
+
+def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -> None:
+    """Try graceful interrupt, then terminate, then kill."""
+    if proc.poll() is not None:
+        return
+
+    # Prefer CTRL_BREAK_EVENT on Windows; SIGINT on Unix.
+    if sys.platform.startswith("win"):
+        with contextlib.suppress(Exception):
+            proc.send_signal(signal.CTRL_BREAK_EVENT)  # type: ignore[attr-defined]
+    else:
+        with contextlib.suppress(Exception):
+            proc.send_signal(signal.SIGINT)
+
+    try:
+        proc.wait(timeout=timeout_s)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+
+    with contextlib.suppress(Exception):
+        proc.terminate()
+    try:
+        proc.wait(timeout=timeout_s)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+
+    with contextlib.suppress(Exception):
+        proc.kill()
+
+
+def create_gateway_app() -> object:
+    """Uvicorn factory (`--factory`): reads `FLUXLIT_APP` and `FLUXLIT_STREAMLIT_UPSTREAM`."""
+    target = os.environ["FLUXLIT_APP"]
+    upstream = os.environ["FLUXLIT_STREAMLIT_UPSTREAM"]
+    api_prefix = os.environ.get("FLUXLIT_API_PREFIX", "/api")
+    fl = load_fluxlit(target)
+    return build_gateway(fl.api, upstream, api_prefix=api_prefix)
+
+
+def run_unified(
+    target: str,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8000,
+    reload: bool = False,
+    log_level: str = "info",
+    proxy_headers: bool = False,
+    forwarded_allow_ips: str | None = None,
+) -> None:
+    streamlit_port = find_free_port()
+    runner = Path(__file__).resolve().parent / "streamlit_main.py"
+
+    fl = load_fluxlit(target)
+
+    api_prefix = fl.settings.api_mount_path
+    internal_api_base = f"http://{host}:{port}{api_prefix}"
+
+    env = _build_streamlit_env(
+        target=target,
+        api_prefix=api_prefix,
+        internal_api_base=internal_api_base,
+    )
+    cmd = _build_streamlit_cmd(runner=runner, port=streamlit_port)
+
+    popen_kwargs: dict[str, Any] = {"env": env}
+    if sys.platform.startswith("win"):
+        # New process group so we can send CTRL_BREAK_EVENT.
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
+    else:
+        popen_kwargs["start_new_session"] = True
+
+    proc: subprocess.Popen[Any] = subprocess.Popen(cmd, **popen_kwargs)
     try:
         _wait_for_tcp("127.0.0.1", streamlit_port)
         upstream = f"http://127.0.0.1:{streamlit_port}"
         os.environ["FLUXLIT_APP"] = target
         os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = upstream
+        os.environ["FLUXLIT_API_PREFIX"] = api_prefix
+
         if reload:
-            uvicorn.run(
+            config = uvicorn.Config(
                 "fluxlit.runtime:create_gateway_app",
                 host=host,
                 port=port,
                 factory=True,
                 reload=True,
-                log_level="info",
+                log_level=log_level,
+                proxy_headers=proxy_headers,
+                forwarded_allow_ips=forwarded_allow_ips,
             )
         else:
-            fl = load_fluxlit(target)
-            uvicorn.run(build_gateway(fl.api, upstream), host=host, port=port, log_level="info")
+            config = uvicorn.Config(
+                build_gateway(fl.api, upstream, api_prefix=fl.settings.api_mount_path),
+                host=host,
+                port=port,
+                log_level=log_level,
+                proxy_headers=proxy_headers,
+                forwarded_allow_ips=forwarded_allow_ips,
+            )
+
+        server = uvicorn.Server(config)
+
+        def monitor_streamlit() -> None:
+            code = proc.wait()
+            if not server.should_exit:
+                sys.stderr.write(f"[fluxlit] Streamlit exited (code={code}); stopping gateway.\n")
+                sys.stderr.flush()
+                server.should_exit = True
+
+        threading.Thread(target=monitor_streamlit, daemon=True).start()
+        server.run()
     finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
+        _terminate_process(proc)

@@ -10,17 +10,21 @@ import websockets
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 
-def build_gateway(api_app: ASGIApp, upstream_base: str) -> ASGIApp:
-    """ASGI app: forwards `/api` to `api_app`, everything else to `upstream_base` (Streamlit)."""
+def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/api") -> ASGIApp:
+    """ASGI app: forwards `api_prefix` to `api_app`.
+
+    Everything else is proxied to `upstream_base` (Streamlit).
+    """
     upstream = upstream_base.rstrip("/")
+    prefix = api_prefix.rstrip("/") or "/api"
 
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
             await api_app(scope, receive, send)
             return
         path = scope.get("path") or ""
-        if path == "/api" or path.startswith("/api/"):
-            api_scope = _strip_prefix_scope(scope, "/api")
+        if path == prefix or path.startswith(f"{prefix}/"):
+            api_scope = _strip_prefix_scope(scope, prefix)
             await api_app(api_scope, receive, send)
             return
         if scope["type"] == "websocket":

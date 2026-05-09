@@ -70,6 +70,7 @@ fluxlit dev app:app
 - **Browser:** open the URL shown by Uvicorn (default `http://127.0.0.1:8000`).
 - **API:** routes are mounted under **`/api`** (e.g. `GET /api/users`).
 - **OpenAPI / docs:** `http://127.0.0.1:8000/api/docs` (Swagger) and `/api/openapi.json`.
+- **Health:** `http://127.0.0.1:8000/api/healthz` (hidden from OpenAPI).
 
 From Streamlit code, `ApiClient` calls the API using a base URL that includes `/api` (set automatically as `FLUXLIT_INTERNAL_API_BASE` when using `fluxlit dev` / `fluxlit run`). Use paths like `client.get("/users")`, not `client.get("/api/users")`.
 
@@ -93,6 +94,8 @@ Browser
 
 Anything that is **not** under `/api` is forwarded to Streamlit (including WebSockets used by Streamlit). Reserve **`/api`** for your HTTP API.
 
+Note: the API prefix is configurable via `FluxlitSettings.api_mount_path` (default `/api`).
+
 ---
 
 ## CLI
@@ -104,7 +107,8 @@ Anything that is **not** under `/api` is forwarded to Streamlit (including WebSo
 | `fluxlit new <name>` | Scaffold a minimal `app.py` in a new directory. |
 | `python -m fluxlit` | Equivalent entry to the `fluxlit` console script. |
 
-Options for `dev` / `run` include `--host`, `--port`. `fluxlit dev` also supports `--reload` (experimental; API gateway reload may not restart Streamlit).
+Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-headers`, `--forwarded-allow-ips`.
+`fluxlit dev` also supports `--reload` (experimental; API gateway reload may not restart Streamlit).
 
 ---
 
@@ -147,8 +151,35 @@ A committed **`fluxlit.toml`** (or similar) config file is on the [roadmap](FLUX
 | `gateway` | ASGI router + HTTP/WebSocket proxy |
 | `runtime` | Subprocess orchestration, Uvicorn entry |
 | `streamlit_main` | Streamlit entry script (`FLUXLIT_APP`) |
+| `testing` | `FluxLitTestClient` (FluxLit-native API + Streamlit test helpers) |
 | `api` | Optional `APIRouter` helpers |
 | `auth` | Placeholder / future shared auth hooks |
+
+---
+
+## Testing
+
+FluxLit uses the same “built-in” testing platforms you likely already know:
+
+- **FastAPI**: `starlette.testclient.TestClient`
+- **Streamlit**: `streamlit.testing.v1.AppTest` (version-dependent)
+
+FluxLit also ships a small wrapper: **`FluxLitTestClient`**.
+
+```python
+from fluxlit import FluxLit, FluxLitTestClient
+
+app = FluxLit(title="Test")
+client = FluxLitTestClient(app)
+
+assert client.api_get("/healthz").status_code == 200
+```
+
+For Streamlit, you can run FluxLit’s Streamlit entrypoint via AppTest:
+
+```python
+at = client.streamlit(target="my_app:app", extra_sys_path=".")
+```
 
 ---
 
