@@ -19,6 +19,19 @@ python -m pytest
 python -m mypy src/fluxlit
 ```
 
+## Documentation (Sphinx)
+
+Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository.
+
+Build locally:
+
+```bash
+python -m pip install -e ".[docs]"
+sphinx-build -b html docs docs/_build/html
+```
+
+Open `docs/_build/html/index.html` in a browser. Configuration lives in [`docs/conf.py`](docs/conf.py); `.readthedocs.yaml` drives RTD builds.
+
 ## Testing notes
 
 - Prefer FluxLit’s wrapper **`FluxLitTestClient`** for gateway-level API tests (so prefix stripping and `/healthz` behavior are exercised through the gateway).
@@ -37,4 +50,4 @@ python -m mypy src/fluxlit
 ## Pull requests
 
 - Include tests when changing routing/runtime behavior.
-- Update docs (`README.md`, `FLUXLIT_PLAN.md`, `FLUXLIT_ROADMAP.md`) when you change public behavior.
+- Update docs (`README.md`, `docs/`, `FLUXLIT_PLAN.md`, `FLUXLIT_ROADMAP.md`) when you change public behavior.

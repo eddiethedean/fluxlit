@@ -1,6 +1,10 @@
 # FluxLit (`fluxlit`)
 
+[![Documentation Status](https://readthedocs.org/projects/fluxlit/badge/?version=stable)](https://fluxlit.readthedocs.io/en/stable/?badge=stable)
+
 Production-oriented unified runtime for **FastAPI** and **Streamlit**: one public port, one CLI, and a single `FluxLit` app object for APIs plus UI pages.
+
+**Full documentation:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) (user guide, CLI, configuration, API reference).
 
 **Docs in this repo:** [Product & architecture plan](FLUXLIT_PLAN.md) · [Development roadmap](FLUXLIT_ROADMAP.md)
 

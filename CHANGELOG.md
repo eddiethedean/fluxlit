@@ -25,4 +25,4 @@
 
 ## Unreleased
 
-- (none)
+- **Docs:** Sphinx + MyST site under `docs/`, optional `pip install -e ".[docs]"`, Read the Docs config (`.readthedocs.yaml`), CI `docs` job, PyPI `Documentation` URL points to RTD.
