@@ -38,3 +38,4 @@
 - **Tests:** broader JWT/OIDC/BFF/error-path coverage, Streamlit auth helpers, security middleware, and `ApiClient` header merging / request-id propagation.
 - **UX:** `FluxlitSettings` gains `FLUXLIT_JWT_*` and `FLUXLIT_OIDC_BFF_SECRET`; `JWTBearer.from_fluxlit_settings`, `FluxLit.make_jwt_bearer`, `FluxLit.attach_oidc_login`, and `prepare_streamlit_api_client` for less boilerplate (docs updated).
 - **Docs / README:** Docs table and new README section on calling secured APIs from Streamlit; quickstart + docs index explain injected `client` vs `for_fluxlit` / `prepare_streamlit_api_client`; features list and package table reflect shipped auth modules; auth-recipes and security cross-link the reference example.
+- **Security:** Add `SECURITY.md` (supported versions, private reporting, `pip-audit` usage); CI `security-audit` job runs `pip-audit` after installing `.[auth]` (runtime-relevant tree); sdist includes `SECURITY.md`.

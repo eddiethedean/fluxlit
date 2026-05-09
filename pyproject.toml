@@ -68,6 +68,7 @@ fluxlit = "fluxlit.cli:main"
 Homepage = "https://github.com/eddiethedean/fluxlit"
 Documentation = "https://fluxlit.readthedocs.io/en/stable/"
 Changelog = "https://github.com/eddiethedean/fluxlit/blob/main/CHANGELOG.md"
+Security = "https://github.com/eddiethedean/fluxlit/blob/main/SECURITY.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fluxlit"]
@@ -80,6 +81,7 @@ include = [
   "LICENSE",
   "README.md",
   "CHANGELOG.md",
+  "SECURITY.md",
   "CONTRIBUTING.md",
   "PLAN.md",
   "ROADMAP.md",

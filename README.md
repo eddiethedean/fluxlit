@@ -11,6 +11,8 @@ Production-oriented unified runtime for **FastAPI** and **Streamlit**: one publi
 
 **Documentation (hosted):** [https://fluxlit.readthedocs.io/en/stable/](https://fluxlit.readthedocs.io/en/stable/)
 
+**Security:** Vulnerability reporting and dependency audit notes are in [`SECURITY.md`](SECURITY.md). CI runs `pip-audit` after installing the **`auth`** extra (core + PyJWT/cryptography).
+
 | Topic | Read the Docs |
 |--------|----------------|
 | Quick start | [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html) |
