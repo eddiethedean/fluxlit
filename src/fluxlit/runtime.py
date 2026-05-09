@@ -133,7 +133,7 @@ def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -
     # Prefer CTRL_BREAK_EVENT on Windows; SIGINT on Unix.
     if sys.platform.startswith("win"):
         with contextlib.suppress(Exception):
-            proc.send_signal(getattr(signal, "CTRL_BREAK_EVENT"))
+            proc.send_signal(getattr(signal, "CTRL_BREAK_EVENT"))  # noqa: B009
     else:
         with contextlib.suppress(Exception):
             proc.send_signal(signal.SIGINT)
@@ -218,7 +218,7 @@ def run_unified(
     popen_kwargs: dict[str, Any] = {"env": env}
     if sys.platform.startswith("win"):
         # New process group so we can send CTRL_BREAK_EVENT.
-        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP")
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP")  # noqa: B009
     else:
         popen_kwargs["start_new_session"] = True
 
