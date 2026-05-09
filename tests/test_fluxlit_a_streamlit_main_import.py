@@ -11,6 +11,7 @@ import importlib
 import sys
 import types
 from collections.abc import Iterator
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -21,11 +22,11 @@ class StreamlitStop(Exception):
 
 
 @pytest.fixture
-def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[types.SimpleNamespace]:
+def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     saved_streamlit = sys.modules.pop("streamlit", None)
     saved_main = sys.modules.pop("fluxlit.streamlit_main", None)
 
-    st = types.SimpleNamespace()
+    st: Any = types.ModuleType("streamlit")
     st._errors: list[str] = []
     st.set_page_config = mock.Mock()
     st.Page = mock.Mock(return_value=object())
@@ -57,7 +58,7 @@ def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[types.SimpleName
 
 
 def test_streamlit_main_errors_when_env_missing(
-    fake_streamlit: types.SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+    fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("FLUXLIT_APP", raising=False)
     sys.modules.pop("fluxlit.streamlit_main", None)
@@ -67,7 +68,7 @@ def test_streamlit_main_errors_when_env_missing(
 
 
 def test_streamlit_main_invalid_app_spec_raises(
-    fake_streamlit: types.SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+    fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("FLUXLIT_APP", "nocolon")
     sys.modules.pop("fluxlit.streamlit_main", None)
@@ -76,7 +77,7 @@ def test_streamlit_main_invalid_app_spec_raises(
 
 
 def test_streamlit_main_no_pages_shows_hint(
-    tmp_path, fake_streamlit: types.SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "sm_np.py").write_text(
         "from fluxlit import FluxLit\napp = FluxLit(title='NP Title')\n",
@@ -93,7 +94,7 @@ def test_streamlit_main_no_pages_shows_hint(
 
 
 def test_streamlit_main_with_pages_runs_navigation(
-    tmp_path, fake_streamlit: types.SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (tmp_path / "sm_pg.py").write_text(
         "from fluxlit import FluxLit\n"

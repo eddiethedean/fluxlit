@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import ipaddress
 import os
 import signal
 import socket
@@ -11,10 +12,12 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import uvicorn
+from starlette.types import ASGIApp
 
 from fluxlit.gateway import build_gateway
 
@@ -29,12 +32,44 @@ def find_free_port() -> int:
         return int(s.getsockname()[1])
 
 
+def _loopback_http_host_for_client(bind_host: str) -> str:
+    """Host segment for URLs used from the Streamlit subprocess to reach the gateway.
+
+    ``0.0.0.0`` / empty bind addresses are valid for listening but invalid as HTTP
+    client targets; use loopback. IPv6 literals are bracketed for RFC 3986 URLs.
+    """
+    h = bind_host.strip()
+    if h in {"", "0.0.0.0"}:
+        return "127.0.0.1"
+    bare = h[1:-1] if h.startswith("[") and h.endswith("]") else h
+    try:
+        addr = ipaddress.ip_address(bare)
+    except ValueError:
+        return h
+    if isinstance(addr, ipaddress.IPv6Address):
+        return f"[{addr}]"
+    return str(addr)
+
+
+def internal_api_base_url(*, bind_host: str, port: int, api_mount_path: str) -> str:
+    """Build ``FLUXLIT_INTERNAL_API_BASE`` for the Streamlit child (same machine as gateway).
+
+    ``bind_host`` is the Uvicorn bind address; the URL uses a loopback-safe host when
+    needed so :class:`~fluxlit.client.ApiClient` can connect from the sidecar process.
+    """
+    path = api_mount_path if api_mount_path.startswith("/") else f"/{api_mount_path}"
+    path = path.rstrip("/") or "/"
+    netloc = f"{_loopback_http_host_for_client(bind_host)}:{port}"
+    return urllib.parse.urlunparse(("http", netloc, path, "", "", ""))
+
+
 def load_fluxlit(target: str) -> FluxLit:
     """Import ``module:attribute`` and ensure the object is a :class:`~fluxlit.app.FluxLit`.
 
     Raises:
         ValueError: If ``target`` is not a ``module:attr`` string.
         ImportError: If ``module`` cannot be imported.
+        AttributeError: If ``module`` has no such attribute.
         TypeError: If ``attr`` is not a :class:`~fluxlit.app.FluxLit` instance.
     """
     from fluxlit.app import FluxLit as FluxLitCls
@@ -121,7 +156,7 @@ def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -
         proc.kill()
 
 
-def create_gateway_app() -> object:
+def create_gateway_app() -> ASGIApp:
     """ASGI factory for Uvicorn ``--factory`` reload mode.
 
     Reads ``FLUXLIT_APP`` (import target), ``FLUXLIT_STREAMLIT_UPSTREAM`` (Streamlit base URL),
@@ -151,7 +186,8 @@ def run_unified(
     """Start Streamlit on a free localhost port and Uvicorn on ``host:port``.
 
     Sets process environment so ``create_gateway_app`` / Streamlit entry can resolve
-    the app and internal API base (``http://{host}:{port}{api_prefix}``). If Streamlit
+    the app and internal API base (loopback-safe URL derived from ``host``, ``port``,
+    and ``api_mount_path``). If Streamlit
     exits, the gateway is stopped. On shutdown, the Streamlit child receives SIGINT /
     terminate / kill (platform-dependent).
 
@@ -170,7 +206,7 @@ def run_unified(
     fl = load_fluxlit(target)
 
     api_prefix = fl.settings.api_mount_path
-    internal_api_base = f"http://{host}:{port}{api_prefix}"
+    internal_api_base = internal_api_base_url(bind_host=host, port=port, api_mount_path=api_prefix)
 
     env = _build_streamlit_env(
         target=target,

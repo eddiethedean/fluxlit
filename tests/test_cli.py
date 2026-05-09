@@ -27,6 +27,50 @@ def test_doctor_prints_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert "demo_cli_app:app" in res.stdout
 
 
+def test_doctor_warns_when_internal_api_path_mismatches_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_mount_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='M', settings=FluxlitSettings("
+        "api_mount_path='/api/v1', gateway_port=59203))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:59203/api")
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_mount_app:app"])
+    assert res.exit_code == 0
+    assert "WARN" in res.stdout
+    assert "api_mount_path" in res.stdout
+
+
+def test_doctor_passes_when_internal_api_path_matches_mount(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_mount_ok.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='M', settings=FluxlitSettings("
+        "api_mount_path='/api/v1', gateway_port=59204))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:59204/api/v1")
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_mount_ok:app"])
+    assert res.exit_code == 0
+    assert "FLUXLIT_INTERNAL_API_BASE" in res.stdout
+    assert "matches api_mount_path" in res.stdout
+
+
 def test_doctor_exit_one_on_failure_without_warnings_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

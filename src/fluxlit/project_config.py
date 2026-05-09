@@ -63,7 +63,8 @@ def load_project_config(cwd: Path | None = None) -> ProjectConfig | None:
     """Parse ``fluxlit.toml`` or ``[tool.fluxlit]`` in ``pyproject.toml``.
 
     If both files exist, ``fluxlit.toml`` takes precedence. Returns ``None`` if
-    neither file exists or the relevant section is missing / invalid.
+    neither file exists, the relevant section is missing, the file is not valid TOML,
+    or the top-level value is not a table (dict).
 
     Args:
         cwd: Directory to search; defaults to :func:`pathlib.Path.cwd`.
@@ -76,13 +77,19 @@ def load_project_config(cwd: Path | None = None) -> ProjectConfig | None:
     pyproject_path = root / "pyproject.toml"
 
     if fluxlit_path.is_file():
-        data = tomllib.loads(fluxlit_path.read_text(encoding="utf-8"))
+        try:
+            data = tomllib.loads(fluxlit_path.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError:
+            return None
         if not isinstance(data, dict):
             return None
         return _parse_table(data)
 
     if pyproject_path.is_file():
-        data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        try:
+            data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError:
+            return None
         tool = data.get("tool")
         if not isinstance(tool, dict):
             return None

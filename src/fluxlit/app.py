@@ -108,6 +108,10 @@ class FluxLit:
         Raises:
             TypeError: If ``package`` is not a package.
             ImportError: If ``{package}.{directory}`` cannot be imported.
+
+        Note:
+            If a page module's ``register(app)`` raises after earlier modules ran,
+            pages from those modules remain registered (best-effort; no rollback).
         """
         parent = importlib.import_module(package)
         paths = getattr(parent, "__path__", None)

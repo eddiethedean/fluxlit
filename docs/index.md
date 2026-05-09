@@ -2,7 +2,7 @@
 
 Production-oriented unified runtime for **FastAPI** and **Streamlit**: one public port, one CLI, and a single **FluxLit** app object for HTTP APIs plus Streamlit UI pages.
 
-**[PyPI](https://pypi.org/project/fluxlit/)** · **[GitHub](https://github.com/odosmatthews/fluxlit)**
+**[PyPI](https://pypi.org/project/fluxlit/)** · **[GitHub](https://github.com/eddiethedean/fluxlit)**
 
 ## At a glance
 

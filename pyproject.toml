@@ -56,9 +56,9 @@ docs = [
 fluxlit = "fluxlit.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/odosmatthews/fluxlit"
+Homepage = "https://github.com/eddiethedean/fluxlit"
 Documentation = "https://fluxlit.readthedocs.io/en/stable/"
-Changelog = "https://github.com/odosmatthews/fluxlit/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/eddiethedean/fluxlit/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fluxlit"]

@@ -10,7 +10,6 @@ from __future__ import annotations
 import logging
 import urllib.parse
 from collections.abc import AsyncIterator
-from typing import cast
 
 import anyio
 import httpx
@@ -184,21 +183,24 @@ async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str)
         await send({"type": "http.response.body", "body": b"Bad Gateway"})
         return
 
-    response_headers = [
-        (k.lower().encode("latin-1"), v.encode("latin-1"))
-        for k, v in response.headers.multi_items()
-        if k.lower() not in {"transfer-encoding", "connection"}
-    ]
-    await send(
-        {
-            "type": "http.response.start",
-            "status": response.status_code,
-            "headers": response_headers,
-        }
-    )
-    async for chunk in response.aiter_raw():
-        await send({"type": "http.response.body", "body": chunk, "more_body": True})
-    await send({"type": "http.response.body", "body": b""})
+    try:
+        response_headers = [
+            (k.lower().encode("latin-1"), v.encode("latin-1"))
+            for k, v in response.headers.multi_items()
+            if k.lower() not in {"transfer-encoding", "connection"}
+        ]
+        await send(
+            {
+                "type": "http.response.start",
+                "status": response.status_code,
+                "headers": response_headers,
+            }
+        )
+        async for chunk in response.aiter_raw():
+            await send({"type": "http.response.body", "body": chunk, "more_body": True})
+        await send({"type": "http.response.body", "body": b""})
+    finally:
+        await response.aclose()
 
 
 def _parse_ws_target(scope: Scope, upstream: str) -> str:
@@ -213,13 +215,13 @@ def _parse_ws_target(scope: Scope, upstream: str) -> str:
     netloc = f"{host}:{port}" if port else host
     base_path = parsed.path.rstrip("/")
     full_path = f"{base_path}{path}" if base_path else path
-    # urlunparse is typed loosely in some stubs; keep str contract for mypy.
-    return cast(str, urllib.parse.urlunparse((scheme, netloc, full_path, "", "", "")))
+    return str(urllib.parse.urlunparse((scheme, netloc, full_path, "", "", "")))
 
 
 async def _proxy_websocket(scope: Scope, receive: Receive, send: Send, upstream: str) -> None:
     first = await receive()
     if first["type"] != "websocket.connect":
+        await send({"type": "websocket.close", "code": 1002})
         return
 
     target = _parse_ws_target(scope, upstream)

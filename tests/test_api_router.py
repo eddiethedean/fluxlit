@@ -23,6 +23,6 @@ def test_router_prefix_and_string_tags() -> None:
     assert r.tags == ["a", "b"]
 
 
-def test_router_accepts_enum_tags() -> None:
-    r = router(tags=[_Tag.users])
-    assert r.tags == [_Tag.users]
+def test_router_accepts_string_tags_from_enum_values() -> None:
+    r = router(tags=[_Tag.users.value])
+    assert r.tags == ["users"]

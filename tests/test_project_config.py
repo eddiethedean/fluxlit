@@ -10,6 +10,16 @@ from fluxlit.project_config import (
 )
 
 
+def test_malformed_fluxlit_toml_returns_none(tmp_path: Path) -> None:
+    (tmp_path / "fluxlit.toml").write_text("this is not valid toml [[\n", encoding="utf-8")
+    assert load_project_config(tmp_path) is None
+
+
+def test_malformed_pyproject_toml_returns_none(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[tool.fluxlit\n", encoding="utf-8")
+    assert load_project_config(tmp_path) is None
+
+
 def test_load_fluxlit_toml(tmp_path: Path) -> None:
     (tmp_path / "fluxlit.toml").write_text(
         'target = "my:app"\ngateway_port = 9000\nlog_level = "debug"\n',

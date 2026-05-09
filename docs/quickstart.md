@@ -9,7 +9,7 @@ pip install fluxlit
 For contributors working on FluxLit itself:
 
 ```bash
-git clone https://github.com/odosmatthews/fluxlit.git
+git clone https://github.com/eddiethedean/fluxlit.git
 cd fluxlit
 pip install -e ".[dev]"
 ```

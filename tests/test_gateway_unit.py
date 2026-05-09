@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import MutableMapping
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
@@ -88,8 +91,8 @@ def test_request_id_from_scope_header_or_generated() -> None:
 async def test_not_found_sends_404() -> None:
     messages: list[dict[str, Any]] = []
 
-    async def send(msg: dict[str, Any]) -> None:
-        messages.append(msg)
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        messages.append(dict(msg))
 
     await _not_found(send)
     assert messages[0]["type"] == "http.response.start"
@@ -102,8 +105,8 @@ async def test_gateway_unknown_scope_type_is_404() -> None:
     gateway = build_gateway(FastAPI(), "http://127.0.0.1:9", api_prefix="/api")
     sent: list[dict[str, Any]] = []
 
-    async def send(msg: dict[str, Any]) -> None:
-        sent.append(msg)
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
 
     async def receive() -> dict[str, Any]:
         return {"type": "http.disconnect"}
@@ -113,7 +116,7 @@ async def test_gateway_unknown_scope_type_is_404() -> None:
         "path": "/anything",
         "headers": [],
     }
-    await gateway(scope, receive, send)  # type: ignore[arg-type]
+    await gateway(scope, receive, send)
     assert sent[0]["status"] == 404
 
 
@@ -123,3 +126,55 @@ def test_websocket_proxy_upstream_refused_closes() -> None:
         with pytest.raises(WebSocketDisconnect):
             with client.websocket_connect("/_stcore/ws"):
                 pass
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_aclose_on_stream_error() -> None:
+    from fluxlit.gateway import _proxy_http
+
+    async def failing_raw() -> Any:
+        raise RuntimeError("stream broken")
+        yield b""  # pragma: no cover
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.headers = httpx.Headers({})
+    mock_resp.aiter_raw = failing_raw
+    mock_resp.aclose = AsyncMock()
+
+    class _FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> object:
+            return mock_resp
+
+    with patch("fluxlit.gateway.httpx.AsyncClient", _FakeAsyncClient):
+        sent: list[dict[str, Any]] = []
+
+        async def send(msg: MutableMapping[str, Any]) -> None:
+            sent.append(dict(msg))
+
+        async def receive() -> dict[str, Any]:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        scope: dict[str, Any] = {
+            "type": "http",
+            "method": "GET",
+            "path": "/x",
+            "headers": [],
+            "query_string": b"",
+        }
+        with pytest.raises(RuntimeError, match="stream broken"):
+            await _proxy_http(scope, receive, send, "http://127.0.0.1:9")
+
+    mock_resp.aclose.assert_awaited_once()

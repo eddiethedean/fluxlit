@@ -6,6 +6,7 @@ from fluxlit.runtime import (
     _build_streamlit_cmd,
     _build_streamlit_env,
     find_free_port,
+    internal_api_base_url,
     load_fluxlit,
 )
 
@@ -31,6 +32,33 @@ def test_load_fluxlit_missing_attribute(tmp_path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.syspath_prepend(str(tmp_path))
     with pytest.raises(AttributeError):
         load_fluxlit("mod_attr:there_is_no_such_attr")
+
+
+def test_internal_api_base_url_maps_inaddr_any_to_loopback() -> None:
+    assert internal_api_base_url(bind_host="0.0.0.0", port=8000, api_mount_path="/api") == (
+        "http://127.0.0.1:8000/api"
+    )
+    assert internal_api_base_url(bind_host="", port=9000, api_mount_path="/api") == (
+        "http://127.0.0.1:9000/api"
+    )
+
+
+def test_internal_api_base_url_brackets_ipv6() -> None:
+    assert internal_api_base_url(bind_host="::1", port=8000, api_mount_path="/api") == (
+        "http://[::1]:8000/api"
+    )
+    assert internal_api_base_url(bind_host="[::1]", port=8000, api_mount_path="/v1") == (
+        "http://[::1]:8000/v1"
+    )
+
+
+def test_internal_api_base_url_plain_hostnames() -> None:
+    assert internal_api_base_url(bind_host="127.0.0.1", port=1, api_mount_path="/api") == (
+        "http://127.0.0.1:1/api"
+    )
+    assert internal_api_base_url(bind_host="localhost", port=8000, api_mount_path="api") == (
+        "http://localhost:8000/api"
+    )
 
 
 def test_find_free_port_returns_ephemeral_port() -> None:

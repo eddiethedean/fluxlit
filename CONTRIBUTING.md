@@ -5,7 +5,7 @@ Thanks for helping improve FluxLit.
 ## Setup
 
 ```bash
-git clone https://github.com/odosmatthews/fluxlit.git
+git clone https://github.com/eddiethedean/fluxlit.git
 cd fluxlit
 python -m pip install -e ".[dev]"
 ```

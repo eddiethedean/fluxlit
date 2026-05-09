@@ -18,7 +18,7 @@ Production-oriented unified runtime for **FastAPI** and **Streamlit**: one publi
 | Changelog | [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) |
 | Roadmap | [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
 
-**Also in the repo:** [Product & architecture plan](https://github.com/odosmatthews/fluxlit/blob/main/PLAN.md) (source for long-form product context; overview is on Read the Docs under [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html)).
+**Also in the repo:** [Product & architecture plan](https://github.com/eddiethedean/fluxlit/blob/main/PLAN.md) (source for long-form product context; overview is on Read the Docs under [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html)).
 
 ---
 
@@ -44,7 +44,7 @@ pip install fluxlit
 For local development of FluxLit itself:
 
 ```bash
-git clone https://github.com/odosmatthews/fluxlit.git
+git clone https://github.com/eddiethedean/fluxlit.git
 cd fluxlit
 pip install -e ".[dev]"
 ```

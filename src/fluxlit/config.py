@@ -22,6 +22,8 @@ class FluxlitSettings(BaseSettings):
     - ``api_mount_path`` — public URL prefix for the API (default ``/api``).
     - ``root_path`` — ASGI root when behind a reverse proxy.
     - ``enable_request_logging`` — per-request INFO logs on the FastAPI app.
+    - ``streamlit_host`` / ``streamlit_port`` / ``streamlit_public_path`` — reserved for
+      future layout; documented on fields, not read by the runtime today.
     """
 
     model_config = SettingsConfigDict(
@@ -34,11 +36,20 @@ class FluxlitSettings(BaseSettings):
     title: str = "FluxLit"
     gateway_host: str = "127.0.0.1"
     gateway_port: int = 8000
-    streamlit_host: str = "127.0.0.1"
-    streamlit_port: int = 0
+    streamlit_host: str = Field(
+        default="127.0.0.1",
+        description="Reserved for future use; Streamlit bind is managed by the runtime.",
+    )
+    streamlit_port: int = Field(
+        default=0,
+        description="Reserved for future use; sidecar Streamlit uses an ephemeral port.",
+    )
     log_level: str = "info"
     api_mount_path: str = "/api"
-    streamlit_public_path: str = ""
+    streamlit_public_path: str = Field(
+        default="",
+        description="Reserved for future use (e.g. public URL path hints).",
+    )
     root_path: str = Field(
         default="",
         description="ASGI root path when served behind a reverse proxy (e.g. /myapp).",
