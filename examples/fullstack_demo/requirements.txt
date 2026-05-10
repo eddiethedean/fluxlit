@@ -1,0 +1,8 @@
+# From repo root: pip install -e ".[auth]" && pip install -r examples/fullstack_demo/requirements.txt
+sqlmodel>=0.0.22
+sqlalchemy>=2.0
+rapsqlite[sqlalchemy]>=0.3.2
+greenlet>=3.0
+alembic>=1.13
+passlib[bcrypt]>=1.7.4
+email-validator>=2.0
