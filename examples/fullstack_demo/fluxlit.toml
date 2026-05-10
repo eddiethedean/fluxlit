@@ -1,0 +1,2 @@
+# Resolved when you run ``fluxlit dev`` from this directory (see ``load_project_config``).
+target = "main:app"

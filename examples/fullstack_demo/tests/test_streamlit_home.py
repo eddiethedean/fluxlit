@@ -16,7 +16,7 @@ def test_streamlit_home_renders_without_error(fluxlit_client: FluxLitTestClient)
     if tuple(int(x) for x in streamlit.__version__.split(".")[:2]) < (1, 30):
         pytest.skip("Streamlit AppTest requires 1.30+")
 
-    at = fluxlit_client.streamlit(target="app:app", extra_sys_path=_EXAMPLE_ROOT)
+    at = fluxlit_client.streamlit(target="main:app", extra_sys_path=_EXAMPLE_ROOT)
     assert len(at.exception) == 0
     markdown_values = [getattr(m, "value", None) or "" for m in at.markdown]
     assert any("FluxLit demo" in str(v) for v in markdown_values)

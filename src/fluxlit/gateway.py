@@ -1,8 +1,17 @@
 """ASGI gateway: dispatch ``api_prefix`` to FastAPI, proxy everything else to Streamlit.
 
 HTTP requests and WebSockets are forwarded to an upstream base URL (the Streamlit
-server). Request IDs are taken from ``X-Request-ID`` or generated, and stored in
+server). The client's ``Host`` header is preserved on the upstream request so
+Streamlit sees the **public** gateway host/port (e.g. ``127.0.0.1:8777``), matching
+the browser's ``Origin``; otherwise WebSocket same-origin checks fail and the UI
+stays blank/black.
+
+Request IDs are taken from ``X-Request-ID`` or generated, and stored in
 :mod:`fluxlit.logging_context` for the duration of each request.
+
+Top-level ``/docs``, ``/redoc``, and ``/openapi.json`` redirect to the same paths under
+``api_prefix`` so Swagger is not accidentally proxied to Streamlit (which would look
+like a blank page).
 """
 
 from __future__ import annotations
@@ -80,6 +89,17 @@ def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/a
                 await _proxy_websocket(scope, receive, send, upstream)
                 return
             if scope["type"] == "http":
+                method = scope.get("method", "GET").upper()
+                if method in {"GET", "HEAD"}:
+                    if path in {"/docs", "/docs/"}:
+                        await _redirect(send, f"{prefix}/docs")
+                        return
+                    if path in {"/redoc", "/redoc/"}:
+                        await _redirect(send, f"{prefix}/redoc")
+                        return
+                    if path in {"/openapi.json"}:
+                        await _redirect(send, f"{prefix}/openapi.json")
+                        return
                 await _proxy_http(scope, receive, send, upstream)
                 return
             await _not_found(send)
@@ -90,11 +110,22 @@ def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/a
 
 
 def _strip_prefix_scope(scope: Scope, prefix: str) -> Scope:
+    """Strip ``prefix`` from the URL path and extend ``root_path`` (ASGI).
+
+    FastAPI's Swagger / ReDoc handlers build ``openapi_url`` as
+    ``scope["root_path"] + app.openapi_url``. Without setting ``root_path`` to the
+    gateway's API mount (e.g. ``/api``), the embedded URL is ``/openapi.json``; the
+    browser then requests the **gateway** root, which is proxied to Streamlit — not
+    JSON — and Swagger UI reports a missing OpenAPI version.
+    """
     path = scope.get("path") or "/"
     rest = path.removeprefix(prefix) or "/"
     new_scope: Scope = dict(scope)
     new_scope["path"] = rest
     new_scope["raw_path"] = rest.encode("latin-1")
+    prior = (scope.get("root_path") or "").rstrip("/")
+    mount = prefix.rstrip("/")
+    new_scope["root_path"] = f"{prior}{mount}" if prior else mount
     return new_scope
 
 
@@ -107,6 +138,21 @@ async def _not_found(send: Send) -> None:
         }
     )
     await send({"type": "http.response.body", "body": b"Not Found"})
+
+
+async def _redirect(send: Send, location: str, *, status: int = 307) -> None:
+    """Send a redirect; default 307 so the client keeps the same method (GET/HEAD)."""
+    await send(
+        {
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                (b"location", location.encode("ascii")),
+                (b"content-length", b"0"),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": b""})
 
 
 def _build_target_url(scope: Scope, upstream: str) -> str:
@@ -122,6 +168,14 @@ def _upstream_host_header(upstream: str) -> str:
     if parsed.port:
         return f"{parsed.hostname}:{parsed.port}"
     return parsed.hostname or "127.0.0.1"
+
+
+def _public_host_from_scope(scope: Scope, upstream: str) -> str:
+    """Host header the browser used (gateway); fallback to upstream netloc."""
+    for k, v in scope.get("headers") or []:
+        if k.lower() == b"host":
+            return v.decode("latin-1").strip() or _upstream_host_header(upstream)
+    return _upstream_host_header(upstream)
 
 
 def _filter_request_headers(raw: list[tuple[bytes, bytes]]) -> list[tuple[bytes, bytes]]:
@@ -154,7 +208,7 @@ async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str)
         (k.decode("latin-1"), v.decode("latin-1")) for k, v in _filter_request_headers(raw_headers)
     ]
     headers = httpx.Headers(pairs)
-    headers["host"] = _upstream_host_header(upstream)
+    headers["host"] = _public_host_from_scope(scope, upstream)
 
     async def request_body() -> AsyncIterator[bytes]:
         while True:
@@ -230,7 +284,8 @@ async def _proxy_websocket(scope: Scope, receive: Receive, send: Send, upstream:
 
     target = _parse_ws_target(scope, upstream)
     headers = scope.get("headers") or []
-    extra: list[tuple[str, str]] = []
+    public_host = _public_host_from_scope(scope, upstream)
+    extra: list[tuple[str, str]] = [("Host", public_host)]
     for k, v in headers:
         key = k.decode("latin-1")
         lk = key.lower()

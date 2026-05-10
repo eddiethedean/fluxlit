@@ -21,7 +21,7 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{EXAMPLE_ROOT / '.pytest_impor
 if str(EXAMPLE_ROOT) not in sys.path:
     sys.path.insert(0, str(EXAMPLE_ROOT))
 
-import app as demo_app  # noqa: E402
+import main as demo_main  # noqa: E402
 from database import get_db  # noqa: E402
 
 
@@ -60,8 +60,8 @@ def fluxlit_client(async_engine):
         async with session_factory() as session:
             yield session
 
-    demo_app.app.api.dependency_overrides[get_db] = _override_db
+    demo_main.app.api.dependency_overrides[get_db] = _override_db
     try:
-        yield FluxLitTestClient(demo_app.app)
+        yield FluxLitTestClient(demo_main.app)
     finally:
-        demo_app.app.api.dependency_overrides.clear()
+        demo_main.app.api.dependency_overrides.clear()

@@ -1,11 +1,16 @@
 """FluxLit full-stack demo: FastAPI + SQLite + Alembic + Streamlit + JWT.
 
+The entry module is named ``main`` (not ``app``) so ``import app`` never resolves to
+FluxLit's own ``fluxlit.app`` package when ``PYTHONPATH`` includes ``.../src/fluxlit``.
+
 Run from this directory::
 
     pip install -e '../../[auth]'
     pip install -r requirements.txt
     alembic upgrade head
-    fluxlit dev app:app
+    export PYTHONPATH="$(pwd)"
+    fluxlit dev
+    # or explicitly: fluxlit dev main:app
 """
 
 from __future__ import annotations

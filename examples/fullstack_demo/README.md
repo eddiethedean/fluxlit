@@ -13,7 +13,8 @@ pip install -e '.[auth]'
 pip install -r examples/fullstack_demo/requirements.txt
 cd examples/fullstack_demo
 alembic upgrade head
-fluxlit dev app:app
+export PYTHONPATH="$(pwd)"
+fluxlit dev
 ```
 
 Or install editable from the example directory:
@@ -23,10 +24,15 @@ cd examples/fullstack_demo
 pip install -e '../../[auth]'
 pip install -r requirements.txt
 alembic upgrade head
-fluxlit dev app:app
+export PYTHONPATH="$(pwd)"
+fluxlit dev
 ```
 
-Open the URL printed by FluxLit (Streamlit + API on one port).
+**Why `main.py` and `fluxlit.toml`?** The FluxLit instance lives in **`main.py`** as **`app`**, and the default target is **`main:app`**. Do not name the module `app.py`: if `PYTHONPATH` accidentally includes `…/fluxlit/src/fluxlit`, then `import app` loads **FluxLit’s library** `fluxlit/app.py` (the `FluxLit` class), which has **no** `app` attribute — Streamlit then fails with `module 'app' has no attribute 'app'`.
+
+Set **`PYTHONPATH`** to this directory so `main` resolves. **`fluxlit.toml`** sets `target = "main:app"` so you can run plain **`fluxlit dev`** from this folder. Open the **gateway** URL FluxLit prints (e.g. `http://127.0.0.1:8501`); Streamlit may use another ephemeral port internally.
+
+**API docs:** Swagger is served at **`/api/docs`** (and ReDoc at **`/api/redoc`**). As of recent FluxLit versions, **`/docs`** at the gateway root redirects there so you are not sent to Streamlit (which used to look like a blank page).
 
 `rapsqlite` ships wheels for common platforms; building from source needs a Rust toolchain (see [rapsqlite docs](https://rapsqlite.readthedocs.io/en/latest/installation.html)).
 
@@ -39,7 +45,7 @@ pip install -r requirements-test.txt
 pytest
 ```
 
-Tests use FluxLit’s **`FluxLitTestClient`** (`fluxlit.testing`): HTTP goes through **`build_gateway`** with the real **`/api`** prefix (same as production), and **`openapi()`** / **`api_get("/healthz")`** match what the combined app exposes. **`streamlit()`** runs Streamlit’s **`AppTest`** against `fluxlit.streamlit_main` with `FLUXLIT_APP=app:app`.
+Tests use FluxLit’s **`FluxLitTestClient`** (`fluxlit.testing`): HTTP goes through **`build_gateway`** with the real **`/api`** prefix (same as production), and **`openapi()`** / **`api_get("/healthz")`** match what the combined app exposes. **`streamlit()`** runs Streamlit’s **`AppTest`** against `fluxlit.streamlit_main` with `FLUXLIT_APP=main:app`.
 
 Each test gets a temporary `sqlite+rapsqlite` file and a FastAPI **`get_db`** override so `fullstack_demo.db` is never used.
 
@@ -65,6 +71,7 @@ Each test gets a temporary `sqlite+rapsqlite` file and a FastAPI **`get_db`** ov
 | `models.py` | SQLModel `User` table |
 | `database.py` | Async engine (rapsqlite) + `get_db` |
 | `security.py` | bcrypt + JWT minting |
-| `app.py` | `FluxLit` app: async register/login/`/users/me` + Streamlit UI |
+| `main.py` | `FluxLit` instance `app`: async register/login/`/users/me` + Streamlit UI |
+| `fluxlit.toml` | Default `target = "main:app"` for `fluxlit dev` |
 | `alembic/` | Migrations (`users` table, sync sqlite on same file) |
 | `tests/` | Pytest suite using `FluxLitTestClient` + `AppTest` |

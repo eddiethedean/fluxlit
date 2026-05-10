@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 import pytest
 from fastapi import FastAPI, Request
@@ -38,6 +39,18 @@ def test_openapi_available_under_api_prefix(api: FastAPI) -> None:
     assert "/ping" in body.get("paths", {})
 
 
+def test_swagger_ui_loads_openapi_under_api_prefix(api: FastAPI) -> None:
+    """Embedded OpenAPI URL must include the gateway prefix (ASGI root_path)."""
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    html = client.get("/api/docs").text
+    m = re.search(r"url: '([^']+)'", html)
+    assert m is not None
+    assert m.group(1) == "/api/openapi.json"
+    spec = client.get(m.group(1)).json()
+    assert spec.get("openapi", "").startswith("3.")
+
+
 def test_custom_api_prefix(api: FastAPI) -> None:
     gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/x")
     client = TestClient(gateway)
@@ -69,6 +82,25 @@ def test_gateway_log_includes_request_id(api: FastAPI, caplog: pytest.LogCapture
     client.get("/api/ping", headers={"X-Request-ID": "unit-test-rid"})
     assert any(
         "unit-test-rid" in r.getMessage() for r in caplog.records if r.name == "fluxlit.gateway"
+    )
+
+
+def test_root_docs_redirects_to_prefixed_docs(api: FastAPI) -> None:
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
+    client = TestClient(gateway)
+    res = client.get("/docs", follow_redirects=False)
+    assert res.status_code == 307
+    assert res.headers["location"] == "/api/docs"
+    assert client.get("/api/docs").status_code == 200
+
+
+def test_root_redoc_and_openapi_redirect(api: FastAPI) -> None:
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/v1")
+    client = TestClient(gateway)
+    assert client.get("/redoc", follow_redirects=False).headers["location"] == "/v1/redoc"
+    assert (
+        client.get("/openapi.json", follow_redirects=False).headers["location"]
+        == "/v1/openapi.json"
     )
 
 

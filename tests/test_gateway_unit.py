@@ -15,6 +15,7 @@ from fluxlit.gateway import (
     _filter_request_headers,
     _not_found,
     _parse_ws_target,
+    _public_host_from_scope,
     _request_id_from_scope,
     _strip_prefix_scope,
     _upstream_host_header,
@@ -38,6 +39,21 @@ def test_upstream_host_header_with_port() -> None:
 
 def test_upstream_host_header_default_host_when_no_netloc() -> None:
     assert _upstream_host_header("http:///path-only") in {"127.0.0.1", "localhost"}
+
+
+def test_public_host_from_scope_uses_client_host() -> None:
+    scope: dict[str, Any] = {"headers": [(b"host", b"127.0.0.1:8777")]}
+    assert _public_host_from_scope(scope, "http://127.0.0.1:8501") == "127.0.0.1:8777"
+
+
+def test_public_host_from_scope_fallback_to_upstream() -> None:
+    scope: dict[str, Any] = {"headers": []}
+    assert _public_host_from_scope(scope, "http://127.0.0.1:8501") == "127.0.0.1:8501"
+
+
+def test_public_host_from_scope_empty_host_falls_back() -> None:
+    scope: dict[str, Any] = {"headers": [(b"host", b"  ")]}
+    assert _public_host_from_scope(scope, "http://127.0.0.1:8501") == "127.0.0.1:8501"
 
 
 def test_filter_request_headers_strips_hop_by_hop_and_host() -> None:
@@ -74,6 +90,7 @@ def test_strip_prefix_scope_normalizes_raw_path() -> None:
     new_scope = _strip_prefix_scope(scope, "/api")  # type: ignore[arg-type]
     assert new_scope["path"] == "/v1/ping"
     assert new_scope["raw_path"] == b"/v1/ping"
+    assert new_scope["root_path"] == "/api"
 
 
 def test_strip_prefix_scope_raw_path_latin1_non_ascii() -> None:
@@ -88,6 +105,20 @@ def test_strip_prefix_scope_raw_path_latin1_non_ascii() -> None:
     new_scope = _strip_prefix_scope(scope, "/api")  # type: ignore[arg-type]
     assert new_scope["path"] == "/café"
     assert new_scope["raw_path"] == "/café".encode("latin-1")
+    assert new_scope["root_path"] == "/api"
+
+
+def test_strip_prefix_scope_extends_existing_root_path() -> None:
+    scope: dict[str, Any] = {
+        "type": "http",
+        "path": "/api/ping",
+        "raw_path": b"/api/ping",
+        "root_path": "/myapp",
+        "headers": [],
+    }
+    new_scope = _strip_prefix_scope(scope, "/api")  # type: ignore[arg-type]
+    assert new_scope["path"] == "/ping"
+    assert new_scope["root_path"] == "/myapp/api"
 
 
 def test_request_id_from_scope_header_or_generated() -> None:
