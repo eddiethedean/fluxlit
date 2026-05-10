@@ -94,7 +94,7 @@ def _strip_prefix_scope(scope: Scope, prefix: str) -> Scope:
     rest = path.removeprefix(prefix) or "/"
     new_scope: Scope = dict(scope)
     new_scope["path"] = rest
-    new_scope["raw_path"] = rest.encode("ascii")
+    new_scope["raw_path"] = rest.encode("latin-1")
     return new_scope
 
 
@@ -196,9 +196,13 @@ async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str)
                 "headers": response_headers,
             }
         )
-        async for chunk in response.aiter_raw():
-            await send({"type": "http.response.body", "body": chunk, "more_body": True})
-        await send({"type": "http.response.body", "body": b""})
+        try:
+            async for chunk in response.aiter_raw():
+                await send({"type": "http.response.body", "body": chunk, "more_body": True})
+            await send({"type": "http.response.body", "body": b""})
+        except Exception:
+            _gateway_log.exception("gateway proxy: error streaming response body from upstream")
+            raise
     finally:
         await response.aclose()
 

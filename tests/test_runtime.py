@@ -41,6 +41,9 @@ def test_internal_api_base_url_maps_inaddr_any_to_loopback() -> None:
     assert internal_api_base_url(bind_host="", port=9000, api_mount_path="/api") == (
         "http://127.0.0.1:9000/api"
     )
+    assert internal_api_base_url(bind_host="::", port=8000, api_mount_path="/api") == (
+        "http://127.0.0.1:8000/api"
+    )
 
 
 def test_internal_api_base_url_brackets_ipv6() -> None:

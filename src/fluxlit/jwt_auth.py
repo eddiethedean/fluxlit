@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
+import anyio
 from fastapi import HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -119,6 +120,37 @@ class JWTBearer:
         msg = "JWT via settings needs FLUXLIT_JWT_HS256_SECRET or FLUXLIT_JWT_JWKS_URL"
         raise ValueError(msg)
 
+    def _decode_token_json(self, token: str) -> dict[str, Any]:
+        """Sync JWT decode (PyJWT + optional JWKS); run in a thread from :meth:`__call__`."""
+        jwt_mod = _require_pyjwt()
+        if self._config.hs256_secret is not None:
+            return cast(
+                dict[str, Any],
+                jwt_mod.decode(
+                    token,
+                    self._config.hs256_secret,
+                    algorithms=self._config.algorithms,
+                    audience=self._config.audience,
+                    issuer=self._config.issuer,
+                    leeway=self._config.leeway_seconds,
+                    options={"require": ["exp"]},
+                ),
+            )
+        assert self._jwks_client is not None
+        signing_key = self._jwks_client.get_signing_key_from_jwt(token)
+        return cast(
+            dict[str, Any],
+            jwt_mod.decode(
+                token,
+                signing_key.key,
+                algorithms=self._config.algorithms,
+                audience=self._config.audience,
+                issuer=self._config.issuer,
+                leeway=self._config.leeway_seconds,
+                options={"require": ["exp"]},
+            ),
+        )
+
     async def __call__(self, request: Request) -> StandardClaims:
         auth = request.headers.get("authorization")
         if not auth or not auth.lower().startswith("bearer "):
@@ -136,28 +168,7 @@ class JWTBearer:
             )
         jwt_mod = _require_pyjwt()
         try:
-            if self._config.hs256_secret is not None:
-                decoded = jwt_mod.decode(
-                    token,
-                    self._config.hs256_secret,
-                    algorithms=self._config.algorithms,
-                    audience=self._config.audience,
-                    issuer=self._config.issuer,
-                    leeway=self._config.leeway_seconds,
-                    options={"require": ["exp"]},
-                )
-            else:
-                assert self._jwks_client is not None
-                signing_key = self._jwks_client.get_signing_key_from_jwt(token)
-                decoded = jwt_mod.decode(
-                    token,
-                    signing_key.key,
-                    algorithms=self._config.algorithms,
-                    audience=self._config.audience,
-                    issuer=self._config.issuer,
-                    leeway=self._config.leeway_seconds,
-                    options={"require": ["exp"]},
-                )
+            decoded = await anyio.to_thread.run_sync(self._decode_token_json, token)
         except jwt_mod.ExpiredSignatureError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

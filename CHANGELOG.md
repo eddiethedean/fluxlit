@@ -39,3 +39,12 @@
 - CI (GitHub Actions) and contributor docs.
 
 ## Unreleased
+
+- **Runtime:** Map IPv6 unspecified bind ``::`` to loopback for ``FLUXLIT_INTERNAL_API_BASE`` (same as ``0.0.0.0``).
+- **OIDC BFF:** Validate ``id_token`` with IdP JWKS when using ``GenericOIDCClient``; optional ``OIDCBFFConfig.id_token_audience`` / ``id_token_leeway_seconds``; parse-only fallback for other ``OIDCProvider`` stubs.
+- **JWT:** Run PyJWT/JWKS decode in a worker thread via ``anyio.to_thread`` to avoid blocking the event loop.
+- **Gateway:** Use Latin-1 for stripped ``raw_path``; log exceptions while streaming proxied response bodies.
+- **API:** ``FluxLit.attach_oidc_login`` raises if called twice on the same instance.
+- **CI:** Release workflow runs ``pip-audit`` (same as main CI).
+- **Docs:** OIDC in-memory store and JWKS ``id_token`` behavior in security, auth-recipes, and ``SECURITY.md``.
+- **Docs:** Fix OIDC docstring cross-reference (Streamlit exchange helpers).

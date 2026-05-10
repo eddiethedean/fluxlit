@@ -265,6 +265,8 @@ Browser flow:
 2. IdP redirects to `GET /api/auth/callback` → redirect to `/?auth_code=...`.
 3. Streamlit runs `exchange_auth_code_from_query` → `POST /api/auth/exchange` → stores `fluxlit_access_token`.
 
+**Production notes:** With {class}`~fluxlit.oidc.GenericOIDCClient`, the callback validates the IdP ``id_token`` via **JWKS**. The PKCE ``state`` and one-time ``auth_code`` stores are **in-memory**—run **one API worker** or use a single replica until you add an external session store (see {doc}`security`).
+
 ---
 
 ## Forward-auth (reverse proxy / SSO)

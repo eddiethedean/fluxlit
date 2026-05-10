@@ -61,6 +61,29 @@ def test_flux_lit_attach_oidc_login_requires_secret() -> None:
         app.attach_oidc_login(oidc)
 
 
+def test_flux_lit_attach_oidc_login_rejects_second_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(GenericOIDCClient, "load_discovery_sync", lambda self: None)
+    from fluxlit.oidc import OIDCDiscoveryDocument
+
+    oidc = GenericOIDCClient(
+        GenericOIDCClientConfig(issuer="https://idp", client_id="c", client_secret="d")
+    )
+    oidc._doc = OIDCDiscoveryDocument.model_validate(  # noqa: SLF001
+        {
+            "issuer": "https://idp",
+            "authorization_endpoint": "https://idp/a",
+            "token_endpoint": "https://idp/t",
+            "jwks_uri": "https://idp/j",
+        }
+    )
+    app = FluxLit(
+        settings=FluxlitSettings(oidc_bff_secret="bff" * 11, public_base_url="http://test")
+    )
+    app.attach_oidc_login(oidc)
+    with pytest.raises(ValueError, match="already called"):
+        app.attach_oidc_login(oidc)
+
+
 def test_flux_lit_attach_oidc_login_registers_routes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GenericOIDCClient, "load_discovery_sync", lambda self: None)
     from fluxlit.oidc import OIDCDiscoveryDocument

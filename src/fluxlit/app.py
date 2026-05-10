@@ -39,9 +39,9 @@ class FluxLit:
     builds ``st.navigation`` from registered pages.
 
     **Security (optional):** :meth:`make_jwt_bearer` reads ``FLUXLIT_JWT_*`` from
-    :attr:`settings`; :meth:`attach_oidc_login` registers OIDC BFF routes using
-    ``FLUXLIT_PUBLIC_BASE_URL`` and ``FLUXLIT_OIDC_BFF_SECRET`` when you do not pass
-    secrets explicitly.
+    :attr:`settings`; :meth:`attach_oidc_login` registers OIDC BFF routes (call **at most once**
+    per instance) using ``FLUXLIT_PUBLIC_BASE_URL`` and ``FLUXLIT_OIDC_BFF_SECRET`` when you do
+    not pass secrets explicitly.
 
     A minimal ``GET /healthz`` route is registered on :attr:`api` (hidden from OpenAPI).
 
@@ -72,6 +72,7 @@ class FluxLit:
 
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
+        self._oidc_bff_attached: bool = False
 
         if self.settings.enable_security_headers:
             self.api.add_middleware(SecurityHeadersMiddleware)
@@ -218,7 +219,14 @@ class FluxLit:
 
         Returns the :class:`fastapi.APIRouter` that was included (same as
         :func:`fluxlit.oidc.register_oidc_bff_routes`).
+
+        Raises:
+            ValueError: If this method is called more than once on the same :class:`FluxLit`
+                instance (duplicate auth routes).
         """
+        if self._oidc_bff_attached:
+            msg = "attach_oidc_login() was already called on this FluxLit instance"
+            raise ValueError(msg)
         secret = (first_party_secret or self.settings.oidc_bff_secret or "").strip()
         if not secret:
             msg = (
@@ -237,7 +245,9 @@ class FluxLit:
             public_base_url=public_base,
             **bff_overrides,
         )
-        return register_oidc_bff_routes(self.api, cfg)
+        router = register_oidc_bff_routes(self.api, cfg)
+        self._oidc_bff_attached = True
+        return router
 
     @property
     def pages(self) -> list[tuple[str, str, Callable[..., None]]]:

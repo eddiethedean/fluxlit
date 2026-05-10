@@ -5,7 +5,7 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from starlette.testclient import TestClient
 
 from fluxlit.oidc import (
@@ -251,3 +251,86 @@ def test_exchange_validates_min_code_length() -> None:
         OIDCBFFConfig(oidc=_MiniOidc(), first_party_secret="bff-first-party-secret-32bytes-x"),
     )
     assert TestClient(app).post("/auth/exchange", json={"code": "short"}).status_code == 422
+
+
+def test_bff_callback_generic_oidc_uses_jwks_verify(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_verify(
+        *,
+        id_token: str,
+        issuer: str,
+        jwks_uri: str,
+        audience: str,
+        leeway: int = 0,
+    ) -> str:
+        captured["id_token"] = id_token
+        captured["issuer"] = issuer
+        captured["jwks_uri"] = jwks_uri
+        captured["audience"] = audience
+        captured["leeway"] = str(leeway)
+        return "jwks-verified-sub"
+
+    monkeypatch.setattr("fluxlit.oidc._verify_id_token_jwks", fake_verify)
+
+    inner = {
+        "issuer": "https://idp.example",
+        "authorization_endpoint": "https://idp.example/a",
+        "token_endpoint": "https://idp.example/t",
+        "jwks_uri": "https://idp.example/jwks",
+    }
+    cfg = GenericOIDCClientConfig(
+        issuer="https://idp.example",
+        client_id="my-client",
+        client_secret="sec",
+    )
+    oidc = GenericOIDCClient(cfg)
+    oidc._doc = OIDCDiscoveryDocument.model_validate(inner)  # noqa: SLF001
+
+    def exchange_code(self: object, **_: object) -> dict[str, str]:
+        return {"id_token": "header.payload.sig", "access_token": "at"}
+
+    monkeypatch.setattr(GenericOIDCClient, "exchange_code", exchange_code)
+
+    app = FastAPI()
+    register_oidc_bff_routes(
+        app,
+        OIDCBFFConfig(
+            oidc=oidc,
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            id_token_leeway_seconds=5,
+        ),
+    )
+    c = TestClient(app)
+    r1 = c.get("/auth/login", follow_redirects=False)
+    assert r1.status_code == 302
+    state = parse_qs(urlparse(r1.headers["location"]).query)["state"][0]
+    r2 = c.get(
+        "/auth/callback", params={"code": "auth-code-here", "state": state}, follow_redirects=False
+    )
+    assert r2.status_code == 302
+    assert captured["id_token"] == "header.payload.sig"
+    assert captured["issuer"] == "https://idp.example"
+    assert captured["jwks_uri"] == "https://idp.example/jwks"
+    assert captured["audience"] == "my-client"
+    assert captured["leeway"] == "5"
+
+
+def test_verify_id_token_jwks_invalid_token_raises_502() -> None:
+    jwt_lib = pytest.importorskip("jwt")
+    from fluxlit.oidc import _verify_id_token_jwks
+
+    jwks = MagicMock()
+    sk = MagicMock()
+    sk.key = object()
+    jwks.get_signing_key_from_jwt.return_value = sk
+    with patch.object(jwt_lib, "PyJWKClient", return_value=jwks):
+        with patch.object(jwt_lib, "decode", side_effect=jwt_lib.InvalidTokenError("bad")):
+            with pytest.raises(HTTPException) as excinfo:
+                _verify_id_token_jwks(
+                    id_token="a.b.c",
+                    issuer="https://iss",
+                    jwks_uri="https://jwks",
+                    audience="aud",
+                )
+    assert excinfo.value.status_code == 502

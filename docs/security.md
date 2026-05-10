@@ -4,6 +4,11 @@ FluxLit serves **one public origin**: the gateway forwards `/api` to FastAPI and
 
 Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recipes`; upgrading an existing app is covered in {doc}`migration-auth`.
 
+## OIDC BFF: production constraints
+
+- **Process memory only:** Login ``state`` and one-time ``auth_code`` values live in in-memory dicts on the BFF config. Use **a single API worker process** (or a single replica) unless you replace this with a shared store. Multiple Uvicorn workers or horizontally scaled replicas will see **broken or flaky logins** unless state is externalized.
+- **``id_token`` validation:** When you use {class}`~fluxlit.oidc.GenericOIDCClient`, the BFF validates the IdP ``id_token`` with **JWKS** (signature, ``iss``, ``aud``, ``exp``) before minting the first-party access token. Custom :class:`~fluxlit.oidc.OIDCProvider` implementations fall back to **parse-only** ``sub`` extraction (for tests and advanced integrations); do not point untrusted providers at that path in production.
+
 ## Threat model (high level)
 
 | Risk | Mitigation direction |

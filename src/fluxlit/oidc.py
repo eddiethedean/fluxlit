@@ -18,7 +18,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from fluxlit.jwt_auth import issue_hs256_access_token
+from fluxlit.jwt_auth import _require_pyjwt, issue_hs256_access_token
 
 
 class OIDCProvider(Protocol):
@@ -170,6 +170,15 @@ class OIDCBFFConfig:
     state_ttl_seconds: int = 600
     otc_ttl_seconds: int = 120
 
+    id_token_audience: str = ""
+    """Expected ``aud`` for ``id_token`` validation.
+
+    If empty, ``client_id`` from :class:`GenericOIDCClient` is used.
+    """
+
+    id_token_leeway_seconds: int = 0
+    """Clock skew leeway (seconds) when validating ``id_token`` with JWKS."""
+
 
 def _purge_expired(store: dict[str, tuple[str, float]], ttl: float, now: float) -> None:
     expired = [k for k, (_, t0) in store.items() if now - t0 > ttl]
@@ -192,7 +201,8 @@ def register_oidc_bff_routes(
     After IdP callback, the user is redirected to ``streamlit_redirect_path`` with a
     short-lived ``auth_code`` query parameter. Streamlit should call
     ``POST {exchange_path}`` with that code (server-side via :class:`~fluxlit.client.ApiClient`)
-    to obtain a bearer token — see :func:`fluxlit.streamlit_auth.consume_auth_code`.
+    to obtain a bearer token — see :func:`fluxlit.streamlit_auth.exchange_auth_code_from_query`
+    or :func:`fluxlit.streamlit_auth.prepare_streamlit_api_client`.
     """
     router = APIRouter(prefix=router_prefix, tags=["auth"])
 
@@ -239,7 +249,7 @@ def register_oidc_bff_routes(
         id_token = tokens.get("id_token")
         if not isinstance(id_token, str) or not id_token:
             raise HTTPException(status_code=502, detail="IdP response missing id_token")
-        sub = _subject_from_id_token(id_token)
+        sub = _resolve_id_token_sub(id_token=id_token, config=config)
         access = issue_hs256_access_token(
             subject=sub,
             issuer=config.token_issuer,
@@ -271,6 +281,53 @@ def register_oidc_bff_routes(
     return router
 
 
+def _verify_id_token_jwks(
+    *,
+    id_token: str,
+    issuer: str,
+    jwks_uri: str,
+    audience: str,
+    leeway: int = 0,
+) -> str:
+    """Validate ``id_token`` signature and claims via IdP JWKS; return ``sub``."""
+    jwt_mod = _require_pyjwt()
+    jwks_client = jwt_mod.PyJWKClient(jwks_uri)
+    try:
+        signing_key = jwks_client.get_signing_key_from_jwt(id_token)
+        payload = jwt_mod.decode(
+            id_token,
+            signing_key.key,
+            algorithms=["RS256", "ES256", "ES384", "ES512"],
+            audience=audience,
+            issuer=issuer,
+            leeway=leeway,
+            options={"require": ["exp", "sub"]},
+        )
+    except jwt_mod.InvalidTokenError as e:
+        raise HTTPException(status_code=502, detail="Invalid id_token") from e
+    sub = payload.get("sub")
+    if not isinstance(sub, str) or not sub:
+        raise HTTPException(status_code=502, detail="id_token missing sub")
+    return sub
+
+
+def _resolve_id_token_sub(*, id_token: str, config: OIDCBFFConfig) -> str:
+    """Return ``sub`` from ``id_token`` (JWKS path for :class:`GenericOIDCClient`)."""
+    oidc = config.oidc
+    if isinstance(oidc, GenericOIDCClient):
+        doc = oidc._require_doc()
+        aud = (config.id_token_audience or "").strip() or oidc._config.client_id
+        iss = oidc.issuer.rstrip("/")
+        return _verify_id_token_jwks(
+            id_token=id_token,
+            issuer=iss,
+            jwks_uri=doc.jwks_uri,
+            audience=aud,
+            leeway=config.id_token_leeway_seconds,
+        )
+    return _subject_from_id_token_parse_only(id_token)
+
+
 def _with_query(*, base: str, path: str, query: dict[str, str]) -> str:
     p = path if path.startswith("/") else f"/{path}"
     root = base.rstrip("/")
@@ -282,11 +339,11 @@ def _with_query(*, base: str, path: str, query: dict[str, str]) -> str:
     return f"{full}?{urlencode(query)}"
 
 
-def _subject_from_id_token(id_token: str) -> str:
-    """Parse ``sub`` from an OIDC id_token JWT payload without signature verification.
+def _subject_from_id_token_parse_only(id_token: str) -> str:
+    """Parse ``sub`` from an OIDC ``id_token`` without signature verification.
 
-    The token was just received from the IdP over TLS using the client secret; for
-    production hardening, validate the id_token signature using the IdP JWKS.
+    Used only for non-:class:`GenericOIDCClient` :class:`OIDCProvider` stubs. Production
+    flows should use :class:`GenericOIDCClient` so :func:`_verify_id_token_jwks` runs.
     """
     try:
         parts = id_token.split(".")

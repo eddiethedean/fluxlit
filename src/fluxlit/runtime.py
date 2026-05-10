@@ -46,6 +46,8 @@ def _loopback_http_host_for_client(bind_host: str) -> str:
         addr = ipaddress.ip_address(bare)
     except ValueError:
         return h
+    if addr.is_unspecified:
+        return "127.0.0.1"
     if isinstance(addr, ipaddress.IPv6Address):
         return f"[{addr}]"
     return str(addr)
