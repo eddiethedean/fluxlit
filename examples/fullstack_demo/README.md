@@ -30,6 +30,25 @@ Open the URL printed by FluxLit (Streamlit + API on one port).
 
 `rapsqlite` ships wheels for common platforms; building from source needs a Rust toolchain (see [rapsqlite docs](https://rapsqlite.readthedocs.io/en/latest/installation.html)).
 
+## Tests
+
+From `examples/fullstack_demo` (after installing deps):
+
+```bash
+pip install -r requirements-test.txt
+pytest
+```
+
+Tests use FluxLit’s **`FluxLitTestClient`** (`fluxlit.testing`): HTTP goes through **`build_gateway`** with the real **`/api`** prefix (same as production), and **`openapi()`** / **`api_get("/healthz")`** match what the combined app exposes. **`streamlit()`** runs Streamlit’s **`AppTest`** against `fluxlit.streamlit_main` with `FLUXLIT_APP=app:app`.
+
+Each test gets a temporary `sqlite+rapsqlite` file and a FastAPI **`get_db`** override so `fullstack_demo.db` is never used.
+
+| File | Coverage |
+| --- | --- |
+| `tests/test_auth.py` | Register, login, `/users/me`, validation (422), JWT issuer/audience rejection, email normalization |
+| `tests/test_gateway.py` | `/healthz`, OpenAPI shape |
+| `tests/test_streamlit_home.py` | Home page renders in `AppTest` (Streamlit ≥ 1.30) |
+
 ## Security notes (demo vs production)
 
 - **Passwords** are stored as **bcrypt** hashes only; login uses constant-time-friendly verification via passlib.
@@ -48,3 +67,4 @@ Open the URL printed by FluxLit (Streamlit + API on one port).
 | `security.py` | bcrypt + JWT minting |
 | `app.py` | `FluxLit` app: async register/login/`/users/me` + Streamlit UI |
 | `alembic/` | Migrations (`users` table, sync sqlite on same file) |
+| `tests/` | Pytest suite using `FluxLitTestClient` + `AppTest` |
