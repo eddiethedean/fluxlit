@@ -5,6 +5,7 @@ import pytest
 from fluxlit.runtime import (
     _build_streamlit_cmd,
     _build_streamlit_env,
+    _inject_public_root_path,
     find_free_port,
     internal_api_base_url,
     load_fluxlit,
@@ -22,7 +23,7 @@ def test_load_fluxlit_rejects_non_fluxlit() -> None:
 
 
 def test_load_fluxlit_module_not_found() -> None:
-    with pytest.raises(ModuleNotFoundError):
+    with pytest.raises(ModuleNotFoundError, match="PYTHONPATH"):
         load_fluxlit("definitely_missing_fluxlit_module_xyz:app")
 
 
@@ -90,3 +91,58 @@ def test_build_streamlit_cmd_contains_port(tmp_path) -> None:
     assert "run" in cmd
     assert str(runner) in cmd
     assert "1234" in cmd
+    assert "--server.address" in cmd
+    assert "127.0.0.1" in cmd
+    assert "--server.enableXsrfProtection" in cmd
+    assert "--server.enableCORS" in cmd
+    assert cmd.count("false") >= 2
+
+
+def test_build_streamlit_cmd_adds_base_url_path(tmp_path) -> None:
+    runner = tmp_path / "streamlit_main.py"
+    cmd = _build_streamlit_cmd(runner=runner, port=1234, base_url_path="/connect/app123")
+    assert "--server.baseUrlPath" in cmd
+    assert cmd[cmd.index("--server.baseUrlPath") + 1] == "/connect/app123"
+
+
+def test_public_mount_path_prefers_root_path() -> None:
+    from fluxlit.config import FluxlitSettings
+
+    s = FluxlitSettings(root_path="/a", streamlit_public_path="/b")
+    assert s.public_mount_path() == "/a"
+
+
+def test_public_mount_path_falls_back_to_streamlit_public() -> None:
+    from fluxlit.config import FluxlitSettings
+
+    s = FluxlitSettings(root_path="", streamlit_public_path="/legacy")
+    assert s.public_mount_path() == "/legacy"
+
+
+@pytest.mark.asyncio
+async def test_inject_public_root_path_fills_empty_asgi_root_path() -> None:
+    """Uvicorn runs with root_path=''; wrapper supplies the browser mount for OpenAPI."""
+    captured: dict[str, str] = {}
+
+    async def inner(scope, receive, send):  # noqa: ARG001
+        captured["root_path"] = str(scope.get("root_path") or "")
+
+    app = _inject_public_root_path(inner, "/myapp")
+    await app({"type": "http", "path": "/api/healthz", "root_path": ""}, None, None)  # type: ignore[arg-type]
+    assert captured["root_path"] == "/myapp"
+
+
+@pytest.mark.asyncio
+async def test_inject_public_root_path_noop_when_root_path_already_set() -> None:
+    captured: dict[str, str] = {}
+
+    async def inner(scope, receive, send):  # noqa: ARG001
+        captured["root_path"] = str(scope.get("root_path") or "")
+
+    app = _inject_public_root_path(inner, "/myapp")
+    await app(
+        {"type": "http", "path": "/x", "root_path": "/custom"},
+        None,
+        None,  # type: ignore[arg-type]
+    )
+    assert captured["root_path"] == "/custom"

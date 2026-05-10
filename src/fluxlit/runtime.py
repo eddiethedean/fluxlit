@@ -17,12 +17,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import uvicorn
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Receive, Scope, Send
 
-from fluxlit.gateway import build_gateway
+from fluxlit.gateway import build_gateway, normalize_root_mount
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit
+
+DEFAULT_PIDFILE_NAME = ".fluxlit-dev.pid"
+# Streamlit cold start can exceed the default 30s on slow disks / CI.
+_STREAMLIT_TCP_WAIT_S = 60.0
 
 
 def find_free_port() -> int:
@@ -65,12 +69,21 @@ def internal_api_base_url(*, bind_host: str, port: int, api_mount_path: str) -> 
     return urllib.parse.urlunparse(("http", netloc, path, "", "", ""))
 
 
+def _fluxlit_import_hint(target: str, mod_name: str) -> str:
+    return (
+        f"Cannot import module {mod_name!r} for FluxLit target {target!r}. "
+        "Put the package on PYTHONPATH (for example `export PYTHONPATH=$(pwd)` before "
+        "`fluxlit dev`). Avoid naming your entry file `app.py` if it would shadow "
+        "FluxLit's internal `fluxlit.app` package."
+    )
+
+
 def load_fluxlit(target: str) -> FluxLit:
     """Import ``module:attribute`` and ensure the object is a :class:`~fluxlit.app.FluxLit`.
 
     Raises:
         ValueError: If ``target`` is not a ``module:attr`` string.
-        ImportError: If ``module`` cannot be imported.
+        ModuleNotFoundError: If ``module`` cannot be imported (message includes a short hint).
         AttributeError: If ``module`` has no such attribute.
         TypeError: If ``attr`` is not a :class:`~fluxlit.app.FluxLit` instance.
     """
@@ -80,11 +93,18 @@ def load_fluxlit(target: str) -> FluxLit:
     if not sep or not attr:
         msg = "App target must look like 'my_module:app'"
         raise ValueError(msg)
-    module = importlib.import_module(mod_name)
-    obj = getattr(module, attr)
+    try:
+        module = importlib.import_module(mod_name)
+    except ModuleNotFoundError as e:
+        raise ModuleNotFoundError(_fluxlit_import_hint(target, mod_name)) from e
+    try:
+        obj = getattr(module, attr)
+    except AttributeError as e:
+        raise AttributeError(
+            f"Module {mod_name!r} has no attribute {attr!r} (FluxLit target {target!r})."
+        ) from e
     if not isinstance(obj, FluxLitCls):
-        msg = f"{target} is not a FluxLit instance"
-        raise TypeError(msg)
+        raise TypeError(f"{target} must resolve to a FluxLit instance, not {type(obj).__name__!r}")
     return obj
 
 
@@ -110,9 +130,15 @@ def _build_streamlit_env(*, target: str, api_prefix: str, internal_api_base: str
     return env
 
 
-def _build_streamlit_cmd(*, runner: Path, port: int) -> list[str]:
-    """Command line: ``python -m streamlit run <runner>`` with headless bind on ``port``."""
-    return [
+def _build_streamlit_cmd(*, runner: Path, port: int, base_url_path: str = "") -> list[str]:
+    """Command line: ``python -m streamlit run <runner>`` with headless bind on ``port``.
+
+    Streamlit binds only to loopback on an ephemeral port; the browser talks to the
+    FluxLit gateway. Disabling XSRF on this hop avoids Streamlit forcing CORS on when
+    XSRF is enabled (noisy warnings and brittle proxy handshakes). CORS stays off
+    because cross-origin browser traffic should not hit the sidecar directly.
+    """
+    cmd: list[str] = [
         sys.executable,
         "-m",
         "streamlit",
@@ -122,9 +148,145 @@ def _build_streamlit_cmd(*, runner: Path, port: int) -> list[str]:
         "true",
         "--server.port",
         str(port),
+        "--server.address",
+        "127.0.0.1",
+        "--server.enableXsrfProtection",
+        "false",
+        "--server.enableCORS",
+        "false",
         "--browser.gatherUsageStats",
         "false",
     ]
+    m = normalize_root_mount(base_url_path)
+    if m:
+        cmd.extend(["--server.baseUrlPath", m])
+    return cmd
+
+
+def default_pidfile_path(explicit: Path | None = None) -> Path:
+    """Path for ``fluxlit dev|run`` PID file (current directory unless overridden)."""
+    if explicit is not None:
+        return Path(explicit).expanduser()
+    env = os.environ.get("FLUXLIT_PIDFILE", "").strip()
+    if env:
+        return Path(env).expanduser()
+    return Path.cwd() / DEFAULT_PIDFILE_NAME
+
+
+def _write_pidfile(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{os.getpid()}\n", encoding="ascii")
+
+
+def _remove_pidfile(path: Path) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        path.unlink()
+
+
+def _pid_is_zombie_unix(pid: int) -> bool:
+    """True if *pid* is a zombie (defunct) — :func:`os.kill` with 0 still succeeds."""
+    try:
+        out = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "stat="],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if out.returncode != 0:
+        return False
+    stat = (out.stdout or "").strip()
+    return bool(stat) and stat[0] == "Z"
+
+
+def _pid_running(pid: int) -> bool:
+    if sys.platform.startswith("win"):
+        try:
+            out = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return True
+        line = (out.stdout or "").strip()
+        return bool(line) and "INFO:" not in line
+
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    if _pid_is_zombie_unix(pid):
+        return False
+    return True
+
+
+def shutdown_unified_process(
+    pidfile: Path | None = None,
+    *,
+    force: bool = False,
+    wait_s: float = 5.0,
+) -> tuple[int, str]:
+    """Stop a stack started by :func:`run_unified` using its PID file.
+
+    Sends ``SIGTERM`` to the recorded PID (the process running Uvicorn + supervision).
+    If ``force`` is True on POSIX, sends ``SIGKILL`` after *wait_s* if still running.
+
+    Returns:
+        ``(exit_code, message)`` where ``exit_code`` is 0 on success, 1 on failure
+        (still running after timeout / permission error), 2 if the pidfile is missing.
+    """
+    path = default_pidfile_path(pidfile)
+    if not path.is_file():
+        return 2, f"No pid file at {path}"
+
+    try:
+        raw = path.read_text(encoding="ascii").strip()
+        pid = int(raw)
+    except (OSError, ValueError):
+        path.unlink(missing_ok=True)
+        return 0, f"Removed invalid pid file at {path}"
+
+    if not _pid_running(pid):
+        path.unlink(missing_ok=True)
+        return 0, f"Removed stale pid file (pid {pid} not running)"
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        path.unlink(missing_ok=True)
+        return 0, f"Process {pid} exited before signal was delivered"
+    except PermissionError as e:
+        return 1, f"Cannot signal pid {pid}: {e}"
+
+    deadline = time.monotonic() + wait_s
+    while time.monotonic() < deadline:
+        if not _pid_running(pid):
+            path.unlink(missing_ok=True)
+            return 0, f"Stopped process {pid}"
+        time.sleep(0.05)
+
+    if force and not sys.platform.startswith("win"):
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGKILL)
+        t2 = time.monotonic() + 2.0
+        while time.monotonic() < t2:
+            if not _pid_running(pid):
+                path.unlink(missing_ok=True)
+                return 0, f"Killed process {pid}"
+            time.sleep(0.05)
+
+    if not _pid_running(pid):
+        path.unlink(missing_ok=True)
+        return 0, f"Stopped process {pid}"
+
+    return 1, f"Process {pid} still running after {wait_s:.1f}s (try --force)"
 
 
 def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -> None:
@@ -158,6 +320,32 @@ def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -
         proc.kill()
 
 
+def _inject_public_root_path(app: ASGIApp, public_mount: str) -> ASGIApp:
+    """Apply ASGI ``root_path`` without Uvicorn path doubling.
+
+    Uvicorn implements ``Config.root_path`` by prepending it to every request path.
+    Reverse proxies that forward the **full** public path (e.g. ``/myapp/api/...``)
+    would otherwise yield ``/myapp/myapp/api/...`` in ``scope["path"]``.
+
+    We run Uvicorn with ``root_path=""`` and set the browser-visible mount here when
+    the server left ``root_path`` empty, so both **strip-prefix** and **full-path**
+    upstream shapes keep correct routing and FastAPI OpenAPI URL generation.
+    """
+    mount = normalize_root_mount(public_mount)
+    if not mount:
+        return app
+
+    async def wrapped(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            prior = (scope.get("root_path") or "").strip()
+            if not prior:
+                scope = dict(scope)
+                scope["root_path"] = mount
+        await app(scope, receive, send)
+
+    return wrapped
+
+
 def create_gateway_app() -> ASGIApp:
     """ASGI factory for Uvicorn ``--factory`` reload mode.
 
@@ -167,12 +355,37 @@ def create_gateway_app() -> ASGIApp:
 
     Returns:
         An ASGI3 callable (same contract as :func:`~fluxlit.gateway.build_gateway`).
+
+    Raises:
+        RuntimeError: If ``FLUXLIT_APP`` or ``FLUXLIT_STREAMLIT_UPSTREAM`` is unset.
     """
-    target = os.environ["FLUXLIT_APP"]
-    upstream = os.environ["FLUXLIT_STREAMLIT_UPSTREAM"]
+    missing = [
+        name
+        for name in ("FLUXLIT_APP", "FLUXLIT_STREAMLIT_UPSTREAM")
+        if not (os.environ.get(name) or "").strip()
+    ]
+    if missing:
+        need = ", ".join(missing)
+        msg = (
+            f"Missing required environment variable(s): {need}. "
+            "These are set automatically by `fluxlit dev` / `fluxlit run`; "
+            "set them before using `create_gateway_app` with Uvicorn --factory."
+        )
+        raise RuntimeError(msg)
+    target = os.environ["FLUXLIT_APP"].strip()
+    upstream = os.environ["FLUXLIT_STREAMLIT_UPSTREAM"].strip()
     api_prefix = os.environ.get("FLUXLIT_API_PREFIX", "/api")
     fl = load_fluxlit(target)
-    return build_gateway(fl.api, upstream, api_prefix=api_prefix)
+    mount = normalize_root_mount(fl.settings.public_mount_path())
+    return _inject_public_root_path(
+        build_gateway(
+            fl.api,
+            upstream,
+            api_prefix=api_prefix,
+            root_mount=mount,
+        ),
+        mount,
+    )
 
 
 def run_unified(
@@ -184,6 +397,8 @@ def run_unified(
     log_level: str = "info",
     proxy_headers: bool = False,
     forwarded_allow_ips: str | None = None,
+    pidfile: Path | None = None,
+    write_pidfile: bool = True,
 ) -> None:
     """Start Streamlit on a free localhost port and Uvicorn on ``host:port``.
 
@@ -201,6 +416,9 @@ def run_unified(
         log_level: Uvicorn log level.
         proxy_headers: Forwarded to :class:`uvicorn.Config`.
         forwarded_allow_ips: Forwarded to :class:`uvicorn.Config`.
+        pidfile: Optional explicit path for the PID file (see :func:`default_pidfile_path`).
+        write_pidfile: If False, do not create a PID file (also skipped when
+            ``FLUXLIT_NO_PIDFILE`` is ``1`` / ``true`` / ``yes``).
     """
     streamlit_port = find_free_port()
     runner = Path(__file__).resolve().parent / "streamlit_main.py"
@@ -209,13 +427,20 @@ def run_unified(
 
     api_prefix = fl.settings.api_mount_path
     internal_api_base = internal_api_base_url(bind_host=host, port=port, api_mount_path=api_prefix)
+    mount = normalize_root_mount(fl.settings.public_mount_path())
+    use_proxy = proxy_headers or fl.settings.trust_proxy
+    allow_ips = forwarded_allow_ips
+    if use_proxy and allow_ips is None:
+        allow_ips = fl.settings.forwarded_allow_ips or "*"
 
     env = _build_streamlit_env(
         target=target,
         api_prefix=api_prefix,
         internal_api_base=internal_api_base,
     )
-    cmd = _build_streamlit_cmd(runner=runner, port=streamlit_port)
+    cmd = _build_streamlit_cmd(
+        runner=runner, port=streamlit_port, base_url_path=fl.settings.public_mount_path()
+    )
 
     popen_kwargs: dict[str, Any] = {"env": env}
     if sys.platform.startswith("win"):
@@ -225,12 +450,20 @@ def run_unified(
         popen_kwargs["start_new_session"] = True
 
     proc: subprocess.Popen[Any] = subprocess.Popen(cmd, **popen_kwargs)
+    pidfile_path: Path | None = None
+    pidfile_written = False
+    no_pf = os.environ.get("FLUXLIT_NO_PIDFILE", "").strip().lower() in {"1", "true", "yes"}
     try:
-        _wait_for_tcp("127.0.0.1", streamlit_port)
+        _wait_for_tcp("127.0.0.1", streamlit_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
         upstream = f"http://127.0.0.1:{streamlit_port}"
         os.environ["FLUXLIT_APP"] = target
         os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = upstream
         os.environ["FLUXLIT_API_PREFIX"] = api_prefix
+
+        if write_pidfile and not no_pf:
+            pidfile_path = default_pidfile_path(pidfile)
+            _write_pidfile(pidfile_path)
+            pidfile_written = True
 
         if reload:
             sys.stderr.write(
@@ -245,17 +478,27 @@ def run_unified(
                 factory=True,
                 reload=True,
                 log_level=log_level,
-                proxy_headers=proxy_headers,
-                forwarded_allow_ips=forwarded_allow_ips,
+                root_path="",
+                proxy_headers=use_proxy,
+                forwarded_allow_ips=allow_ips,
             )
         else:
             config = uvicorn.Config(
-                build_gateway(fl.api, upstream, api_prefix=fl.settings.api_mount_path),
+                _inject_public_root_path(
+                    build_gateway(
+                        fl.api,
+                        upstream,
+                        api_prefix=fl.settings.api_mount_path,
+                        root_mount=mount,
+                    ),
+                    mount,
+                ),
                 host=host,
                 port=port,
                 log_level=log_level,
-                proxy_headers=proxy_headers,
-                forwarded_allow_ips=forwarded_allow_ips,
+                root_path="",
+                proxy_headers=use_proxy,
+                forwarded_allow_ips=allow_ips,
             )
 
         server = uvicorn.Server(config)
@@ -270,4 +513,6 @@ def run_unified(
         threading.Thread(target=monitor_streamlit, daemon=True).start()
         server.run()
     finally:
+        if pidfile_written and pidfile_path is not None:
+            _remove_pidfile(pidfile_path)
         _terminate_process(proc)

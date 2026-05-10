@@ -13,13 +13,18 @@ from starlette.websockets import WebSocketDisconnect
 from fluxlit.gateway import (
     _build_target_url,
     _filter_request_headers,
+    _forwarded_upstream_header_pairs,
     _not_found,
     _parse_ws_target,
+    _port_from_host_header,
+    _proxy_http,
     _public_host_from_scope,
     _request_id_from_scope,
     _strip_prefix_scope,
     _upstream_host_header,
     build_gateway,
+    normalize_root_mount,
+    split_gateway_paths,
 )
 
 
@@ -64,6 +69,52 @@ def test_filter_request_headers_strips_hop_by_hop_and_host() -> None:
     ]
     out = _filter_request_headers(raw)
     assert out == [(b"X-Custom", b"1")]
+
+
+def test_filter_request_headers_strips_x_forwarded() -> None:
+    raw = [
+        (b"x-forwarded-for", b"evil"),
+        (b"X-Forwarded-Host", b"evil"),
+        (b"x-forwarded-prefix", b"evil"),
+        (b"X-Custom", b"1"),
+    ]
+    assert _filter_request_headers(raw) == [(b"X-Custom", b"1")]
+
+
+def test_port_from_host_header_ipv4_and_bracket_ipv6() -> None:
+    assert _port_from_host_header("127.0.0.1:8777") == 8777
+    assert _port_from_host_header("[::1]:8777") == 8777
+    assert _port_from_host_header("example.com") is None
+
+
+def test_forwarded_upstream_header_pairs() -> None:
+    scope: dict[str, Any] = {
+        "scheme": "https",
+        "client": ("203.0.113.1", 1234),
+    }
+    pairs = _forwarded_upstream_header_pairs(scope, "h.example:9")
+    assert ("X-Forwarded-Host", "h.example:9") in pairs
+    assert ("X-Forwarded-Proto", "https") in pairs
+    assert ("X-Forwarded-Port", "9") in pairs
+    assert ("X-Forwarded-For", "203.0.113.1") in pairs
+
+
+def test_forwarded_upstream_header_pairs_includes_prefix() -> None:
+    scope: dict[str, Any] = {"scheme": "http", "client": None}
+    pairs = _forwarded_upstream_header_pairs(scope, "h.example", forwarded_prefix="/content/42")
+    assert ("X-Forwarded-Prefix", "/content/42") in pairs
+
+
+def test_normalize_and_split_gateway_paths() -> None:
+    assert normalize_root_mount(" /myapp/ ") == "/myapp"
+    assert normalize_root_mount("") == ""
+    assert split_gateway_paths("/myapp/api/x", "/myapp") == ("/api/x", "/myapp/api/x")
+    assert split_gateway_paths("/_stcore/stream", "/myapp") == (
+        "/_stcore/stream",
+        "/myapp/_stcore/stream",
+    )
+    assert split_gateway_paths("/api/x", "/myapp") == ("/api/x", "/myapp/api/x")
+    assert split_gateway_paths("/api/x", "") == ("/api/x", "/api/x")
 
 
 def test_parse_ws_target_https_and_base_path() -> None:
@@ -174,18 +225,16 @@ def test_websocket_proxy_upstream_refused_closes() -> None:
 
 
 @pytest.mark.asyncio
-async def test_proxy_http_aclose_on_stream_error() -> None:
-    from fluxlit.gateway import _proxy_http
-
-    async def failing_raw() -> Any:
-        raise RuntimeError("stream broken")
-        yield b""  # pragma: no cover
-
+async def test_proxy_http_aclose_on_body_error() -> None:
     mock_resp = MagicMock()
     mock_resp.status_code = 200
     mock_resp.headers = httpx.Headers({})
-    mock_resp.aiter_raw = failing_raw
     mock_resp.aclose = AsyncMock()
+
+    def _bad_content() -> bytes:
+        raise RuntimeError("body broken")
+
+    type(mock_resp).content = property(lambda self: _bad_content())
 
     class _FakeAsyncClient:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -219,7 +268,67 @@ async def test_proxy_http_aclose_on_stream_error() -> None:
             "headers": [],
             "query_string": b"",
         }
-        with pytest.raises(RuntimeError, match="stream broken"):
-            await _proxy_http(scope, receive, send, "http://127.0.0.1:9")
+        with pytest.raises(RuntimeError, match="body broken"):
+            await _proxy_http(scope, receive, send, "http://127.0.0.1:9", "/x")
 
+    mock_resp.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_strips_gzip_headers_and_sets_body_length() -> None:
+    """Upstream may advertise gzip + wire length while httpx exposes decoded bytes."""
+    decoded = b"<html>" + b"x" * 200
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.headers = httpx.Headers(
+        {
+            "content-type": "text/html",
+            "content-encoding": "gzip",
+            "content-length": "9",
+        }
+    )
+    mock_resp.content = decoded
+    mock_resp.aclose = AsyncMock()
+
+    class _FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> object:
+            return mock_resp
+
+    with patch("fluxlit.gateway.httpx.AsyncClient", _FakeAsyncClient):
+        sent: list[dict[str, Any]] = []
+
+        async def send(msg: MutableMapping[str, Any]) -> None:
+            sent.append(dict(msg))
+
+        async def receive() -> dict[str, Any]:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        scope: dict[str, Any] = {
+            "type": "http",
+            "method": "GET",
+            "path": "/",
+            "headers": [],
+            "query_string": b"",
+        }
+        await _proxy_http(scope, receive, send, "http://127.0.0.1:9", "/")
+
+    start = sent[0]
+    assert start["type"] == "http.response.start"
+    hdrs = {k.decode(): v.decode() for k, v in start["headers"]}
+    assert hdrs["content-type"] == "text/html"
+    assert "content-encoding" not in hdrs
+    assert hdrs["content-length"] == str(len(decoded))
+    assert sent[1] == {"type": "http.response.body", "body": decoded}
     mock_resp.aclose.assert_awaited_once()

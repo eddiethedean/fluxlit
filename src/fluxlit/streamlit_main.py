@@ -14,36 +14,20 @@ Do not import this module in library code; it executes Streamlit UI on import.
 
 from __future__ import annotations
 
-import importlib
 import os
 from collections.abc import Callable
 from typing import Any
 
 import streamlit as st
 
-from fluxlit.app import FluxLit
-
-
-def _load_fluxlit(spec: str) -> FluxLit:
-    """Import ``spec`` as ``module:attribute`` and validate the attribute is :class:`FluxLit`."""
-    mod_name, sep, attr = spec.partition(":")
-    if not sep or not attr:
-        msg = "FLUXLIT_APP must look like 'my_module:app'"
-        raise ValueError(msg)
-    module = importlib.import_module(mod_name)
-    obj = getattr(module, attr)
-    if not isinstance(obj, FluxLit):
-        msg = f"{spec} must resolve to a FluxLit instance"
-        raise TypeError(msg)
-    return obj
-
+from fluxlit.runtime import load_fluxlit
 
 spec = os.environ.get("FLUXLIT_APP")
 if not spec:
     st.error("FLUXLIT_APP is not set.")
     st.stop()
 
-_fluxlit = _load_fluxlit(spec)
+_fluxlit = load_fluxlit(spec)
 st.set_page_config(page_title=_fluxlit.settings.title)
 _client = _fluxlit.get_client()
 

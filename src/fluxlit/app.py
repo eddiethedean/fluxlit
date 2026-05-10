@@ -65,7 +65,7 @@ class FluxLit:
 
         fa_kwargs: dict[str, Any] = {
             "title": self.settings.title,
-            "root_path": self.settings.root_path,
+            "root_path": self.settings.public_mount_path(),
         }
         if fastapi_kwargs:
             fa_kwargs.update(fastapi_kwargs)

@@ -1,0 +1,38 @@
+# Emulate subpath deployment: public URL http://localhost:8080/myapp/ → FluxLit on :8000
+#
+# From this directory:
+#   docker compose up --build
+#   ./smoke-test.sh
+#
+# Or from repo root:
+#   docker compose -f docker/proxy-deployment/docker-compose.yml up --build
+
+services:
+  fluxlit:
+    build:
+      context: ../..
+      dockerfile: docker/proxy-deployment/Dockerfile
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/healthz', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 30s
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      fluxlit:
+        condition: service_healthy
+    restart: unless-stopped

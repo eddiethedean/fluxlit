@@ -1,0 +1,9 @@
+# Merge with docker-compose.yml: full-path forwarding (no prefix strip).
+#   docker compose -f docker-compose.yml -f docker-compose.fullpath.yml up --build
+# Public URL: http://127.0.0.1:8081/myapp/
+services:
+  nginx:
+    ports:
+      - "8081:80"
+    volumes:
+      - ./nginx-fullpath.conf:/etc/nginx/conf.d/default.conf:ro

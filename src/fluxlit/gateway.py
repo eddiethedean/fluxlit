@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import urllib.parse
 from collections.abc import AsyncIterator
+from typing import Any, cast
 
 import anyio
 import httpx
@@ -35,6 +36,44 @@ from fluxlit.logging_context import (
 _gateway_log = logging.getLogger("fluxlit.gateway")
 
 
+def normalize_root_mount(raw: str) -> str:
+    """Normalize a public URL prefix (e.g. Posit Connect content path) for routing.
+
+    Returns ``""`` when unset, otherwise a path starting with ``/`` and no trailing
+    slash (except root ``"/"`` is not used — empty means no mount).
+    """
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    if not s.startswith("/"):
+        s = f"/{s}"
+    return s.rstrip("/") or ""
+
+
+def split_gateway_paths(path: str, root_mount: str) -> tuple[str, str]:
+    """Split the ASGI path for dispatch vs Streamlit upstream.
+
+    Some reverse proxies forward the **full** public path (``/content/123/api/...``).
+    Others strip the mount and only forward the suffix (``/api/...``) while setting
+    ASGI ``root_path``. :func:`normalize_root_mount` should match the browser-visible
+    prefix configured for Streamlit ``server.baseUrlPath``.
+
+    Returns:
+        ``(dispatch_path, streamlit_path)`` — use *dispatch_path* to choose API vs
+        Streamlit; send *streamlit_path* to the Streamlit sidecar when proxying.
+    """
+    m = normalize_root_mount(root_mount)
+    p = path if path.startswith("/") else f"/{path}"
+    if not m:
+        return p, p
+    if p == m or p.startswith(f"{m}/"):
+        rest = "/" if p == m else p[len(m) :]
+        if not rest.startswith("/"):
+            rest = f"/{rest}"
+        return rest, p
+    return p, f"{m}{p}"
+
+
 def _request_id_from_scope(scope: Scope) -> str:
     """Return the client ``X-Request-ID`` header value or a new UUID string."""
     raw = scope.get("headers") or []
@@ -45,7 +84,13 @@ def _request_id_from_scope(scope: Scope) -> str:
     return new_request_id()
 
 
-def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/api") -> ASGIApp:
+def build_gateway(
+    api_app: ASGIApp,
+    upstream_base: str,
+    *,
+    api_prefix: str = "/api",
+    root_mount: str = "",
+) -> ASGIApp:
     """Build the composite ASGI application used as Uvicorn's entrypoint.
 
     Routes whose path equals ``api_prefix`` or starts with ``api_prefix/`` are
@@ -59,12 +104,19 @@ def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/a
         api_app: Inner FastAPI / Starlette app (mount path not included in its routes).
         upstream_base: Base URL for Streamlit, e.g. ``http://127.0.0.1:8501``.
         api_prefix: Public URL prefix for the API (default ``/api``).
+        root_mount: Optional browser-visible path prefix when the app is published
+            under a subpath (e.g. Posit Connect / Workbench). Must match
+            :class:`~fluxlit.config.FluxlitSettings.root_path` and Streamlit
+            ``server.baseUrlPath``. When the proxy forwards the full path, this
+            strip is applied before dispatch; Streamlit still receives paths that
+            include the prefix.
 
     Returns:
         A callable ASGI3 application.
     """
     upstream = upstream_base.rstrip("/")
     prefix = api_prefix.rstrip("/") or "/api"
+    mount = normalize_root_mount(root_mount)
 
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
@@ -74,39 +126,55 @@ def build_gateway(api_app: ASGIApp, upstream_base: str, *, api_prefix: str = "/a
         token = set_request_id(rid)
         try:
             method_or_type = scope.get("method") or scope["type"]
-            path = scope.get("path") or ""
+            path_in = scope.get("path") or ""
+            path, streamlit_path = split_gateway_paths(path_in, mount)
             _gateway_log.debug(
                 "gateway %s %s request_id=%s",
                 method_or_type,
-                path,
+                path_in,
                 rid,
             )
             if path == prefix or path.startswith(f"{prefix}/"):
-                api_scope = _strip_prefix_scope(scope, prefix)
+                inner = dict(scope)
+                inner["path"] = path
+                inner["raw_path"] = path.encode("latin-1")
+                api_scope = _strip_prefix_scope(inner, prefix)
                 await api_app(api_scope, receive, send)
                 return
             if scope["type"] == "websocket":
-                await _proxy_websocket(scope, receive, send, upstream)
+                await _proxy_websocket(
+                    scope, receive, send, upstream, streamlit_path, forwarded_prefix=mount or None
+                )
                 return
             if scope["type"] == "http":
                 method = scope.get("method", "GET").upper()
                 if method in {"GET", "HEAD"}:
                     if path in {"/docs", "/docs/"}:
-                        await _redirect(send, f"{prefix}/docs")
+                        await _redirect(send, _location_under_mount(mount, f"{prefix}/docs"))
                         return
                     if path in {"/redoc", "/redoc/"}:
-                        await _redirect(send, f"{prefix}/redoc")
+                        await _redirect(send, _location_under_mount(mount, f"{prefix}/redoc"))
                         return
                     if path in {"/openapi.json"}:
-                        await _redirect(send, f"{prefix}/openapi.json")
+                        loc = _location_under_mount(mount, f"{prefix}/openapi.json")
+                        await _redirect(send, loc)
                         return
-                await _proxy_http(scope, receive, send, upstream)
+                await _proxy_http(
+                    scope, receive, send, upstream, streamlit_path, forwarded_prefix=mount or None
+                )
                 return
             await _not_found(send)
         finally:
             reset_request_id(token)
 
     return app
+
+
+def _location_under_mount(mount: str, suffix: str) -> str:
+    """Build a root-absolute Location (``/app/api/docs``) when mounted under ``/app``."""
+    m = normalize_root_mount(mount)
+    s = suffix if suffix.startswith("/") else f"/{suffix}"
+    return f"{m}{s}" if m else s
 
 
 def _strip_prefix_scope(scope: Scope, prefix: str) -> Scope:
@@ -155,12 +223,12 @@ async def _redirect(send: Send, location: str, *, status: int = 307) -> None:
     await send({"type": "http.response.body", "body": b""})
 
 
-def _build_target_url(scope: Scope, upstream: str) -> str:
-    path = scope.get("path") or "/"
+def _build_target_url(scope: Scope, upstream: str, *, path: str | None = None) -> str:
+    use_path = path if path is not None else (scope.get("path") or "/")
     query = scope.get("query_string", b"").decode("latin-1")
     if query:
-        return f"{upstream}{path}?{query}"
-    return f"{upstream}{path}"
+        return f"{upstream}{use_path}?{query}"
+    return f"{upstream}{use_path}"
 
 
 def _upstream_host_header(upstream: str) -> str:
@@ -178,6 +246,43 @@ def _public_host_from_scope(scope: Scope, upstream: str) -> str:
     return _upstream_host_header(upstream)
 
 
+def _port_from_host_header(host_val: str) -> int | None:
+    """Parse a port from ``Host`` (supports ``[ipv6]:port``)."""
+    if host_val.startswith("["):
+        if "]:" in host_val:
+            rest = host_val.split("]:", 1)[1]
+            return int(rest) if rest.isdigit() else None
+        return None
+    if ":" in host_val:
+        maybe_port = host_val.rsplit(":", 1)[1]
+        if maybe_port.isdigit():
+            return int(maybe_port)
+    return None
+
+
+def _forwarded_upstream_header_pairs(
+    scope: Scope,
+    public_host: str,
+    *,
+    forwarded_prefix: str | None = None,
+) -> list[tuple[str, str]]:
+    """Headers that describe the client-facing URL (for servers that read ``X-Forwarded-*``)."""
+    proto = scope.get("scheme") or "http"
+    pairs: list[tuple[str, str]] = [
+        ("X-Forwarded-Host", public_host),
+        ("X-Forwarded-Proto", proto),
+    ]
+    port = _port_from_host_header(public_host)
+    if port is not None:
+        pairs.append(("X-Forwarded-Port", str(port)))
+    if forwarded_prefix:
+        pairs.append(("X-Forwarded-Prefix", forwarded_prefix))
+    client = scope.get("client")
+    if isinstance(client, (list, tuple)) and len(client) >= 1 and client[0]:
+        pairs.append(("X-Forwarded-For", client[0]))
+    return pairs
+
+
 def _filter_request_headers(raw: list[tuple[bytes, bytes]]) -> list[tuple[bytes, bytes]]:
     hop_by_hop = {
         b"connection",
@@ -189,10 +294,18 @@ def _filter_request_headers(raw: list[tuple[bytes, bytes]]) -> list[tuple[bytes,
         b"transfer-encoding",
         b"upgrade",
     }
+    # Drop client-supplied forwarding headers; the gateway sets authoritative values.
+    strip = hop_by_hop | {
+        b"x-forwarded-for",
+        b"x-forwarded-host",
+        b"x-forwarded-proto",
+        b"x-forwarded-port",
+        b"x-forwarded-prefix",
+    }
     out: list[tuple[bytes, bytes]] = []
     for k, v in raw:
         kl = k.lower()
-        if kl in hop_by_hop:
+        if kl in strip:
             continue
         if kl == b"host":
             continue
@@ -200,15 +313,28 @@ def _filter_request_headers(raw: list[tuple[bytes, bytes]]) -> list[tuple[bytes,
     return out
 
 
-async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str) -> None:
+async def _proxy_http(
+    scope: Scope,
+    receive: Receive,
+    send: Send,
+    upstream: str,
+    streamlit_path: str,
+    *,
+    forwarded_prefix: str | None = None,
+) -> None:
     method = scope.get("method", "GET").upper()
-    url = _build_target_url(scope, upstream)
+    url = _build_target_url(scope, upstream, path=streamlit_path)
     raw_headers = scope.get("headers") or []
     pairs = [
         (k.decode("latin-1"), v.decode("latin-1")) for k, v in _filter_request_headers(raw_headers)
     ]
     headers = httpx.Headers(pairs)
-    headers["host"] = _public_host_from_scope(scope, upstream)
+    public_host = _public_host_from_scope(scope, upstream)
+    headers["host"] = public_host
+    for hk, hv in _forwarded_upstream_header_pairs(
+        scope, public_host, forwarded_prefix=forwarded_prefix
+    ):
+        headers[hk] = hv
 
     async def request_body() -> AsyncIterator[bytes]:
         while True:
@@ -222,11 +348,39 @@ async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str)
             else:
                 break
 
+    async def drain_incoming_request_body() -> None:
+        """Consume the ASGI request body before opening the upstream call.
+
+        When the gateway runs inside another ASGI caller (tests, nested clients), unread
+        ``http.request`` events share the same event loop with ``httpx``'s connection to
+        Streamlit; deferring ``receive()`` until after the upstream stream starts can
+        trigger premature ``ReadError`` on the upstream socket (empty HTML to browsers).
+        """
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                break
+            if not message.get("more_body", False):
+                break
+
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
-            req = client.build_request(method, url, headers=headers, content=request_body())
-            response = await client.send(req, stream=True)
-    except httpx.RequestError:
+        timeout = httpx.Timeout(120.0, connect=30.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            # Do not attach a streaming body to GET/HEAD: some upstreams (incl. Streamlit)
+            # reset the connection when a request body is declared, which yields an empty
+            # response to the browser despite Content-Length (blank Streamlit UI).
+            if method in {"GET", "HEAD"}:
+                await drain_incoming_request_body()
+                req = client.build_request(method, url, headers=headers)
+            else:
+                req = client.build_request(method, url, headers=headers, content=request_body())
+            # Buffer the upstream response (``stream=False``). Using ``aiter_raw()`` here
+            # breaks when another ``httpx`` ASGI transport wraps this app: nested httpcore
+            # streaming yields ``ReadError`` and clients see ``Content-Length`` with an empty
+            # body (blank Streamlit page).
+            response = await client.send(req, stream=False)
+    except httpx.RequestError as exc:
+        _gateway_log.warning("gateway upstream HTTP error for %s: %s", url, exc)
         await send(
             {
                 "type": "http.response.start",
@@ -238,11 +392,19 @@ async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str)
         return
 
     try:
+        # ``httpx`` decodes ``Content-Encoding`` (e.g. gzip) into ``response.content`` but
+        # leaves the upstream ``content-encoding`` / ``content-length`` headers as sent on
+        # the wire. Forwarding those with a decoded body breaks clients (truncated HTML).
+        out_body = b"" if method == "HEAD" else response.content
+        _skip_resp_hdr = frozenset(
+            {"transfer-encoding", "connection", "content-encoding", "content-length"}
+        )
         response_headers = [
             (k.lower().encode("latin-1"), v.encode("latin-1"))
             for k, v in response.headers.multi_items()
-            if k.lower() not in {"transfer-encoding", "connection"}
+            if k.lower() not in _skip_resp_hdr
         ]
+        response_headers.append((b"content-length", str(len(out_body)).encode("latin-1")))
         await send(
             {
                 "type": "http.response.start",
@@ -251,53 +413,84 @@ async def _proxy_http(scope: Scope, receive: Receive, send: Send, upstream: str)
             }
         )
         try:
-            async for chunk in response.aiter_raw():
-                await send({"type": "http.response.body", "body": chunk, "more_body": True})
-            await send({"type": "http.response.body", "body": b""})
+            await send({"type": "http.response.body", "body": out_body})
         except Exception:
-            _gateway_log.exception("gateway proxy: error streaming response body from upstream")
+            _gateway_log.exception("gateway proxy: error building response body from upstream")
             raise
     finally:
         await response.aclose()
 
 
-def _parse_ws_target(scope: Scope, upstream: str) -> str:
-    path = scope.get("path") or "/"
+def _parse_ws_target(scope: Scope, upstream: str, *, path: str | None = None) -> str:
+    use_path = path if path is not None else (scope.get("path") or "/")
     qs = scope.get("query_string", b"")
     if qs:
-        path = f"{path}?{qs.decode('latin-1')}"
+        use_path = f"{use_path}?{qs.decode('latin-1')}"
     parsed = urllib.parse.urlparse(upstream)
     scheme = "wss" if parsed.scheme == "https" else "ws"
     host = parsed.hostname or "127.0.0.1"
     port = parsed.port
     netloc = f"{host}:{port}" if port else host
     base_path = parsed.path.rstrip("/")
-    full_path = f"{base_path}{path}" if base_path else path
+    full_path = f"{base_path}{use_path}" if base_path else use_path
     return str(urllib.parse.urlunparse((scheme, netloc, full_path, "", "", "")))
 
 
-async def _proxy_websocket(scope: Scope, receive: Receive, send: Send, upstream: str) -> None:
+async def _proxy_websocket(
+    scope: Scope,
+    receive: Receive,
+    send: Send,
+    upstream: str,
+    streamlit_path: str,
+    *,
+    forwarded_prefix: str | None = None,
+) -> None:
     first = await receive()
     if first["type"] != "websocket.connect":
         await send({"type": "websocket.close", "code": 1002})
         return
 
-    target = _parse_ws_target(scope, upstream)
+    target = _parse_ws_target(scope, upstream, path=streamlit_path)
     headers = scope.get("headers") or []
     public_host = _public_host_from_scope(scope, upstream)
     extra: list[tuple[str, str]] = [("Host", public_host)]
+    extra.extend(
+        _forwarded_upstream_header_pairs(scope, public_host, forwarded_prefix=forwarded_prefix)
+    )
+    skip_ws = {
+        "host",
+        "connection",
+        "upgrade",
+        "sec-websocket-key",
+        "sec-websocket-version",
+        # Negotiate extensions only on this hop. Forwarding the browser's
+        # Sec-WebSocket-Extensions while this client also adds permessage-deflate breaks
+        # the upstream handshake (endless "Connecting" / WS 403). Streamlit's
+        # Sec-WebSocket-Protocol line (XSRF + session) is forwarded as-is from the client.
+        "sec-websocket-extensions",
+        "x-forwarded-for",
+        "x-forwarded-host",
+        "x-forwarded-proto",
+        "x-forwarded-port",
+    }
     for k, v in headers:
         key = k.decode("latin-1")
         lk = key.lower()
-        if lk in {"host", "connection", "upgrade", "sec-websocket-key", "sec-websocket-version"}:
+        if lk in skip_ws:
             continue
         extra.append((key, v.decode("latin-1")))
 
     try:
+        # Streamlit responds with ``Sec-WebSocket-Protocol: streamlit``. The ``websockets``
+        # client requires ``subprotocols=[...]`` whenever the server picks a subprotocol;
+        # we still merge *additional_headers* after building the request, so the browser's
+        # full ``streamlit, <xsrf>, <session>`` line is sent on the wire.
         async with websockets.connect(
             target,
             additional_headers=extra,
+            subprotocols=cast(Any, ["streamlit"]),
             max_size=None,
+            open_timeout=30.0,
         ) as upstream_ws:
             subprotocols = scope.get("subprotocols") or []
             accepted = upstream_ws.subprotocol
@@ -336,5 +529,11 @@ async def _proxy_websocket(scope: Scope, receive: Receive, send: Send, upstream:
 
                 tg.start_soon(client_to_upstream)
                 tg.start_soon(upstream_to_client)
-    except (OSError, websockets.InvalidURI, websockets.InvalidHandshake):
+    except (
+        OSError,
+        websockets.InvalidURI,
+        websockets.InvalidHandshake,
+        websockets.NegotiationError,
+    ) as exc:
+        _gateway_log.warning("gateway websocket upstream failed: %s", exc)
         await send({"type": "websocket.close", "code": 1011})

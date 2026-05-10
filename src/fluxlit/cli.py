@@ -1,4 +1,4 @@
-"""Typer CLI: ``fluxlit dev``, ``run``, ``doctor``, ``build``, ``new``.
+"""Typer CLI: ``fluxlit dev``, ``run``, ``shutdown``, ``doctor``, ``build``, ``new``.
 
 The ``fluxlit`` setuptools entrypoint calls :func:`main`. Commands resolve defaults from
 :func:`fluxlit.project_config.load_project_config` and :class:`~fluxlit.config.FluxlitSettings`.
@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import typer
 
 from fluxlit.project_config import load_project_config, resolve_binding, resolve_target
-from fluxlit.runtime import run_unified
+from fluxlit.runtime import run_unified, shutdown_unified_process
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -78,6 +78,18 @@ def dev(
         "--reload-scope",
         help="Only 'gateway' is supported: reloads the ASGI app, not Streamlit.",
     ),
+    pidfile: Annotated[
+        Path | None,
+        typer.Option(
+            "--pidfile",
+            help="Where to write the PID file (default: .fluxlit-dev.pid or FLUXLIT_PIDFILE).",
+        ),
+    ] = None,
+    no_pidfile: bool = typer.Option(
+        False,
+        "--no-pidfile",
+        help="Do not write a PID file (also respect FLUXLIT_NO_PIDFILE=1).",
+    ),
 ) -> None:
     """Run the unified stack for local development (Streamlit subprocess + Uvicorn gateway).
 
@@ -113,7 +125,41 @@ def dev(
         log_level=log_r,
         proxy_headers=proxy_headers,
         forwarded_allow_ips=forwarded_allow_ips,
+        pidfile=pidfile,
+        write_pidfile=not no_pidfile,
     )
+
+
+@app.command()
+def shutdown(
+    pidfile: Annotated[
+        Path | None,
+        typer.Option(
+            "--pidfile",
+            help="PID file path (default: .fluxlit-dev.pid in cwd or FLUXLIT_PIDFILE).",
+        ),
+    ] = None,
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="After wait, send SIGKILL (POSIX only) if still running.",
+    ),
+    wait_s: float = typer.Option(
+        5.0,
+        "--wait",
+        help="Seconds to wait after SIGTERM before --force kicks in.",
+    ),
+) -> None:
+    """Stop ``fluxlit dev`` or ``fluxlit run`` using the PID file they write.
+
+    Run this from the same working directory (or pass ``--pidfile`` / set ``FLUXLIT_PIDFILE``)
+    as the server process. Normal exit removes the PID file; this command also deletes it when
+    the process is already gone.
+    """
+    code, msg = shutdown_unified_process(pidfile, force=force, wait_s=wait_s)
+    typer.echo(msg)
+    raise typer.Exit(code=code)
 
 
 @app.command("run")
@@ -131,6 +177,18 @@ def run_cmd(
     forwarded_allow_ips: str | None = typer.Option(
         None,
         help="Comma-separated IPs to trust for forwarded headers (uvicorn forwarded_allow_ips).",
+    ),
+    pidfile: Annotated[
+        Path | None,
+        typer.Option(
+            "--pidfile",
+            help="Where to write the PID file (default: .fluxlit-dev.pid or FLUXLIT_PIDFILE).",
+        ),
+    ] = None,
+    no_pidfile: bool = typer.Option(
+        False,
+        "--no-pidfile",
+        help="Do not write a PID file (also respect FLUXLIT_NO_PIDFILE=1).",
     ),
 ) -> None:
     """Run the unified stack for production-style use (no Uvicorn reload).
@@ -160,6 +218,8 @@ def run_cmd(
         log_level=log_r,
         proxy_headers=proxy_headers,
         forwarded_allow_ips=forwarded_allow_ips,
+        pidfile=pidfile,
+        write_pidfile=not no_pidfile,
     )
 
 
@@ -269,12 +329,26 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
         )
     )
 
-    if fl is not None and fl.settings.root_path and not fl.settings.public_base_url.strip():
+    if (
+        fl is not None
+        and fl.settings.public_mount_path()
+        and not fl.settings.public_base_url.strip()
+    ):
         rows.append(
             (
                 "oauth_public_base_url",
                 "WARN",
-                "root_path set but public_base_url empty — set FLUXLIT_PUBLIC_BASE_URL for OAuth",
+                "subpath set but public_base_url empty — set FLUXLIT_PUBLIC_BASE_URL for OAuth",
+            )
+        )
+
+    if fl is not None and fl.settings.public_mount_path() and not fl.settings.trust_proxy:
+        rows.append(
+            (
+                "proxy_headers",
+                "WARN",
+                "subpath/root_path set but trust_proxy false — behind Posit Connect/nginx set "
+                "FLUXLIT_TRUST_PROXY=1 or pass --proxy-headers",
             )
         )
 

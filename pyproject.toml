@@ -53,6 +53,9 @@ dev = [
   "PyJWT[crypto]>=2.8.0",
   "cryptography>=42.0.0",
 ]
+e2e = [
+  "pytest-playwright>=0.5",
+]
 docs = [
   "furo>=2024.1",
   "itsdangerous>=2.0",
@@ -115,3 +118,6 @@ source = ["src/fluxlit"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+  "e2e: browser tests (install .[e2e] and run playwright install chromium)",
+]

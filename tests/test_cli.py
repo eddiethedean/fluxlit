@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import contextlib
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -47,6 +50,27 @@ def test_doctor_warns_when_internal_api_path_mismatches_mount(
     assert res.exit_code == 0
     assert "WARN" in res.stdout
     assert "api_mount_path" in res.stdout
+
+
+def test_doctor_warns_when_subpath_without_trust_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_subpath_proxy.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='S', settings=FluxlitSettings("
+        "root_path='/content/1', trust_proxy=False, public_base_url='https://example.com', "
+        "gateway_port=59277))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_subpath_proxy:app"])
+    assert res.exit_code == 0
+    assert "proxy_headers" in res.stdout
+    assert "FLUXLIT_TRUST_PROXY" in res.stdout
 
 
 def test_doctor_passes_when_internal_api_path_matches_mount(
@@ -236,3 +260,44 @@ def test_dev_defaults_come_from_settings(tmp_path: Path, monkeypatch: pytest.Mon
     assert called["host"] == "0.0.0.0"
     assert called["port"] == 7777
     assert called["log_level"] == "warning"
+
+
+def test_shutdown_no_pidfile_exits_two(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    res = runner.invoke(app, ["shutdown"], catch_exceptions=False)
+    assert res.exit_code == 2
+    assert "No pid file" in res.stdout
+
+
+def test_shutdown_exits_zero_on_stale_pid(tmp_path: Path) -> None:
+    pid_path = tmp_path / ".fluxlit-dev.pid"
+    pid_path.write_text("999999999\n", encoding="ascii")
+    runner = CliRunner()
+    res = runner.invoke(app, ["shutdown", "--pidfile", str(pid_path)], catch_exceptions=False)
+    assert res.exit_code == 0
+    assert not pid_path.exists()
+
+
+def test_shutdown_sends_sigterm_to_recorded_pid(tmp_path: Path) -> None:
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(120)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    pid_path = tmp_path / "sub.pid"
+    pid_path.write_text(f"{proc.pid}\n", encoding="ascii")
+    try:
+        runner = CliRunner()
+        res = runner.invoke(
+            app,
+            ["shutdown", "--pidfile", str(pid_path), "--wait", "5"],
+            catch_exceptions=False,
+        )
+        assert res.exit_code == 0
+        proc.wait(timeout=15)
+        assert proc.returncode is not None
+    finally:
+        with contextlib.suppress(Exception):
+            proc.kill()
+            proc.wait(timeout=3)

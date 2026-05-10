@@ -33,7 +33,10 @@ log_level = "info"
 |----------|------|
 | `FLUXLIT_TITLE` | App title (FastAPI / UX default). |
 | `FLUXLIT_GATEWAY_HOST` / `FLUXLIT_GATEWAY_PORT` | Bind defaults (CLI still overrides for `dev` / `run`). |
-| `FLUXLIT_ROOT_PATH` | ASGI root path behind a reverse proxy (passed to FastAPI). |
+| `FLUXLIT_ROOT_PATH` | Public URL prefix when the app is mounted under a subpath (FastAPI/Uvicorn `root_path`, gateway routing, Streamlit `server.baseUrlPath`). Use the path users see in the browser (e.g. Posit Connect content URL path). |
+| `FLUXLIT_TRUST_PROXY` | If true, enable Uvicorn `proxy_headers` and trust `X-Forwarded-*` / client scheme (typical behind Posit Connect, nginx, or Traefik). You can also pass `fluxlit run --proxy-headers`. |
+| `FLUXLIT_FORWARDED_ALLOW_IPS` | Uvicorn `forwarded_allow_ips` when proxy headers are enabled; defaults to `*` when trusting the proxy and this is unset. |
+| `FLUXLIT_STREAMLIT_PUBLIC_PATH` | Optional subpath used only if `FLUXLIT_ROOT_PATH` is empty; prefer `FLUXLIT_ROOT_PATH`. |
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side {class}`~fluxlit.client.ApiClient` (should include `/api`). |
 | `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log API requests (method, path, status) at INFO with request id context. |
 | `FLUXLIT_ENABLE_SECURITY_HEADERS` | If true, add baseline security headers on the FastAPI app (HSTS when HTTPS, `X-Content-Type-Options`, etc.). |
@@ -57,3 +60,11 @@ pip install "fluxlit[auth]"
 ```
 
 Core HTTP stack remains unchanged if you skip this extra.
+
+## Reverse proxies (Posit Connect, Workbench, nginx)
+
+For a **subpath** deployment (e.g. `https://server.example.com/content/123/`), set **`FLUXLIT_ROOT_PATH`** to that prefix (no trailing slash), e.g. `/content/123`. FluxLit aligns gateway routing (whether the proxy **strips** the prefix or forwards the **full** public path) and Streamlit `baseUrlPath` for static assets and WebSockets. With `fluxlit run`, Uvicorn uses an empty `root_path` and the runtime injects the public mount into the ASGI scope so **strip-prefix** and **full-path** upstreams both work without doubling the prefix.
+
+Behind a trusted edge proxy, set **`FLUXLIT_TRUST_PROXY=1`** (or `fluxlit run --proxy-headers`) so scheme and host from `X-Forwarded-*` match what browsers use. Tighten **`FLUXLIT_FORWARDED_ALLOW_IPS`** if you do not want to trust all sources (default `*` when proxy trust is on and this is unset).
+
+Set **`FLUXLIT_PUBLIC_BASE_URL`** to the public origin (e.g. `https://server.example.com`) when using OAuth/OIDC so redirects stay on the user-facing URL.

@@ -177,7 +177,7 @@ Install **`fluxlit[auth]`** for JWT/OIDC helpers used in those guides.
 | `fluxlit new <name>` | Scaffold a minimal `app.py` in a new directory. |
 | `python -m fluxlit` | Equivalent entry to the `fluxlit` console script. |
 
-Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-headers`, `--forwarded-allow-ips`.
+Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-headers`, `--forwarded-allow-ips`. For **Posit Connect / Workbench** (or any subpath reverse proxy), set **`FLUXLIT_ROOT_PATH`** to the browser-visible prefix (e.g. `/content/123`) and **`FLUXLIT_TRUST_PROXY=1`** (or `--proxy-headers`); see [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) (reverse proxies section).
 `fluxlit dev --reload` reloads the **API gateway process only** via Uvicorn; the Streamlit subprocess is **not** restarted. Use `--reload-scope=gateway` (default) or restart `fluxlit` to pick up Streamlit UI changes.
 
 ---
@@ -210,7 +210,9 @@ See [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html)
 |----------|------|
 | `FLUXLIT_TITLE` | App title (default for FastAPI / UX). |
 | `FLUXLIT_GATEWAY_HOST` / `FLUXLIT_GATEWAY_PORT` | Defaults for binding (also used in settings; CLI overrides bind for dev/run). |
-| `FLUXLIT_ROOT_PATH` | ASGI root path behind a reverse proxy (passed through to FastAPI). |
+| `FLUXLIT_ROOT_PATH` | Public subpath when mounted behind a proxy (FastAPI/Uvicorn `root_path`, gateway + Streamlit `baseUrlPath`). |
+| `FLUXLIT_TRUST_PROXY` | Trust `X-Forwarded-*` / client scheme via Uvicorn (use behind Connect, nginx, etc.). |
+| `FLUXLIT_FORWARDED_ALLOW_IPS` | Optional Uvicorn allowlist; defaults to `*` when proxy trust is on. |
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side `ApiClient` (includes `/api`). |
 | `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log each API request (method, path, status) at INFO with request id context. |
 
@@ -269,6 +271,8 @@ FluxLit uses the same “built-in” testing platforms you likely already know:
 - **Streamlit**: `streamlit.testing.v1.AppTest` (version-dependent)
 
 FluxLit also ships a small wrapper: **`FluxLitTestClient`**.
+
+Optional **browser E2E** tests (Playwright + a real `run_unified` stack, including Streamlit’s WebSocket) live under `tests/e2e`. Install `pip install -e ".[e2e]"`, run `playwright install chromium`, then `pytest tests/e2e -m e2e`. The default `pytest` / CI unit run skips that directory unless you invoke it explicitly.
 
 ```python
 from fluxlit import FluxLit, FluxLitTestClient

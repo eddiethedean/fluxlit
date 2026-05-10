@@ -22,8 +22,8 @@ class FluxlitSettings(BaseSettings):
     - ``api_mount_path`` — public URL prefix for the API (default ``/api``).
     - ``root_path`` — ASGI root when behind a reverse proxy.
     - ``enable_request_logging`` — per-request INFO logs on the FastAPI app.
-    - ``streamlit_host`` / ``streamlit_port`` / ``streamlit_public_path`` — reserved for
-      future layout; documented on fields, not read by the runtime today.
+    - ``trust_proxy`` / ``forwarded_allow_ips`` — Uvicorn proxy trust (e.g. Posit Connect).
+    - ``streamlit_public_path`` — optional subpath when ``root_path`` is unset.
     """
 
     model_config = SettingsConfigDict(
@@ -48,11 +48,35 @@ class FluxlitSettings(BaseSettings):
     api_mount_path: str = "/api"
     streamlit_public_path: str = Field(
         default="",
-        description="Reserved for future use (e.g. public URL path hints).",
+        description=(
+            "Optional subpath if ``root_path`` is unset; same role for Streamlit "
+            "``baseUrlPath``. Prefer ``root_path`` (also sets FastAPI/Uvicorn ASGI root)."
+        ),
     )
     root_path: str = Field(
         default="",
-        description="ASGI root path when served behind a reverse proxy (e.g. /myapp).",
+        description=(
+            "Public URL path prefix when the app is mounted under a subpath "
+            "(reverse proxy, Posit Connect / Workbench, etc.). Drives gateway routing, "
+            "Streamlit ``server.baseUrlPath``, and ASGI ``root_path`` injected by "
+            "``fluxlit run`` (Uvicorn ``root_path`` stays empty so strip-prefix and "
+            "full-path proxies do not double the prefix)."
+        ),
+    )
+    trust_proxy: bool = Field(
+        default=False,
+        description=(
+            "If True, enable Uvicorn ``proxy_headers`` so ``X-Forwarded-*`` / scheme "
+            "are trusted (typical behind Posit Connect, nginx, or Traefik). "
+            "Override with ``fluxlit run --proxy-headers``."
+        ),
+    )
+    forwarded_allow_ips: str | None = Field(
+        default=None,
+        description=(
+            "Uvicorn ``forwarded_allow_ips`` when proxy headers are enabled; "
+            "defaults to '*' if unset and the proxy is trusted."
+        ),
     )
     enable_request_logging: bool = Field(
         default=False,
@@ -110,3 +134,10 @@ class FluxlitSettings(BaseSettings):
             "used by ``FluxLit.attach_oidc_login``."
         ),
     )
+
+    def public_mount_path(self) -> str:
+        """Browser-visible path prefix (``root_path``, else ``streamlit_public_path``)."""
+        r = (self.root_path or "").strip()
+        if r:
+            return r
+        return (self.streamlit_public_path or "").strip()

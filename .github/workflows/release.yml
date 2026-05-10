@@ -46,7 +46,7 @@ jobs:
           ruff format --check src tests
 
       - name: Tests
-        run: python -m pytest -n auto
+        run: python -m pytest -n auto --ignore=tests/e2e
 
       - name: Mypy
         run: python -m mypy src/fluxlit

@@ -30,6 +30,23 @@ def test_api_routes_are_prefixed_with_api(api: FastAPI) -> None:
     assert res.json() == {"ok": "pong"}
 
 
+def test_api_routes_work_with_root_mount_full_proxy_path(api: FastAPI) -> None:
+    """Simulate a proxy that forwards the full public path (e.g. Posit Connect)."""
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api", root_mount="/content/42")
+    client = TestClient(gateway)
+    res = client.get("/content/42/api/ping")
+    assert res.status_code == 200
+    assert res.json() == {"ok": "pong"}
+
+
+def test_root_docs_redirect_includes_root_mount(api: FastAPI) -> None:
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api", root_mount="/myapp")
+    client = TestClient(gateway)
+    res = client.get("/myapp/docs", follow_redirects=False)
+    assert res.status_code == 307
+    assert res.headers["location"] == "/myapp/api/docs"
+
+
 def test_openapi_available_under_api_prefix(api: FastAPI) -> None:
     gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="/api")
     client = TestClient(gateway)
