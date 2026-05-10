@@ -316,6 +316,95 @@ def test_bff_callback_generic_oidc_uses_jwks_verify(monkeypatch: pytest.MonkeyPa
     assert captured["leeway"] == "5"
 
 
+def test_bff_auth_exchange_code_is_single_use() -> None:
+    import base64
+    import json
+
+    h = base64.urlsafe_b64encode(b'{"alg":"none"}').decode().rstrip("=")
+    p = (
+        base64.urlsafe_b64encode(json.dumps({"sub": "single-use-user"}).encode())
+        .decode()
+        .rstrip("=")
+    )
+    tok = f"{h}.{p}.x"
+
+    class _WithIdToken(_MiniOidc):
+        def exchange_code(self, **_: object) -> dict[str, str]:
+            return {"id_token": tok, "access_token": "at"}
+
+    app = FastAPI()
+    register_oidc_bff_routes(
+        app,
+        OIDCBFFConfig(oidc=_WithIdToken(), first_party_secret="bff-first-party-secret-32bytes-x"),
+    )
+    c = TestClient(app)
+    r1 = c.get("/auth/login", follow_redirects=False)
+    state = parse_qs(urlparse(r1.headers["location"]).query)["state"][0]
+    r2 = c.get("/auth/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    assert r2.status_code == 302
+    otc = parse_qs(urlparse(r2.headers["location"]).query)["auth_code"][0]
+    assert len(otc) >= 8
+    ok = c.post("/auth/exchange", json={"code": otc})
+    assert ok.status_code == 200
+    assert ok.json()["access_token"]
+    replay = c.post("/auth/exchange", json={"code": otc})
+    assert replay.status_code == 401
+
+
+def test_bff_callback_generic_oidc_custom_id_token_audience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_verify(
+        *,
+        id_token: str,
+        issuer: str,
+        jwks_uri: str,
+        audience: str,
+        leeway: int = 0,
+    ) -> str:
+        captured["audience"] = audience
+        return "sub-x"
+
+    monkeypatch.setattr("fluxlit.oidc._verify_id_token_jwks", fake_verify)
+
+    inner = {
+        "issuer": "https://idp.example",
+        "authorization_endpoint": "https://idp.example/a",
+        "token_endpoint": "https://idp.example/t",
+        "jwks_uri": "https://idp.example/jwks",
+    }
+    cfg = GenericOIDCClientConfig(
+        issuer="https://idp.example",
+        client_id="my-client",
+        client_secret="sec",
+    )
+    oidc = GenericOIDCClient(cfg)
+    oidc._doc = OIDCDiscoveryDocument.model_validate(inner)  # noqa: SLF001
+
+    def exchange_code(_self: object, **_: object) -> dict[str, str]:
+        return {"id_token": "x.y.z", "access_token": "at"}
+
+    monkeypatch.setattr(GenericOIDCClient, "exchange_code", exchange_code)
+
+    app = FastAPI()
+    register_oidc_bff_routes(
+        app,
+        OIDCBFFConfig(
+            oidc=oidc,
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            id_token_audience="custom-resource-id",
+        ),
+    )
+    c = TestClient(app)
+    r1 = c.get("/auth/login", follow_redirects=False)
+    state = parse_qs(urlparse(r1.headers["location"]).query)["state"][0]
+    r2 = c.get("/auth/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    assert r2.status_code == 302
+    assert captured["audience"] == "custom-resource-id"
+
+
 def test_verify_id_token_jwks_invalid_token_raises_502() -> None:
     jwt_lib = pytest.importorskip("jwt")
     from fluxlit.oidc import _verify_id_token_jwks

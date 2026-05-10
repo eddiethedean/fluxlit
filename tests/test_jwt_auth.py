@@ -28,6 +28,47 @@ def hs256_bearer() -> JWTBearer:
     )
 
 
+@pytest.mark.asyncio
+async def test_jwt_bearer_hs256_decode_uses_anyio_thread(monkeypatch: pytest.MonkeyPatch) -> None:
+    """JWKS/HS256 sync decode must run via anyio.to_thread (non-blocking contract)."""
+    bearer = JWTBearer(
+        JWTAuthConfig(
+            issuer="https://issuer.example",
+            audience="my-api",
+            algorithms=["HS256"],
+            hs256_secret=_HS_SECRET,
+        )
+    )
+    token = issue_hs256_access_token(
+        subject="thread-check",
+        issuer="https://issuer.example",
+        audience="my-api",
+        secret=_HS_SECRET,
+        ttl_seconds=300,
+    )
+    ran_in_thread: list[bool] = []
+
+    async def fake_run_sync(func: object, *args: object) -> object:
+        ran_in_thread.append(True)
+        if not callable(func):
+            raise TypeError("expected callable")
+        return func(*args)
+
+    monkeypatch.setattr("fluxlit.jwt_auth.anyio.to_thread.run_sync", fake_run_sync)
+    from starlette.requests import Request
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [(b"authorization", f"Bearer {token}".encode())],
+    }
+    request = Request(scope)
+    claims = await bearer(request)
+    assert ran_in_thread == [True]
+    assert claims.sub == "thread-check"
+
+
 def test_jwt_bearer_accepts_valid_hs256(hs256_bearer: JWTBearer) -> None:
     app = FastAPI()
     bearer = hs256_bearer

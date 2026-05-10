@@ -9,6 +9,7 @@ from fluxlit.client import ApiClient
 from fluxlit.streamlit_auth import (
     bearer_headers_from_session,
     exchange_auth_code_from_query,
+    prepare_streamlit_api_client,
 )
 
 
@@ -106,3 +107,76 @@ def test_bearer_headers_from_session_empty_and_set() -> None:
     st.session_state["fluxlit_access_token"] = "secret"
     assert bearer_headers_from_session(st) == {"Authorization": "Bearer secret"}
     assert bearer_headers_from_session(st, session_key="other") == {}
+
+
+def test_prepare_streamlit_api_client_skips_exchange_when_session_has_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Existing session token must not call exchange_auth_code_from_query."""
+    calls: list[object] = []
+
+    def spy(*_a: object, **_k: object) -> None:
+        calls.append(True)
+
+    monkeypatch.setattr("fluxlit.streamlit_auth.exchange_auth_code_from_query", spy)
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    st = MagicMock()
+    st.session_state = {"fluxlit_access_token": "cached"}
+    st.query_params = {"auth_code": "ignored"}
+    api = prepare_streamlit_api_client(st, base_url="http://127.0.0.1:8000/api")
+    try:
+        assert calls == []
+        assert st.session_state["fluxlit_access_token"] == "cached"
+    finally:
+        api.close()
+
+
+def test_prepare_streamlit_api_client_returns_bootstrap_when_no_code_no_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    st = MagicMock()
+    st.session_state = {}
+    st.query_params = {}
+    api = prepare_streamlit_api_client(st, base_url="http://127.0.0.1:8000/api")
+    try:
+        assert api._auth_header_factory is None  # type: ignore[attr-defined]
+        assert st.session_state.get("fluxlit_access_token") is None
+    finally:
+        api.close()
+
+
+def test_prepare_streamlit_api_client_exchange_then_sends_bearer_on_get(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """After auth_code exchange, follow-up GET must include Authorization (bootstrap closed)."""
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    st = MagicMock()
+    st.session_state = {}
+    st.query_params = {"auth_code": "longenoughcodeherexxx"}
+    auth_on_requests: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        auth_on_requests.append(request.headers.get("authorization"))
+        if request.url.path.endswith("/auth/exchange"):
+            body = {"access_token": "after-exchange", "token_type": "bearer"}
+            return httpx.Response(200, json=body)
+        return httpx.Response(200, json={"status": "ok"})
+
+    transport = httpx.MockTransport(handler)
+    orig_client = httpx.Client
+
+    def client_factory(**kwargs: object) -> httpx.Client:
+        merged = dict(kwargs)
+        merged["transport"] = transport
+        return orig_client(**merged)
+
+    monkeypatch.setattr("fluxlit.client.httpx.Client", client_factory)
+    api = prepare_streamlit_api_client(st, base_url="http://127.0.0.1:8000/api")
+    try:
+        api.get("/protected")
+    finally:
+        api.close()
+    assert st.session_state["fluxlit_access_token"] == "after-exchange"
+    assert auth_on_requests[0] is None
+    assert auth_on_requests[1] == "Bearer after-exchange"

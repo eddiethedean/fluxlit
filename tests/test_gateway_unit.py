@@ -76,6 +76,20 @@ def test_strip_prefix_scope_normalizes_raw_path() -> None:
     assert new_scope["raw_path"] == b"/v1/ping"
 
 
+def test_strip_prefix_scope_raw_path_latin1_non_ascii() -> None:
+    """Paths with Latin-1 code points must round-trip via latin-1 bytes (not ascii)."""
+    path = "/api/café"
+    scope: dict[str, Any] = {
+        "type": "http",
+        "path": path,
+        "raw_path": path.encode("latin-1"),
+        "headers": [],
+    }
+    new_scope = _strip_prefix_scope(scope, "/api")  # type: ignore[arg-type]
+    assert new_scope["path"] == "/café"
+    assert new_scope["raw_path"] == "/café".encode("latin-1")
+
+
 def test_request_id_from_scope_header_or_generated() -> None:
     scope_gen: dict[str, Any] = {"headers": []}
     rid1 = _request_id_from_scope(scope_gen)  # type: ignore[arg-type]
