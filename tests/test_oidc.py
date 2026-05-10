@@ -77,6 +77,25 @@ def test_oidc_bff_login_callback_exchange() -> None:
     assert isinstance(body.get("access_token"), str) and body["access_token"]
 
 
+def test_oidc_login_redirect_uri_uses_public_base_and_callback_path() -> None:
+    """IdP redirect_uri must match browser-visible origin + API callback (subpath-safe)."""
+    app = FastAPI()
+    cfg = OIDCBFFConfig(
+        oidc=_StubOIDC(),
+        first_party_secret="bff-first-party-secret-32bytes-x",
+        public_base_url="https://customer.example/connect",
+        callback_path="/api/auth/callback",
+    )
+    register_oidc_bff_routes(app, cfg)
+    client = TestClient(app)
+    r = client.get("/auth/login", follow_redirects=False)
+    assert r.status_code == 302
+    loc = r.headers["location"]
+    q = parse_qs(urlparse(loc).query)
+    redirect_uri = q["redirect_uri"][0]
+    assert redirect_uri == "https://customer.example/connect/api/auth/callback"
+
+
 def test_oidc_bff_exchange_rejects_reuse() -> None:
     app = FastAPI()
     cfg = OIDCBFFConfig(

@@ -120,4 +120,5 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
   "e2e: browser tests (install .[e2e] and run playwright install chromium)",
+  "slow: subprocess or long-running tests (skipped in default CI matrix)",
 ]

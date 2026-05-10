@@ -61,6 +61,27 @@ def test_create_gateway_app_reads_env_and_proxies_api(
     assert client.get("/nope").status_code == 502
 
 
+def test_create_gateway_app_honors_fluxlit_root_path_for_both_upstream_shapes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``create_gateway_app`` wraps like ``fluxlit run``: strip- and full-path URLs work."""
+    (tmp_path / "cg_mount.py").write_text(
+        "from fluxlit import FluxLit\napp = FluxLit(title='M')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_APP", "cg_mount:app")
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", "http://127.0.0.1:9")
+    monkeypatch.setenv("FLUXLIT_API_PREFIX", "/api")
+    monkeypatch.setenv("FLUXLIT_ROOT_PATH", "/content/99")
+
+    asgi = create_gateway_app()
+    client = TestClient(asgi)
+    assert client.get("/api/healthz").status_code == 200
+    assert client.get("/content/99/api/healthz").status_code == 200
+    assert client.get("/content/99/nope-streamlit").status_code == 502
+
+
 def test_default_pidfile_path_cwd_and_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     assert default_pidfile_path() == tmp_path / ".fluxlit-dev.pid"

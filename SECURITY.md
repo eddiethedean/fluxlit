@@ -38,5 +38,6 @@ Include affected versions, component (gateway, `ApiClient`, JWT/OIDC helpers, et
 
 - Runtime and Streamlit/API security patterns: [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html) (documentation).
 - JWT/OIDC usage: [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html).
+- How auth and `ApiClient` logging are tested (including that bearer secrets must not appear in debug logs): [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html).
 
 **OIDC BFF:** Default route registration keeps OAuth ``state`` and Streamlit ``auth_code`` in **process memory**. Deploy with **one worker/replica** for that API process, or replace the store for high availability. ``id_token`` is validated with IdP JWKS when using ``GenericOIDCClient``.

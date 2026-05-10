@@ -51,4 +51,6 @@ CURL_INSECURE=1 BASE_URL=https://127.0.0.1:8444 ./docker/proxy-deployment/smoke-
 - **Frontend:** `GET …/myapp/` returns HTML that includes Streamlit bootstrap (`_stcore` / `stApp`).
 - **WebSocket:** TLS-aware handshake to **`…/myapp/_stcore/stream`** with subprotocol `streamlit` (unless `SKIP_WS=1`).
 
+**Also in CI:** Python tests under **`tests/`** cover gateway forwarding (`X-Forwarded-*`, `Host`), HTTP proxy behavior (gzip, redirects), and WebSocket paths aligned with Streamlit’s stream route — complementary to this shell smoke script.
+
 Stop: `docker compose -f docker/proxy-deployment/docker-compose.yml down` (add extra `-f` files if you used overrides).

@@ -8,6 +8,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
+from starlette.types import Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
 
 from fluxlit.gateway import (
@@ -117,6 +118,25 @@ def test_normalize_and_split_gateway_paths() -> None:
     assert split_gateway_paths("/api/x", "") == ("/api/x", "/api/x")
 
 
+@pytest.mark.parametrize(
+    ("path_in", "mount", "dispatch", "streamlit_path"),
+    [
+        ("/myapp/api/healthz", "/myapp", "/api/healthz", "/myapp/api/healthz"),
+        ("/myapp/api/v1/items", "/myapp", "/api/v1/items", "/myapp/api/v1/items"),
+        ("/myapp", "/myapp", "/", "/myapp"),
+        ("/prefix", "/myapp", "/prefix", "/myapp/prefix"),
+        ("/api/healthz", "/myapp", "/api/healthz", "/myapp/api/healthz"),
+    ],
+)
+def test_split_gateway_paths_table(
+    path_in: str,
+    mount: str,
+    dispatch: str,
+    streamlit_path: str,
+) -> None:
+    assert split_gateway_paths(path_in, mount) == (dispatch, streamlit_path)
+
+
 def test_parse_ws_target_https_and_base_path() -> None:
     scope: dict[str, Any] = {"path": "/_stcore/stream", "query_string": b"x=1"}
     url = _parse_ws_target(scope, "https://example.com/prefix/")
@@ -220,7 +240,10 @@ def test_websocket_proxy_upstream_refused_closes() -> None:
     gateway = build_gateway(FastAPI(), "http://127.0.0.1:9", api_prefix="/api")
     with TestClient(gateway) as client:
         with pytest.raises(WebSocketDisconnect):
-            with client.websocket_connect("/_stcore/ws"):
+            with client.websocket_connect(
+                "/_stcore/stream",
+                subprotocols=["streamlit"],
+            ):
                 pass
 
 
@@ -332,3 +355,72 @@ async def test_proxy_http_strips_gzip_headers_and_sets_body_length() -> None:
     assert hdrs["content-length"] == str(len(decoded))
     assert sent[1] == {"type": "http.response.body", "body": decoded}
     mock_resp.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_head_sends_empty_body_and_zero_content_length() -> None:
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.headers = httpx.Headers(
+        {
+            "content-type": "text/html",
+            "content-encoding": "gzip",
+            "content-length": "9999",
+        }
+    )
+    mock_resp.content = b"<ignored for HEAD>"
+    mock_resp.aclose = AsyncMock()
+
+    class _FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> object:
+            return mock_resp
+
+    with patch("fluxlit.gateway.httpx.AsyncClient", _FakeAsyncClient):
+        sent: list[dict[str, Any]] = []
+
+        async def send(msg: MutableMapping[str, Any]) -> None:
+            sent.append(dict(msg))
+
+        async def receive() -> dict[str, Any]:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        scope: dict[str, Any] = {
+            "type": "http",
+            "method": "HEAD",
+            "path": "/",
+            "headers": [],
+            "query_string": b"",
+        }
+        await _proxy_http(scope, receive, send, "http://127.0.0.1:9", "/")
+
+    hdrs = {k.decode(): v.decode() for k, v in sent[0]["headers"]}
+    assert hdrs["content-length"] == "0"
+    assert "content-encoding" not in hdrs
+    assert sent[1]["body"] == b""
+    mock_resp.aclose.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_inject_public_root_path_does_not_touch_lifespan() -> None:
+    from fluxlit.runtime import _inject_public_root_path
+
+    seen: list[str] = []
+
+    async def inner(scope: Scope, receive: Receive, send: Send) -> None:  # noqa: ARG001
+        seen.append(scope["type"])  # type: ignore[typeddict-item]
+
+    app = _inject_public_root_path(inner, "/myapp")
+    await app({"type": "lifespan"}, None, None)  # type: ignore[arg-type]
+    assert seen == ["lifespan"]

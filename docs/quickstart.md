@@ -14,6 +14,8 @@ cd fluxlit
 pip install -e ".[dev]"
 ```
 
+Run the default fast suite (same idea as CI): `python -m pytest -n auto --ignore=tests/e2e -m "not slow"`. Coverage, `slow`, E2E, and Docker proxy checks are in {doc}`testing`.
+
 ## Scaffold (optional)
 
 ```bash

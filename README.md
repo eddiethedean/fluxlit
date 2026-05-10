@@ -272,7 +272,17 @@ FluxLit uses the same “built-in” testing platforms you likely already know:
 
 FluxLit also ships a small wrapper: **`FluxLitTestClient`**.
 
-Optional **browser E2E** tests (Playwright + a real `run_unified` stack, including Streamlit’s WebSocket) live under `tests/e2e`. Install `pip install -e ".[e2e]"`, run `playwright install chromium`, then `pytest tests/e2e -m e2e`. The default `pytest` / CI unit run skips that directory unless you invoke it explicitly.
+**Contributor default (matches CI `test` job):** run the fast unit/integration suite in parallel, skip browser tests, and skip tests marked **`slow`** (subprocess / long-running):
+
+```bash
+python -m pytest -n auto --ignore=tests/e2e -m "not slow"
+```
+
+- **`slow`:** e.g. a subprocess `fluxlit run` health check. Run with `pytest -m slow --ignore=tests/e2e` or rely on the **`slow-tests`** CI job.
+- **Coverage:** locally, `pytest ... --cov=fluxlit --cov-report=term-missing` (see [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html)). CI runs coverage on Linux (Python 3.12) and uploads **`coverage.xml`** as a workflow artifact (`coverage-xml`).
+- **E2E:** Playwright + a real unified stack under `tests/e2e` (`@pytest.mark.e2e`), including **`FLUXLIT_ROOT_PATH`** / subpath checks. Install `pip install -e ".[dev,e2e]"`, run `python -m playwright install --with-deps chromium`, then `pytest tests/e2e -m e2e`. Keep `--ignore=tests/e2e` on the default run so those tests are opt-in.
+
+Full commands, Docker proxy smoke, and conventions: **[docs/testing.md](docs/testing.md)** (also on Read the Docs as [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html)).
 
 ```python
 from fluxlit import FluxLit, FluxLitTestClient
@@ -298,9 +308,11 @@ See [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) o
 ```bash
 pip install -e ".[dev]"
 ruff check src tests && ruff format src tests
-python -m pytest
+python -m pytest -n auto --ignore=tests/e2e -m "not slow"
 python -m mypy src/fluxlit
 ```
+
+Optional: `pytest -m slow --ignore=tests/e2e` and coverage — see [docs/testing.md](docs/testing.md).
 
 ---
 
@@ -315,7 +327,7 @@ python -m mypy src/fluxlit
 - `fluxlit.toml` / `[tool.fluxlit]` project defaults; `ApiClient.get_model` / `post_model`
 - Request id propagation (`X-Request-ID`) and optional API access logging
 - Optional **`fluxlit[auth]`:** JWT (HS256 + JWKS/RS256), OIDC + BFF login routes, Streamlit code exchange + `ApiClient` helpers, `FluxLit.make_jwt_bearer` / `attach_oidc_login`, forward-auth helpers, opt-in security headers (see [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html))
-- Typed package; Ruff + Mypy + Pytest in-tree; CI on GitHub Actions
+- Typed package; Ruff + Mypy + Pytest in-tree; CI on GitHub Actions (matrix tests, **`slow-tests`**, **`coverage`** artifact, Docker **proxy-smoke**, Playwright **e2e**)
 
 **Planned** (see [Roadmap on Read the Docs](https://fluxlit.readthedocs.io/en/stable/roadmap.html))
 

@@ -8,7 +8,8 @@ from fastapi import FastAPI, Request
 from starlette.testclient import TestClient
 
 from fluxlit import FluxLit
-from fluxlit.gateway import build_gateway
+from fluxlit.gateway import build_gateway, normalize_root_mount
+from fluxlit.runtime import _inject_public_root_path
 
 
 @pytest.fixture
@@ -142,3 +143,53 @@ def test_api_accepts_post_json_body(api: FastAPI) -> None:
     res = client.post("/api/echo", json={"k": "v"})
     assert res.status_code == 200
     assert res.json() == {"got": "v"}
+
+
+def _wrapped_subpath_gateway(api: FastAPI, *, root: str) -> TestClient:
+    """Match ``fluxlit run``: inject ASGI root_path + gateway with same ``root_mount``."""
+    mount = normalize_root_mount(root)
+    app = _inject_public_root_path(
+        build_gateway(api, "http://127.0.0.1:9", api_prefix="/api", root_mount=mount),
+        mount,
+    )
+    return TestClient(app)
+
+
+def test_subpath_inject_strip_prefix_upstream_path(api: FastAPI) -> None:
+    """Proxy forwards ``/api/...`` only (prefix stripped); Uvicorn path has no mount segment."""
+    client = _wrapped_subpath_gateway(api, root="/publish")
+    assert client.get("/api/ping").status_code == 200
+    assert client.get("/api/ping").json() == {"ok": "pong"}
+
+
+def test_subpath_inject_full_proxy_path(api: FastAPI) -> None:
+    """Proxy forwards full public path ``/publish/api/...`` (no doubling with inject)."""
+    client = _wrapped_subpath_gateway(api, root="/publish")
+    res = client.get("/publish/api/ping")
+    assert res.status_code == 200
+    assert res.json() == {"ok": "pong"}
+
+
+def test_subpath_inject_healthz_both_path_shapes() -> None:
+    fl = FluxLit(title="subpath")
+    client = _wrapped_subpath_gateway(fl.api, root="/app")
+    assert client.get("/api/healthz").json() == {"status": "ok"}
+    assert client.get("/app/api/healthz").json() == {"status": "ok"}
+
+
+def test_subpath_inject_openapi_and_swagger_under_mount(api: FastAPI) -> None:
+    client = _wrapped_subpath_gateway(api, root="/z")
+    spec = client.get("/z/api/openapi.json")
+    assert spec.status_code == 200
+    assert "/ping" in spec.json().get("paths", {})
+    html = client.get("/z/api/docs").text
+    m = re.search(r"url: '([^']+)'", html)
+    assert m is not None
+    assert m.group(1) == "/z/api/openapi.json"
+    assert client.get(m.group(1)).status_code == 200
+
+
+def test_subpath_inject_non_api_still_proxies_to_streamlit(api: FastAPI) -> None:
+    client = _wrapped_subpath_gateway(api, root="/mount")
+    res = client.get("/mount/some-streamlit-asset")
+    assert res.status_code == 502

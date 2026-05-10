@@ -48,3 +48,5 @@
 - **CI:** Release workflow runs ``pip-audit`` (same as main CI).
 - **Docs:** OIDC in-memory store and JWKS ``id_token`` behavior in security, auth-recipes, and ``SECURITY.md``.
 - **Docs:** Fix OIDC docstring cross-reference (Streamlit exchange helpers).
+- **Tests / CI:** `slow` pytest marker; **`slow-tests`** and **`coverage`** workflow jobs (upload **`coverage.xml`** artifact); broader gateway tests (HTTP upstream, WebSocket echo, forwarded headers), JWKS/JWT/OIDC edge cases, `ApiClient` log redaction, subprocess runtime health check, Playwright E2E including **`FLUXLIT_ROOT_PATH`**.
+- **Docs:** README, `docs/testing.md` / Read the Docs Testing page, docs index, roadmap testing table, and cross-links aligned with the above.

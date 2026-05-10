@@ -15,9 +15,11 @@ python -m pip install -e ".[dev]"
 ```bash
 ruff check src tests
 ruff format src tests
-python -m pytest
+python -m pytest -n auto --ignore=tests/e2e -m "not slow"
 python -m mypy src/fluxlit
 ```
+
+Coverage (optional): `pytest -n auto --ignore=tests/e2e --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, and Docker proxy smoke.
 
 ## Documentation (Sphinx)
 
@@ -33,6 +35,8 @@ sphinx-build -b html docs docs/_build/html
 Open `docs/_build/html/index.html` in a browser. Configuration lives in [`docs/conf.py`](docs/conf.py); `.readthedocs.yaml` drives RTD builds.
 
 ## Testing notes
+
+Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` markers, Playwright, proxy smoke).
 
 - Prefer FluxLit’s wrapper **`FluxLitTestClient`** for gateway-level API tests (so prefix stripping and `/healthz` behavior are exercised through the gateway).
 - Use Streamlit’s built-in **`streamlit.testing.v1.AppTest`** for UI tests where possible (version-dependent).

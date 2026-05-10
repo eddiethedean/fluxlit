@@ -95,7 +95,7 @@ Full page reload can drop Streamlit’s in-process session unless state is **reh
 | Config | `fluxlit.config` | `FluxlitSettings` / `FLUXLIT_*` |
 | Project file | `fluxlit.project_config` | `fluxlit.toml` / `[tool.fluxlit]` defaults |
 | Client | `fluxlit.client` | `ApiClient` for server-side calls into `/api` |
-| Testing | `fluxlit.testing` | `FluxLitTestClient` (API gateway TestClient + Streamlit AppTest helper) |
+| Testing | `fluxlit.testing` | `FluxLitTestClient` (API gateway TestClient + Streamlit AppTest helper); repo CI splits fast vs `slow`, coverage artifact, E2E, proxy smoke (see `docs/testing.md`) |
 | Gateway | `fluxlit.gateway` | ASGI dispatch and reverse proxy |
 | Logging | `fluxlit.logging_context` | Request id context for gateway / API |
 | Runtime | `fluxlit.runtime` | Load `FluxLit` by import path, spawn Streamlit, run Uvicorn |

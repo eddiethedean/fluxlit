@@ -34,3 +34,7 @@ This matches Streamlit’s supported deployment model, avoids unsupported deep e
 - **Honest about Streamlit:** subprocess + WebSocket proxy until a native single-process model is proven.
 
 Further product context: see the [architecture and product plan](https://github.com/eddiethedean/fluxlit/blob/main/PLAN.md) in the repository.
+
+## Automated tests
+
+Gateway routing, HTTP/WebSocket proxying, `root_path`, and auth helpers are covered by Pytest (fast matrix, optional `slow` subprocess checks, Playwright E2E, and Docker-based proxy smoke). See {doc}`testing`.

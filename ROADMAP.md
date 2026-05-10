@@ -17,7 +17,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 **Gaps vs “production”**
 
-- CI workflow (Linux / macOS / Windows matrix) exists; expand with higher-signal integration tests over time.
+- CI adds **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, and Playwright **e2e** (including subpath); continue with soak/load and broader scenarios over time.
 - Reload is gateway-only (`fluxlit dev --reload`); Streamlit lifecycle on reload is not orchestrated.
 - Auth, metrics, and hardened Docker/K8s beyond `fluxlit build` templates are not implemented.
 - **Browser refresh continuity** for Streamlit (cookie-free, URL + server store) is specified under **Phase 2 follow-on** in this file but not implemented yet.
@@ -313,16 +313,17 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 | Area | Today | Target |
 |------|--------|--------|
-| Gateway HTTP | Partial (routing) | Proxy integration with mock upstream |
-| Gateway WebSocket | Manual | Automated stability / reconnect cases |
-| Runtime orchestration | Manual | CI smoke or subprocess contract tests |
-| Auth (Phase 3 / v0.3) | — | Unit + integration with fake OIDC / JWKS; ApiClient redaction tests |
-| `root_path` / forwards | — | Regression tests with TestClient + headers |
+| Gateway HTTP | TestClient + threaded upstream (gzip, redirects); forwarded-header assertions | More edge cases (timeouts, trailers) |
+| Gateway WebSocket | Echo/proxy happy path against `/_stcore/stream` | Automated stability / reconnect cases |
+| Runtime orchestration | Subprocess `run_unified` + `/api/healthz` (`slow`) | Optional deeper lifecycle tests |
+| Auth (Phase 3 / v0.3) | Fake JWKS server, JWT/OIDC edge cases; `ApiClient` must not log bearer secrets | Broader IdP matrices |
+| `root_path` / forwards | Forwarded headers + Playwright subpath E2E | Regression matrix for more proxy shapes |
 | Streamlit URL-bound session (Phase 2 follow-on) | — | AppTest: re-run with same query params + store contract |
 
 ### CI targets
 
 - **Linux** (required), **macOS** (recommended), **Windows** (recommended; subprocess + path quirks).
+- **Coverage** job (Linux / Python 3.12) uploads `coverage.xml`; **`slow-tests`** runs marked subprocess tests; **proxy-smoke** and **e2e** jobs cover Docker nginx and browser stacks.
 
 ---
 
