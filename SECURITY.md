@@ -6,8 +6,9 @@ Security fixes are applied to the **current release line** on [PyPI](https://pyp
 
 | Version   | Support note                                      |
 | --------- | ------------------------------------------------- |
-| **0.2.x** | Active                                            |
-| **< 0.2** | Upgrade recommended; limited backporting          |
+| **0.3.x** | Active                                            |
+| **0.2.x** | Best-effort fixes; upgrade to 0.3.x recommended |
+| **< 0.2** | Upgrade recommended; limited backporting        |
 
 Pre-release installs (e.g. from `main`) should track the latest commit for fixes.
 

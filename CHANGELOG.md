@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+- **Auth (optional `fluxlit[auth]`):** JWT bearer validation with HS256 (dev) or JWKS (RS256/ES256), `RequireScopes` / `RequireRoles`, first-party HS256 minting for BFF flows.
+- **OIDC:** `GenericOIDCClient` (OpenID discovery + Authorization Code with PKCE), `register_oidc_bff_routes` with one-time `auth_code` exchange for Streamlit-safe token handoff.
+- **Forward auth:** `TrustedProxyUser` / `TrustedProxyUserConfig` with optional HTTPS and client-host checks.
+- **Client:** `ApiClient` `default_headers`, `auth_header_factory`, `propagate_request_id`, and `ApiClient.for_fluxlit(bearer_token=...)`.
+- **Streamlit:** `exchange_auth_code_from_query`, `bearer_headers_from_session`, `prepare_streamlit_api_client`.
+- **Security:** opt-in `FluxlitSettings.enable_security_headers` and CORS (`cors_allow_origins`, `cors_allow_credentials`); `public_base_url` for OAuth redirects; `SECURITY.md` and CI `pip-audit` on `.[auth]`; PyPI `Security` project URL; sdist includes `SECURITY.md`.
+- **CLI:** `fluxlit doctor` JWT clock-skew note, OAuth/CORS guidance.
+- **Config / UX:** `FLUXLIT_JWT_*`, `FLUXLIT_OIDC_BFF_SECRET`, `jwt_leeway_seconds`; `JWTBearer.from_fluxlit_settings`, `FluxLit.make_jwt_bearer`, `FluxLit.attach_oidc_login`.
+- **Docs:** security architecture, auth recipes, migration guide, README quick links and secured-API section, quickstart/index updates; reference example `examples/reference_auth/`; docs extra includes `itsdangerous` for Sphinx.
+- **Tests:** JWT/OIDC/BFF/error-path coverage, Streamlit auth helpers, security middleware, `ApiClient` header merging / request-id propagation, friendly security ergonomics tests.
+
 ## 0.2.0
 
 - **Config:** `fluxlit.toml` and `pyproject.toml` `[tool.fluxlit]` for default `target`, bind options, and log level (`fluxlit.project_config`). Precedence: CLI → environment → project file → defaults.
@@ -26,16 +39,3 @@
 - CI (GitHub Actions) and contributor docs.
 
 ## Unreleased
-
-- **Auth (optional `fluxlit[auth]`):** JWT bearer validation with HS256 (dev) or JWKS (RS256/ES256), `RequireScopes` / `RequireRoles`, first-party HS256 minting for BFF flows.
-- **OIDC:** `GenericOIDCClient` (OpenID discovery + Authorization Code with PKCE), `register_oidc_bff_routes` with one-time `auth_code` exchange for Streamlit-safe token handoff.
-- **Forward auth:** `TrustedProxyUser` / `TrustedProxyUserConfig` with optional HTTPS and client-host checks.
-- **Client:** `ApiClient` `default_headers`, `auth_header_factory`, `propagate_request_id`, and `ApiClient.for_fluxlit(bearer_token=...)`.
-- **Streamlit:** `exchange_auth_code_from_query`, `bearer_headers_from_session`.
-- **Security:** opt-in `FluxlitSettings.enable_security_headers` and CORS (`cors_allow_origins`, `cors_allow_credentials`); `public_base_url` for OAuth redirects.
-- **CLI:** `fluxlit doctor` JWT clock-skew note, OAuth/CORS guidance.
-- **Docs:** security architecture, migration guide, reference example under `examples/reference_auth/`.
-- **Tests:** broader JWT/OIDC/BFF/error-path coverage, Streamlit auth helpers, security middleware, and `ApiClient` header merging / request-id propagation.
-- **UX:** `FluxlitSettings` gains `FLUXLIT_JWT_*` and `FLUXLIT_OIDC_BFF_SECRET`; `JWTBearer.from_fluxlit_settings`, `FluxLit.make_jwt_bearer`, `FluxLit.attach_oidc_login`, and `prepare_streamlit_api_client` for less boilerplate (docs updated).
-- **Docs / README:** Docs table and new README section on calling secured APIs from Streamlit; quickstart + docs index explain injected `client` vs `for_fluxlit` / `prepare_streamlit_api_client`; features list and package table reflect shipped auth modules; auth-recipes and security cross-link the reference example.
-- **Security:** Add `SECURITY.md` (supported versions, private reporting, `pip-audit` usage); CI `security-audit` job runs `pip-audit` after installing `.[auth]` (runtime-relevant tree); sdist includes `SECURITY.md`.
