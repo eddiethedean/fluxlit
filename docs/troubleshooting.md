@@ -1,6 +1,6 @@
 # Troubleshooting
 
-**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication)
+**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication)
 
 ## First step: `fluxlit doctor`
 
@@ -36,6 +36,11 @@ Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports 
 - Temporarily hit **`GET /api/healthz`**: if 200 but `readyz` is 503, the API process is fine; the sidecar is not.
 
 In **unit tests** without `FLUXLIT_STREAMLIT_UPSTREAM`, `readyz` may return **200** with `not_configured` — that is expected.
+
+## Payload too large or bad gateway from the proxy
+
+- **`413 Payload Too Large`** on paths proxied to Streamlit means the request body exceeded **`FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES`** (or the same setting in `FluxlitSettings`). Raise the limit if large uploads are intentional, or upload via the API instead of through the Streamlit proxy.
+- **`502 Bad Gateway`** on proxied routes usually means the gateway could not complete the upstream HTTP call (connection refused, timeouts, TLS errors, etc.). Check **`FLUXLIT_GATEWAY_UPSTREAM_CONNECT_TIMEOUT_S`** / **`FLUXLIT_GATEWAY_UPSTREAM_READ_TIMEOUT_S`**, Streamlit health, and network path to the sidecar. See {doc}`configuration` and {doc}`observability` (request ids in logs).
 
 ## Streamlit cannot reach the API
 

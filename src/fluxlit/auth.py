@@ -1,7 +1,5 @@
 """Authentication helpers: forward-auth (trusted headers) and related utilities."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -66,7 +64,7 @@ class TrustedProxyUser:
             return forwarded.split(",")[0].strip().lower()
         return request.url.scheme.lower()
 
-    async def __call__(self, request: Request) -> str:
+    def __call__(self, request: Request) -> str:
         if self._config.trusted_client_hosts is not None:
             client = request.client
             host = client.host if client else None

@@ -39,6 +39,7 @@ class FluxLitTestClient:
             "http://127.0.0.1:9",
             api_prefix=self.api_prefix,
             access_log=self.app.settings.enable_gateway_access_log,
+            proxy_settings=self.app.settings,
         )
         return TestClient(gateway)
 

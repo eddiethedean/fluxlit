@@ -42,7 +42,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | Feature | Description |
 |---------|-------------|
 | **Structured logging + correlation** | JSON logs in container images; one **request / trace** correlation id from gateway → FastAPI → Streamlit logs; document required fields for common log stacks. |
-| **SLOs & alerting** | Documented SLO examples (e.g. p99 on `GET /api/healthz`, error budget on `GET /api/readyz`); map to alert rules, not only process liveness. |
+| **SLOs & alerting** | Documented SLO examples (e.g. p99 on `GET /api/healthz`, error budget on `GET /api/readyz`); map to alert rules, not only process liveness. See [SLOs & alerting](docs/observability.md#slos--alerting) in `docs/observability.md`. |
 | **Graceful shutdown** | Document and test **SIGTERM** under real orchestrators (e.g. Kubernetes `preStop`, `terminationGracePeriodSeconds`): in-flight HTTP/WebSocket drain, Streamlit teardown order, and upper-bound timeouts. |
 | **Backpressure & timeouts** | Explicit timeouts on httpx / WebSocket paths to the Streamlit upstream; optional max request body size; limits on concurrent upstream connections so a wedged sidecar cannot exhaust the gateway. |
 

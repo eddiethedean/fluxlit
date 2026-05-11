@@ -113,6 +113,25 @@ explicit_package_bases = true
 module = "pyarrow.*"
 follow_imports = "skip"
 
+[tool.ty.src]
+# Package + tests; examples/docker/scripts stay out of default ty scope.
+include = ["src", "tests"]
+
+# Tests use Starlette/FastAPI stubs, dynamic imports, and intentional mis-typing; relax ty there.
+[[tool.ty.overrides]]
+include = ["tests/**"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-method-override = "ignore"
+unsupported-operator = "ignore"
+invalid-assignment = "ignore"
+invalid-return-type = "ignore"
+unresolved-attribute = "ignore"
+call-top-callable = "ignore"
+no-matching-overload = "ignore"
+unresolved-import = "ignore"
+
 [tool.coverage.run]
 source = ["src/fluxlit"]
 

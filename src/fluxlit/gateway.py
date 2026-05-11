@@ -6,8 +6,10 @@ Streamlit sees the **public** gateway host/port (e.g. ``127.0.0.1:8777``), match
 the browser's ``Origin``; otherwise WebSocket same-origin checks fail and the UI
 stays blank/black.
 
-Request IDs are taken from ``X-Request-ID`` or generated, and stored in
-:mod:`fluxlit.logging_context` for the duration of each request.
+Request IDs are taken from ``X-Request-ID`` or generated, stored in
+:mod:`fluxlit.logging_context` for the duration of each request, and **re-sent to
+Streamlit** on proxied HTTP and WebSocket hops as authoritative ``X-Request-ID`` (the
+gateway wins over any client-supplied value on that upstream leg).
 
 Top-level ``/docs``, ``/redoc``, and ``/openapi.json`` redirect to the same paths under
 ``api_prefix`` so Swagger is not accidentally proxied to Streamlit (which would look
@@ -16,9 +18,11 @@ like a blank page).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import urllib.parse
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any, cast
 
 import anyio
@@ -26,6 +30,7 @@ import httpx
 import websockets
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from fluxlit.config import FluxlitSettings
 from fluxlit.logging_context import (
     REQUEST_ID_HEADER,
     new_request_id,
@@ -34,6 +39,45 @@ from fluxlit.logging_context import (
 )
 
 _gateway_log = logging.getLogger("fluxlit.gateway")
+
+
+@dataclass(frozen=True)
+class GatewayProxyOptions:
+    """Upstream HTTP/WebSocket tuning for :func:`build_gateway`.
+
+    Mirrors :class:`~fluxlit.config.FluxlitSettings` gateway fields.
+    """
+
+    connect_timeout: float = 30.0
+    read_timeout: float = 120.0
+    max_proxy_body_bytes: int = 0
+    max_concurrent_upstream_http: int = 0
+    httpx_max_connections: int = 0
+    httpx_max_keepalive_connections: int = 0
+    ws_open_timeout_s: float = 30.0
+    ws_ping_interval_s: float | None = None
+    ws_ping_timeout_s: float | None = None
+    ws_close_timeout_s: float | None = None
+    ws_max_message_bytes: int | None = None
+
+
+def _gateway_opts(fluxlit_settings: FluxlitSettings | None) -> GatewayProxyOptions:
+    if fluxlit_settings is None:
+        return GatewayProxyOptions()
+    fs = fluxlit_settings
+    return GatewayProxyOptions(
+        connect_timeout=fs.gateway_upstream_connect_timeout_s,
+        read_timeout=fs.gateway_upstream_read_timeout_s,
+        max_proxy_body_bytes=fs.gateway_max_proxy_request_body_bytes,
+        max_concurrent_upstream_http=fs.gateway_max_concurrent_upstream_http,
+        httpx_max_connections=fs.gateway_httpx_max_connections,
+        httpx_max_keepalive_connections=fs.gateway_httpx_max_keepalive_connections,
+        ws_open_timeout_s=fs.gateway_ws_open_timeout_s,
+        ws_ping_interval_s=fs.gateway_ws_ping_interval_s,
+        ws_ping_timeout_s=fs.gateway_ws_ping_timeout_s,
+        ws_close_timeout_s=fs.gateway_ws_close_timeout_s,
+        ws_max_message_bytes=fs.gateway_ws_max_message_bytes,
+    )
 
 
 def normalize_root_mount(raw: str) -> str:
@@ -92,6 +136,7 @@ def build_gateway(
     access_log: bool = False,
     api_prefix: str = "/api",
     root_mount: str = "",
+    proxy_settings: FluxlitSettings | None = None,
 ) -> ASGIApp:
     """Build the composite ASGI application used as Uvicorn's entrypoint.
 
@@ -117,11 +162,43 @@ def build_gateway(
             ``server.baseUrlPath``. When the proxy forwards the full path, this
             strip is applied before dispatch; Streamlit still receives paths that
             include the prefix.
+        proxy_settings: Optional :class:`~fluxlit.config.FluxlitSettings` for upstream
+            timeouts, body limits, concurrency, and WebSocket tuning (defaults match
+            historical hardcoded gateway behavior when omitted).
 
     Returns:
         A callable ASGI3 application.
     """
     fixed_upstream = upstream_base.rstrip("/")
+    opts = _gateway_opts(proxy_settings)
+    http_client: httpx.AsyncClient | None = None
+    http_client_lock = asyncio.Lock()
+
+    async def _shared_httpx_client() -> httpx.AsyncClient:
+        nonlocal http_client
+        async with http_client_lock:
+            if http_client is None:
+                timeout = httpx.Timeout(opts.read_timeout, connect=opts.connect_timeout)
+                limits: httpx.Limits | None = None
+                if opts.httpx_max_connections > 0:
+                    mk = (
+                        opts.httpx_max_keepalive_connections
+                        if opts.httpx_max_keepalive_connections > 0
+                        else opts.httpx_max_connections
+                    )
+                    limits = httpx.Limits(
+                        max_connections=opts.httpx_max_connections,
+                        max_keepalive_connections=mk,
+                    )
+                client_kw: dict[str, Any] = {"timeout": timeout}
+                if limits is not None:
+                    client_kw["limits"] = limits
+                http_client = httpx.AsyncClient(**client_kw)
+        return http_client
+
+    upstream_sem: asyncio.Semaphore | None = None
+    if opts.max_concurrent_upstream_http > 0:
+        upstream_sem = asyncio.Semaphore(opts.max_concurrent_upstream_http)
 
     def resolve_upstream() -> str:
         if upstream_resolver is not None:
@@ -171,7 +248,14 @@ def build_gateway(
                     return
             if scope["type"] == "websocket":
                 await _proxy_websocket(
-                    scope, receive, send, upstream, streamlit_path, forwarded_prefix=mount or None
+                    scope,
+                    receive,
+                    send,
+                    upstream,
+                    streamlit_path,
+                    forwarded_prefix=mount or None,
+                    request_id=rid,
+                    proxy_options=opts,
                 )
                 return
             if scope["type"] == "http":
@@ -188,7 +272,16 @@ def build_gateway(
                         await _redirect(send, loc)
                         return
                 await _proxy_http(
-                    scope, receive, send, upstream, streamlit_path, forwarded_prefix=mount or None
+                    scope,
+                    receive,
+                    send,
+                    upstream,
+                    streamlit_path,
+                    forwarded_prefix=mount or None,
+                    request_id=rid,
+                    proxy_options=opts,
+                    httpx_client_getter=_shared_httpx_client,
+                    upstream_sem=upstream_sem,
                 )
                 return
             await _not_found(send)
@@ -375,6 +468,27 @@ def _filter_request_headers(raw: list[tuple[bytes, bytes]]) -> list[tuple[bytes,
     return out
 
 
+class _GatewayPayloadTooLarge(Exception):
+    """Internal: proxied request body exceeded configured max bytes."""
+
+
+async def _respond_413_payload_too_large(send: Send) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b"Payload Too Large",
+            "more_body": False,
+        }
+    )
+
+
 async def _proxy_http(
     scope: Scope,
     receive: Receive,
@@ -383,13 +497,53 @@ async def _proxy_http(
     streamlit_path: str,
     *,
     forwarded_prefix: str | None = None,
+    request_id: str,
+    proxy_options: GatewayProxyOptions,
+    httpx_client_getter: Callable[[], Awaitable[httpx.AsyncClient]],
+    upstream_sem: asyncio.Semaphore | None,
+) -> None:
+    async def _guarded() -> None:
+        await _proxy_http_inner(
+            scope,
+            receive,
+            send,
+            upstream,
+            streamlit_path,
+            forwarded_prefix=forwarded_prefix,
+            request_id=request_id,
+            proxy_options=proxy_options,
+            httpx_client_getter=httpx_client_getter,
+        )
+
+    if upstream_sem is not None:
+        async with upstream_sem:
+            await _guarded()
+    else:
+        await _guarded()
+
+
+async def _proxy_http_inner(
+    scope: Scope,
+    receive: Receive,
+    send: Send,
+    upstream: str,
+    streamlit_path: str,
+    *,
+    forwarded_prefix: str | None,
+    request_id: str,
+    proxy_options: GatewayProxyOptions,
+    httpx_client_getter: Callable[[], Awaitable[httpx.AsyncClient]],
 ) -> None:
     method = scope.get("method", "GET").upper()
     url = _build_target_url(scope, upstream, path=streamlit_path)
     raw_headers = scope.get("headers") or []
-    pairs = [
-        (k.decode("latin-1"), v.decode("latin-1")) for k, v in _filter_request_headers(raw_headers)
-    ]
+    rid_lc = REQUEST_ID_HEADER.lower()
+    pairs: list[tuple[str, str]] = []
+    for k, v in _filter_request_headers(raw_headers):
+        kk = k.decode("latin-1")
+        if kk.lower() == rid_lc:
+            continue
+        pairs.append((kk, v.decode("latin-1")))
     headers = httpx.Headers(pairs)
     public_host = _public_host_from_scope(scope, upstream)
     headers["host"] = public_host
@@ -397,13 +551,20 @@ async def _proxy_http(
         scope, public_host, forwarded_prefix=forwarded_prefix
     ):
         headers[hk] = hv
+    headers[REQUEST_ID_HEADER] = request_id
+
+    max_body = proxy_options.max_proxy_body_bytes
 
     async def request_body() -> AsyncIterator[bytes]:
+        total = 0
         while True:
             message = await receive()
             if message["type"] == "http.request":
                 chunk = message.get("body", b"")
                 if chunk:
+                    total += len(chunk)
+                    if max_body and total > max_body:
+                        raise _GatewayPayloadTooLarge
                     yield chunk
                 if not message.get("more_body", False):
                     break
@@ -418,31 +579,34 @@ async def _proxy_http(
         Streamlit; deferring ``receive()`` until after the upstream stream starts can
         trigger premature ``ReadError`` on the upstream socket (empty HTML to browsers).
         """
+        total = 0
         while True:
             message = await receive()
             if message["type"] != "http.request":
                 break
+            chunk = message.get("body", b"")
+            total += len(chunk)
+            if max_body and total > max_body:
+                raise _GatewayPayloadTooLarge
             if not message.get("more_body", False):
                 break
 
+    response: httpx.Response | None = None
     try:
-        timeout = httpx.Timeout(120.0, connect=30.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            # Do not attach a streaming body to GET/HEAD: some upstreams (incl. Streamlit)
-            # reset the connection when a request body is declared, which yields an empty
-            # response to the browser despite Content-Length (blank Streamlit UI).
-            if method in {"GET", "HEAD"}:
-                await drain_incoming_request_body()
-                req = client.build_request(method, url, headers=headers)
-            else:
-                req = client.build_request(method, url, headers=headers, content=request_body())
-            # Buffer the upstream response (``stream=False``). Using ``aiter_raw()`` here
-            # breaks when another ``httpx`` ASGI transport wraps this app: nested httpcore
-            # streaming yields ``ReadError`` and clients see ``Content-Length`` with an empty
-            # body (blank Streamlit page).
-            response = await client.send(req, stream=False)
+        client = await httpx_client_getter()
+        if method in {"GET", "HEAD"}:
+            await drain_incoming_request_body()
+            req = client.build_request(method, url, headers=headers)
+        else:
+            req = client.build_request(method, url, headers=headers, content=request_body())
+        response = await client.send(req, stream=False)
+    except _GatewayPayloadTooLarge:
+        await _respond_413_payload_too_large(send)
+        return
     except httpx.RequestError as exc:
-        _gateway_log.warning("gateway upstream HTTP error for %s: %s", url, exc)
+        _gateway_log.warning(
+            "gateway upstream HTTP error for %s request_id=%s: %s", url, request_id, exc
+        )
         await send(
             {
                 "type": "http.response.start",
@@ -450,13 +614,11 @@ async def _proxy_http(
                 "headers": [(b"content-type", b"text/plain; charset=utf-8")],
             }
         )
-        await send({"type": "http.response.body", "body": b"Bad Gateway"})
+        await send({"type": "http.response.body", "body": b"Bad Gateway", "more_body": False})
         return
 
+    assert response is not None
     try:
-        # ``httpx`` decodes ``Content-Encoding`` (e.g. gzip) into ``response.content`` but
-        # leaves the upstream ``content-encoding`` / ``content-length`` headers as sent on
-        # the wire. Forwarding those with a decoded body breaks clients (truncated HTML).
         out_body = b"" if method == "HEAD" else response.content
         _skip_resp_hdr = frozenset(
             {"transfer-encoding", "connection", "content-encoding", "content-length"}
@@ -475,7 +637,7 @@ async def _proxy_http(
             }
         )
         try:
-            await send({"type": "http.response.body", "body": out_body})
+            await send({"type": "http.response.body", "body": out_body, "more_body": False})
         except Exception:  # noqa: BLE001 — log then re-raise; ASGI send can fail for many reasons
             _gateway_log.exception("gateway proxy: error building response body from upstream")
             raise
@@ -506,6 +668,8 @@ async def _proxy_websocket(
     streamlit_path: str,
     *,
     forwarded_prefix: str | None = None,
+    request_id: str,
+    proxy_options: GatewayProxyOptions,
 ) -> None:
     first = await receive()
     if first["type"] != "websocket.connect":
@@ -534,6 +698,7 @@ async def _proxy_websocket(
         "x-forwarded-host",
         "x-forwarded-proto",
         "x-forwarded-port",
+        "x-request-id",
     }
     for k, v in headers:
         key = k.decode("latin-1")
@@ -541,6 +706,17 @@ async def _proxy_websocket(
         if lk in skip_ws:
             continue
         extra.append((key, v.decode("latin-1")))
+    extra.append(("X-Request-ID", request_id))
+
+    ws_connect_kw: dict[str, Any] = {"open_timeout": proxy_options.ws_open_timeout_s}
+    if proxy_options.ws_max_message_bytes is not None:
+        ws_connect_kw["max_size"] = proxy_options.ws_max_message_bytes
+    if proxy_options.ws_ping_interval_s is not None:
+        ws_connect_kw["ping_interval"] = proxy_options.ws_ping_interval_s
+    if proxy_options.ws_ping_timeout_s is not None:
+        ws_connect_kw["ping_timeout"] = proxy_options.ws_ping_timeout_s
+    if proxy_options.ws_close_timeout_s is not None:
+        ws_connect_kw["close_timeout"] = proxy_options.ws_close_timeout_s
 
     try:
         # Streamlit responds with ``Sec-WebSocket-Protocol: streamlit``. The ``websockets``
@@ -551,8 +727,7 @@ async def _proxy_websocket(
             target,
             additional_headers=extra,
             subprotocols=cast(Any, ["streamlit"]),
-            max_size=None,
-            open_timeout=30.0,
+            **ws_connect_kw,
         ) as upstream_ws:
             subprotocols = scope.get("subprotocols") or []
             accepted = upstream_ws.subprotocol

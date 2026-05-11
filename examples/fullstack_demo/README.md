@@ -36,6 +36,8 @@ Set **`PYTHONPATH`** to this directory so `main` resolves. **`fluxlit.toml`** se
 
 **API docs:** Swagger is served at **`/api/docs`** (and ReDoc at **`/api/redoc`**). As of recent FluxLit versions, **`/docs`** at the gateway root redirects there so you are not sent to Streamlit (which used to look like a blank page).
 
+**Operations:** optional **`FLUXLIT_*`** gateway limits, JSON logging, and graceful shutdown settings are documented under [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) and [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) on Read the Docs (same stack as this demo when you deploy with `fluxlit run`).
+
 `rapsqlite` ships wheels for common platforms; building from source needs a Rust toolchain (see [rapsqlite docs](https://rapsqlite.readthedocs.io/en/latest/installation.html)).
 
 ## Tests

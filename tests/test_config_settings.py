@@ -55,6 +55,18 @@ def test_streamlit_run_cli_args_wrong_type_raises(monkeypatch: pytest.MonkeyPatc
         FluxlitSettings()
 
 
+def test_uvicorn_graceful_shutdown_timeout_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S", "42.5")
+    s = FluxlitSettings()
+    assert s.uvicorn_graceful_shutdown_timeout_s == 42.5
+
+
+def test_gateway_max_proxy_body_bytes_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES", "1048576")
+    s = FluxlitSettings()
+    assert s.gateway_max_proxy_request_body_bytes == 1048576
+
+
 def test_settings_defaults_are_isolated() -> None:
     """Repeated dict/list defaults must not alias across instances."""
     a = FluxlitSettings()

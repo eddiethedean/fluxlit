@@ -84,6 +84,9 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 | Unified ASGI | `tests/test_asgi_unified.py` — lifespan + concurrent HTTP, httpx + `TestClient`, streaming bodies, sidecar failure |
 | Readiness | `tests/test_health_probe.py`, `tests/test_gateway_readyz.py`, `tests/test_app.py` (`readyz`) |
 | Gateway logging | `tests/test_gateway_access_log.py` |
+| Gateway correlation + `httpx` wiring | `tests/test_gateway_correlation_integration.py` (threaded upstream, `build_gateway` + `proxy_settings`) |
+| Gateway proxy edge cases | `tests/test_gateway_proxy_robust.py` (`_gateway_opts`, 502/413 paths, WebSocket connect kwargs) |
+| JSON logging formatter | `tests/test_logging_json.py` |
 | Upstream state | `tests/test_runtime_upstream.py` |
 | Reload | `tests/test_streamlit_reload_watcher.py`, `tests/test_runtime_extra.py`, CLI tests for `--reload-scope` |
 | Log redaction | `tests/test_logging_redact.py` |
@@ -93,6 +96,6 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 
 - Prefer **FluxLitTestClient** (see [test_fluxlit_testclient.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_fluxlit_testclient.py)) when you need the real gateway stack.
 - Use Streamlit **AppTest** for UI logic where versions allow.
-- Gateway routing and proxy behavior: [test_gateway.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway.py), [test_gateway_unit.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_unit.py), [test_gateway_proxy_*.py](https://github.com/eddiethedean/fluxlit/tree/main/tests).
+- Gateway routing and proxy behavior: [test_gateway.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway.py), [test_gateway_unit.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_unit.py), [test_gateway_forwarded.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_forwarded.py), [test_gateway_http_upstream.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_http_upstream.py), [test_gateway_correlation_integration.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_correlation_integration.py), [test_gateway_proxy_robust.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_proxy_robust.py).
 
 For runtime or routing issues while developing, see {doc}`troubleshooting`.

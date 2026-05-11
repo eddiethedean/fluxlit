@@ -1,17 +1,21 @@
 from __future__ import annotations
 
-from collections.abc import MutableMapping
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+import asyncio
+from collections.abc import Awaitable, Callable, MutableMapping
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
+import websockets
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 from starlette.types import Receive, Scope, Send
 from starlette.websockets import WebSocketDisconnect
+from websockets.frames import Close
 
 from fluxlit.gateway import (
+    GatewayProxyOptions,
     _build_target_url,
     _filter_request_headers,
     _forwarded_upstream_header_pairs,
@@ -19,6 +23,7 @@ from fluxlit.gateway import (
     _parse_ws_target,
     _port_from_host_header,
     _proxy_http,
+    _proxy_websocket,
     _public_host_from_scope,
     _request_id_from_scope,
     _strip_prefix_scope,
@@ -27,6 +32,13 @@ from fluxlit.gateway import (
     normalize_root_mount,
     split_gateway_paths,
 )
+
+
+def _httpx_getter(client: httpx.AsyncClient) -> Callable[[], Awaitable[httpx.AsyncClient]]:
+    async def _g() -> httpx.AsyncClient:
+        return client
+
+    return _g
 
 
 def test_build_target_url_with_query() -> None:
@@ -275,24 +287,34 @@ async def test_proxy_http_aclose_on_body_error() -> None:
         async def send(self, *args: object, **kwargs: object) -> object:
             return mock_resp
 
-    with patch("fluxlit.gateway.httpx.AsyncClient", _FakeAsyncClient):
-        sent: list[dict[str, Any]] = []
+    fake = cast(httpx.AsyncClient, _FakeAsyncClient())
+    sent: list[dict[str, Any]] = []
 
-        async def send(msg: MutableMapping[str, Any]) -> None:
-            sent.append(dict(msg))
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
 
-        async def receive() -> dict[str, Any]:
-            return {"type": "http.request", "body": b"", "more_body": False}
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
 
-        scope: dict[str, Any] = {
-            "type": "http",
-            "method": "GET",
-            "path": "/x",
-            "headers": [],
-            "query_string": b"",
-        }
-        with pytest.raises(RuntimeError, match="body broken"):
-            await _proxy_http(scope, receive, send, "http://127.0.0.1:9", "/x")
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/x",
+        "headers": [],
+        "query_string": b"",
+    }
+    with pytest.raises(RuntimeError, match="body broken"):
+        await _proxy_http(
+            scope,
+            receive,
+            send_asgi,
+            "http://127.0.0.1:9",
+            "/x",
+            request_id="rid-aclose",
+            proxy_options=GatewayProxyOptions(),
+            httpx_client_getter=_httpx_getter(fake),
+            upstream_sem=None,
+        )
 
     mock_resp.aclose.assert_awaited_once()
 
@@ -329,23 +351,33 @@ async def test_proxy_http_strips_gzip_headers_and_sets_body_length() -> None:
         async def send(self, *args: object, **kwargs: object) -> object:
             return mock_resp
 
-    with patch("fluxlit.gateway.httpx.AsyncClient", _FakeAsyncClient):
-        sent: list[dict[str, Any]] = []
+    fake = cast(httpx.AsyncClient, _FakeAsyncClient())
+    sent: list[dict[str, Any]] = []
 
-        async def send(msg: MutableMapping[str, Any]) -> None:
-            sent.append(dict(msg))
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
 
-        async def receive() -> dict[str, Any]:
-            return {"type": "http.request", "body": b"", "more_body": False}
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
 
-        scope: dict[str, Any] = {
-            "type": "http",
-            "method": "GET",
-            "path": "/",
-            "headers": [],
-            "query_string": b"",
-        }
-        await _proxy_http(scope, receive, send, "http://127.0.0.1:9", "/")
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [],
+        "query_string": b"",
+    }
+    await _proxy_http(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:9",
+        "/",
+        request_id="rid-gzip",
+        proxy_options=GatewayProxyOptions(),
+        httpx_client_getter=_httpx_getter(fake),
+        upstream_sem=None,
+    )
 
     start = sent[0]
     assert start["type"] == "http.response.start"
@@ -353,7 +385,9 @@ async def test_proxy_http_strips_gzip_headers_and_sets_body_length() -> None:
     assert hdrs["content-type"] == "text/html"
     assert "content-encoding" not in hdrs
     assert hdrs["content-length"] == str(len(decoded))
-    assert sent[1] == {"type": "http.response.body", "body": decoded}
+    assert sent[1]["type"] == "http.response.body"
+    assert sent[1]["body"] == decoded
+    assert sent[1].get("more_body") is False
     mock_resp.aclose.assert_awaited_once()
 
 
@@ -387,23 +421,33 @@ async def test_proxy_http_head_sends_empty_body_and_zero_content_length() -> Non
         async def send(self, *args: object, **kwargs: object) -> object:
             return mock_resp
 
-    with patch("fluxlit.gateway.httpx.AsyncClient", _FakeAsyncClient):
-        sent: list[dict[str, Any]] = []
+    fake = cast(httpx.AsyncClient, _FakeAsyncClient())
+    sent: list[dict[str, Any]] = []
 
-        async def send(msg: MutableMapping[str, Any]) -> None:
-            sent.append(dict(msg))
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
 
-        async def receive() -> dict[str, Any]:
-            return {"type": "http.request", "body": b"", "more_body": False}
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
 
-        scope: dict[str, Any] = {
-            "type": "http",
-            "method": "HEAD",
-            "path": "/",
-            "headers": [],
-            "query_string": b"",
-        }
-        await _proxy_http(scope, receive, send, "http://127.0.0.1:9", "/")
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "HEAD",
+        "path": "/",
+        "headers": [],
+        "query_string": b"",
+    }
+    await _proxy_http(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:9",
+        "/",
+        request_id="rid-head",
+        proxy_options=GatewayProxyOptions(),
+        httpx_client_getter=_httpx_getter(fake),
+        upstream_sem=None,
+    )
 
     hdrs = {k.decode(): v.decode() for k, v in sent[0]["headers"]}
     assert hdrs["content-length"] == "0"
@@ -424,6 +468,232 @@ async def test_inject_public_root_path_does_not_touch_lifespan() -> None:
     app = _inject_public_root_path(inner, "/myapp")
     await app({"type": "lifespan"}, None, None)  # type: ignore[arg-type]
     assert seen == ["lifespan"]
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_connect_passes_x_request_id_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            return None
+
+        async def recv(self) -> bytes:
+            raise websockets.ConnectionClosed(rcvd=Close(1000, ""), sent=None)
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    def _fake_connect(*_a: object, **kwargs: object) -> _FakeConnectCM:
+        captured["connect_kwargs"] = kwargs
+        return _FakeConnectCM()
+
+    monkeypatch.setattr("fluxlit.gateway.websockets.connect", _fake_connect)
+
+    sent: list[dict[str, Any]] = []
+    _ws_recv_calls = 0
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        nonlocal _ws_recv_calls
+        _ws_recv_calls += 1
+        if _ws_recv_calls == 1:
+            return {"type": "websocket.connect"}
+        return {"type": "websocket.disconnect", "code": 1000}
+
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"p.example:9")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-rid-99",
+        proxy_options=GatewayProxyOptions(),
+    )
+
+    extra = captured["connect_kwargs"]["additional_headers"]
+    assert ("X-Request-ID", "ws-rid-99") in extra
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_get_body_over_max_returns_413() -> None:
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"x" * 50, "more_body": False}
+
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [],
+        "query_string": b"",
+    }
+
+    class _NoSendClient:
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            raise AssertionError("build_request should not run after 413 drain")
+
+        async def send(self, *args: object, **kwargs: object) -> httpx.Response:
+            raise AssertionError("send should not run after 413 drain")
+
+    fake = cast(httpx.AsyncClient, _NoSendClient())
+    await _proxy_http(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:9",
+        "/",
+        request_id="rid-413",
+        proxy_options=GatewayProxyOptions(max_proxy_body_bytes=10),
+        httpx_client_getter=_httpx_getter(fake),
+        upstream_sem=None,
+    )
+    assert sent[0]["type"] == "http.response.start"
+    assert sent[0]["status"] == 413
+    assert b"Payload Too Large" in sent[1]["body"]
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_semaphore_blocks_second_request_until_first_finishes() -> None:
+    first_in_send = asyncio.Event()
+    second_in_send = asyncio.Event()
+    release_first = asyncio.Event()
+
+    class _FirstClient:
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> httpx.Response:
+            first_in_send.set()
+            await release_first.wait()
+            return httpx.Response(200, content=b"one")
+
+    class _SecondClient:
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> httpx.Response:
+            second_in_send.set()
+            return httpx.Response(200, content=b"two")
+
+    sem = asyncio.Semaphore(1)
+    opts = GatewayProxyOptions()
+
+    async def receive_empty() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def run_first() -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+
+        async def send(msg: MutableMapping[str, Any]) -> None:
+            out.append(dict(msg))
+
+        await _proxy_http(
+            {"type": "http", "method": "GET", "path": "/a", "headers": [], "query_string": b""},
+            receive_empty,
+            send,
+            "http://127.0.0.1:9",
+            "/a",
+            request_id="r1",
+            proxy_options=opts,
+            httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _FirstClient())),
+            upstream_sem=sem,
+        )
+        return out
+
+    async def run_second() -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+
+        async def send(msg: MutableMapping[str, Any]) -> None:
+            out.append(dict(msg))
+
+        await _proxy_http(
+            {"type": "http", "method": "GET", "path": "/b", "headers": [], "query_string": b""},
+            receive_empty,
+            send,
+            "http://127.0.0.1:9",
+            "/b",
+            request_id="r2",
+            proxy_options=opts,
+            httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _SecondClient())),
+            upstream_sem=sem,
+        )
+        return out
+
+    t1 = asyncio.create_task(run_first())
+    await asyncio.wait_for(first_in_send.wait(), timeout=2.0)
+    t2 = asyncio.create_task(run_second())
+    await asyncio.sleep(0.05)
+    assert not second_in_send.is_set()
+    release_first.set()
+    await asyncio.gather(t1, t2)
+    assert second_in_send.is_set()
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_upstream_request_error_returns_502() -> None:
+    class _ErrClient:
+        def build_request(self, *args: object, **kwargs: object) -> object:
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> httpx.Response:
+            raise httpx.RequestError("boom", request=httpx.Request("GET", "http://127.0.0.1:9"))
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [],
+        "query_string": b"",
+    }
+    await _proxy_http(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:9",
+        "/",
+        request_id="rid-502",
+        proxy_options=GatewayProxyOptions(),
+        httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _ErrClient())),
+        upstream_sem=None,
+    )
+    assert sent[0]["type"] == "http.response.start"
+    assert sent[0]["status"] == 502
+    assert sent[1]["body"] == b"Bad Gateway"
 
 
 def test_build_gateway_502_when_upstream_resolver_returns_empty() -> None:

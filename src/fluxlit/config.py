@@ -95,6 +95,80 @@ class FluxlitSettings(BaseSettings):
             "(fluxlit_dispatch, path); default is DEBUG only."
         ),
     )
+    gateway_upstream_connect_timeout_s: float = Field(
+        default=30.0,
+        ge=0.0,
+        description="``httpx`` connect timeout (seconds) for gateway → Streamlit HTTP proxy.",
+    )
+    gateway_upstream_read_timeout_s: float = Field(
+        default=120.0,
+        ge=0.0,
+        description="``httpx`` read timeout (seconds) for gateway → Streamlit HTTP proxy.",
+    )
+    gateway_max_proxy_request_body_bytes: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Max incoming request body bytes proxied to Streamlit; ``0`` means unlimited. "
+            "When exceeded the gateway responds with **413**."
+        ),
+    )
+    gateway_max_concurrent_upstream_http: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Max concurrent in-flight HTTP proxy requests to Streamlit; ``0`` means no limit."
+        ),
+    )
+    gateway_httpx_max_connections: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "``httpx.Limits.max_connections`` for the shared gateway client; ``0`` uses "
+            "httpx defaults."
+        ),
+    )
+    gateway_httpx_max_keepalive_connections: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "``httpx.Limits.max_keepalive_connections`` when ``gateway_httpx_max_connections`` "
+            "is set; ``0`` lets httpx derive a value."
+        ),
+    )
+    gateway_ws_open_timeout_s: float = Field(
+        default=30.0,
+        ge=0.0,
+        description="WebSocket client ``open_timeout`` (seconds) to the Streamlit upstream.",
+    )
+    gateway_ws_ping_interval_s: float | None = Field(
+        default=None,
+        description=(
+            "Optional ``ping_interval`` for the upstream WebSocket (library default if unset)."
+        ),
+    )
+    gateway_ws_ping_timeout_s: float | None = Field(
+        default=None,
+        description="Optional ``ping_timeout`` for the upstream WebSocket.",
+    )
+    gateway_ws_close_timeout_s: float | None = Field(
+        default=None,
+        description="Optional ``close_timeout`` for the upstream WebSocket.",
+    )
+    gateway_ws_max_message_bytes: int | None = Field(
+        default=None,
+        description=(
+            "Optional ``max_size`` (bytes) for upstream WebSocket frames; ``None`` is unlimited."
+        ),
+    )
+    uvicorn_graceful_shutdown_timeout_s: float | None = Field(
+        default=None,
+        ge=0.0,
+        description=(
+            "If set, passed to Uvicorn ``timeout_graceful_shutdown`` (align with Kubernetes "
+            "``terminationGracePeriodSeconds`` minus ``preStop`` work)."
+        ),
+    )
     enable_security_headers: bool = Field(
         default=False,
         description="If True, add baseline security headers (HSTS, X-Content-Type-Options, etc.).",

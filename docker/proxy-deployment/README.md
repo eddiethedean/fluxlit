@@ -1,6 +1,7 @@
 # Docker: emulated reverse-proxy deployment
 
-Three nginx shapes are supported (all use **`FLUXLIT_ROOT_PATH=/myapp`** and **`FLUXLIT_TRUST_PROXY=1`** in the FluxLit image):
+Three nginx shapes are supported (all use **`FLUXLIT_ROOT_PATH=/myapp`** and **`FLUXLIT_TRUST_PROXY=1`** in the FluxLit image). The FluxLit gateway forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets so you can correlate nginx, gateway, and sidecar logs when clients send that header (or the gateway generates one).
+
 
 | Scenario | Compose | Public URL | Proxy behavior |
 |----------|---------|------------|----------------|

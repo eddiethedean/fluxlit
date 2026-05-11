@@ -35,6 +35,8 @@ The working directory should be the project root so Python can import the module
 - `--proxy-headers`, `--forwarded-allow-ips` (Uvicorn / reverse proxy trust)
 - `--pidfile` / `--no-pidfile` — PID file path for **`fluxlit shutdown`** (default file or `FLUXLIT_PIDFILE`; skip with `--no-pidfile` or `FLUXLIT_NO_PIDFILE=1`)
 
+Environment-only knobs (no matching CLI flag) still apply: for example **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`**, when set, is forwarded to Uvicorn as **`timeout_graceful_shutdown`** — see {doc}`deployment` and {doc}`configuration`.
+
 ## `shutdown`
 
 **`fluxlit shutdown`** sends **SIGTERM** to the process recorded in the PID file (then optional **SIGKILL** with **`--force`** after **`--wait`** seconds). Use the same working directory and **`--pidfile`** as the server, or set **`FLUXLIT_PIDFILE`** to an absolute path.

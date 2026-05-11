@@ -58,6 +58,18 @@ log_level = "info"
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side {class}`~fluxlit.client.ApiClient` (should include `/api`). |
 | `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log API requests (method, path, status) at INFO with request id context. |
 | `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG` | If true, log each **gateway** request at INFO with structured `extra` (`fluxlit_dispatch`, path, method/type); default is DEBUG-only. See {doc}`observability`. |
+| `FLUXLIT_GATEWAY_UPSTREAM_CONNECT_TIMEOUT_S` | `httpx` connect timeout (seconds) for gateway → Streamlit HTTP proxy (default **30**). |
+| `FLUXLIT_GATEWAY_UPSTREAM_READ_TIMEOUT_S` | `httpx` read timeout (seconds) for that proxy (default **120**). |
+| `FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES` | Max incoming request body bytes proxied to Streamlit; **0** = unlimited. When exceeded the gateway responds with **413**. |
+| `FLUXLIT_GATEWAY_MAX_CONCURRENT_UPSTREAM_HTTP` | Max concurrent in-flight HTTP proxy requests to Streamlit; **0** = no limit (semaphore). |
+| `FLUXLIT_GATEWAY_HTTPX_MAX_CONNECTIONS` | When **> 0**, sets `httpx.Limits.max_connections` on the shared gateway `AsyncClient` (**0** = httpx default). |
+| `FLUXLIT_GATEWAY_HTTPX_MAX_KEEPALIVE_CONNECTIONS` | When max connections is set, optional keepalive cap (**0** lets httpx derive). |
+| `FLUXLIT_GATEWAY_WS_OPEN_TIMEOUT_S` | WebSocket client `open_timeout` (seconds) to the Streamlit upstream (default **30**). |
+| `FLUXLIT_GATEWAY_WS_PING_INTERVAL_S` | Optional upstream WebSocket `ping_interval` (unset = library default). |
+| `FLUXLIT_GATEWAY_WS_PING_TIMEOUT_S` | Optional upstream `ping_timeout`. |
+| `FLUXLIT_GATEWAY_WS_CLOSE_TIMEOUT_S` | Optional upstream `close_timeout`. |
+| `FLUXLIT_GATEWAY_WS_MAX_MESSAGE_BYTES` | Optional upstream `max_size` (bytes) for frames; omit or unset for unlimited. |
+| `FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S` | If set, passed to Uvicorn `timeout_graceful_shutdown` for `fluxlit dev` / `fluxlit run` (align with Kubernetes `terminationGracePeriodSeconds`). See {doc}`deployment`. |
 | `FLUXLIT_ENABLE_SECURITY_HEADERS` | If true, add baseline security headers on the FastAPI app (HSTS when HTTPS, `X-Content-Type-Options`, etc.). |
 | `FLUXLIT_CORS_ALLOW_ORIGINS` | JSON list of allowed origins (e.g. `["http://localhost:3000"]`). Empty list disables CORS middleware. |
 | `FLUXLIT_CORS_ALLOW_CREDENTIALS` | Whether to set `Access-Control-Allow-Credentials` when CORS is enabled. |
@@ -72,6 +84,8 @@ log_level = "info"
 | `FLUXLIT_OIDC_BFF_SECRET` | Secret for first-party JWTs after OIDC callback; used by :meth:`fluxlit.app.FluxLit.attach_oidc_login` when `first_party_secret` is omitted. |
 
 **Passthrough caveats:** Do not use `FLUXLIT_STREAMLIT_RUN_CLI_ARGS` to set sidecar `--server.port`, `--server.address`, or `--server.baseUrlPath` (FluxLit assigns these; overrides break the parent process and gateway). In `FLUXLIT_CORS_MIDDLEWARE_KWARGS`, do not repeat `allow_origins`, `allow_credentials`, `allow_methods`, or `allow_headers` (FluxLit sets those from the dedicated fields; duplicates are ignored). Constructor `fastapi_kwargs` cannot change FastAPI `title` or `root_path`; they always follow `FluxlitSettings` so the API matches the public mount and Streamlit.
+
+Gateway proxy fields also exist on {class}`~fluxlit.config.FluxlitSettings` as `gateway_*` / `uvicorn_graceful_shutdown_timeout_s` for use from Python (e.g. tests or `FluxLit(settings=...)`). JSON log formatting is not configured via env; attach {class}`~fluxlit.logging_json.JsonLogFormatter` in your logging setup — see {doc}`observability`.
 
 See the {mod}`fluxlit.config` API reference for the full settings model.
 

@@ -57,6 +57,17 @@ curl -fsS http://127.0.0.1:8000/api/healthz
 curl -fsS http://127.0.0.1:8000/api/readyz
 ```
 
+(kubernetes-graceful-shutdown)=
+## Kubernetes: graceful shutdown
+
+FluxLit runs **Uvicorn** and a **Streamlit child** in one pod. When Kubernetes sends **SIGTERM**, Uvicorn stops accepting new connections and drains in-flight HTTP/WebSockets up to **`timeout_graceful_shutdown`**, then runs ASGI lifespan shutdown (which tears down Streamlit). Align timeouts so the pod is not **SIGKILL** mid-drain.
+
+- **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** — optional; forwarded to Uvicorn as `timeout_graceful_shutdown`. Set it **below** `terminationGracePeriodSeconds`, leaving time for `preStop` hooks and for the runtime’s bounded Streamlit termination (SIGINT / terminate / kill sequence) after lifespan exits.
+- **`terminationGracePeriodSeconds`** — must exceed Uvicorn’s graceful window plus any **`preStop`** sleep you add for load balancers to stop sending traffic before SIGTERM.
+- **`preStop`** — common pattern: `sleep 5` (or similar) so endpoints update before the main process sees SIGTERM; alternative is active coordination with your ingress. This is **not** a substitute for Uvicorn drain; it only reduces in-flight work at cutoff.
+
+Ordering: ingress / kube-proxy stop sending new connections → **SIGTERM** → Uvicorn drain → lifespan stops Streamlit → process exits. If drain is too long, Kubernetes still **SIGKILL** after the grace period.
+
 ## Docker and Compose
 
 - **`fluxlit build`** writes a minimal `Dockerfile` and `.dockerignore` into the current directory (or `-o` / `--output`). Adjust the generated files for your dependency layout, base image, non-root user, and image size. The template uses `CMD ["fluxlit", "run", "<target>"]` and sets `FLUXLIT_GATEWAY_HOST=0.0.0.0`.
@@ -68,6 +79,7 @@ Do **not** run `fluxlit dev` with `--reload` in production images.
 ## Observability in production
 
 - Enable **`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`** only if your log pipeline can handle per-request volume; pair with filters and {mod}`fluxlit.logging_redact` where headers are copied into logs — {doc}`observability`.
+- For **JSON lines** (Loki, Datadog, Cloud Logging), attach {class}`~fluxlit.logging_json.JsonLogFormatter` to your root, `uvicorn`, and `fluxlit` loggers (sample `dictConfig` in {doc}`observability`).
 - **`FLUXLIT_ENABLE_REQUEST_LOGGING`** affects the **inner FastAPI** app only (not the gateway dispatch line).
 
 ## Runtime-injected environment
@@ -86,6 +98,7 @@ The parent process sets variables for the Streamlit child and for gateway code t
 - [ ] `FLUXLIT_GATEWAY_HOST` / bind address matches container/platform (often `0.0.0.0`).
 - [ ] Proxy: `FLUXLIT_TRUST_PROXY`, `FLUXLIT_ROOT_PATH`, and `FLUXLIT_PUBLIC_BASE_URL` (for OAuth) set correctly.
 - [ ] Readiness probe uses `/api/readyz` when Streamlit must be up before receiving traffic.
+- [ ] Optional: set **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** (and Kubernetes `terminationGracePeriodSeconds` / `preStop`) per {ref}`kubernetes-graceful-shutdown` above.
 - [ ] Secrets in env or a secrets manager — not baked into images; `.env` excluded from Docker context (default `.dockerignore` from `fluxlit build` already ignores `.env`).
 
 ## Related

@@ -3,7 +3,10 @@
 ## Unreleased
 
 - **Configuration:** `FluxlitSettings` / `FluxLit` passthroughs for Streamlit (`streamlit_run_cli_args`, `streamlit_page_config` → `st.set_page_config`) and Starlette `CORSMiddleware` (`cors_middleware_kwargs`); `fastapi_kwargs` documented as the full `FastAPI(...)` hook.
-- **Tests:** `test_streamlit_page_config`, `test_config_settings` (env JSON, `SettingsError`, type errors, default isolation), FastAPI `openapi_url` / CORS `expose_headers` coverage, unified lifespan asserting Streamlit argv includes `streamlit_run_cli_args`.
+- **Gateway / operations:** authoritative `X-Request-ID` on proxied HTTP and WebSocket to Streamlit; `FluxlitSettings` for upstream connect/read timeouts, max proxied request body (**413**), concurrent upstream HTTP cap, shared `httpx.AsyncClient` connection limits, WebSocket open/ping/close/`max_size` tuning; `uvicorn_graceful_shutdown_timeout_s` wired into `fluxlit dev` / `fluxlit run` Uvicorn config when set.
+- **Logging:** `fluxlit.logging_json.JsonLogFormatter` (stdlib JSON, merges `extra` fields).
+- **Docs:** `docs/observability.md` (correlation diagram, JSON `dictConfig`, SLO/alerting sketches), `docs/deployment.md` (Kubernetes graceful shutdown), `docs/configuration.md` gateway env table; README, index, quickstart, architecture, testing cross-links.
+- **Tests:** gateway correlation integration and proxy robustness modules; expanded `test_logging_json` / `test_config_settings`; `test_streamlit_page_config`; FastAPI `openapi_url` / CORS `expose_headers` coverage; unified lifespan asserting Streamlit argv includes `streamlit_run_cli_args`.
 - **Safety:** Reject `streamlit_run_cli_args` that override sidecar port/address/baseUrlPath; strip CORS middleware kwargs that duplicate FluxLit-controlled keys; always set FastAPI `title` / `root_path` from settings after `fastapi_kwargs` merge.
 
 ## 0.5.0
@@ -72,13 +75,3 @@
   - CLI + ApiClient contract tests
 - CI (GitHub Actions) and contributor docs.
 
-## Unreleased
-
-- **Dev:** `fluxlit dev --reload --reload-scope=full` restarts the Streamlit sidecar on file changes (`watchfiles`); `gateway` remains the default (Uvicorn reload only).
-- **Gateway:** Optional per-request `upstream_resolver` and temp-file upstream state so reload workers and Streamlit restarts stay consistent; optional `enable_gateway_access_log` (structured INFO logs).
-- **API:** `GET /api/readyz` readiness probe for the Streamlit upstream (see `fluxlit.health`).
-- **CLI:** `fluxlit doctor` JWT clock skew only when JWT/OIDC env is present; `fluxlit_auth_extra` check; proxy_headers PASS when `trust_proxy` matches subpath deployment; clearer OAuth base URL warning.
-- **Utilities:** `fluxlit.logging_redact` for safe header logging.
-- **Docs:** `docs/observability.md`, `docs/rate-limiting.md`; auth-recipes BFF refresh subsection; CLI/reload and README updates.
-- **Examples:** `examples/docker_compose/` minimal Compose stack.
-- **Dependencies:** direct `watchfiles` dependency.

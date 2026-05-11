@@ -15,6 +15,7 @@
 |--|--|
 | [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html) | [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html) · [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html) · [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) |
 | [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html) · [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) · [Rate limiting](https://fluxlit.readthedocs.io/en/stable/rate-limiting.html) | [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html) · [Auth migration](https://fluxlit.readthedocs.io/en/stable/migration-auth.html) · [Security](https://fluxlit.readthedocs.io/en/stable/security.html) · [Troubleshooting](https://fluxlit.readthedocs.io/en/stable/troubleshooting.html) |
+| **Ops:** request correlation, JSON logs, gateway limits, graceful shutdown | See [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) and [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html#kubernetes-graceful-shutdown) (Kubernetes subsection) |
 | [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html) | [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html) · [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) · [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) · [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
 
 Longer product context: [PLAN.md](PLAN.md).
@@ -99,6 +100,10 @@ gateway_port = 8000
 
 Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html).
 
+**Gateway → Streamlit (optional env):** tune upstream HTTP timeouts, max proxied request body (returns **413** when exceeded), concurrent upstream HTTP cap, `httpx` connection limits, WebSocket open/ping/close timeouts, and optional frame size — see the **Gateway proxy** rows in [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html#environment-variables). **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** maps to Uvicorn’s graceful drain window when set (`fluxlit dev` / `fluxlit run`).
+
+**Logs:** enable structured gateway lines with **`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`**; for one JSON object per line in log aggregators, use **`fluxlit.logging_json.JsonLogFormatter`** (examples in [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html)).
+
 ---
 
 ## Project layout (sketch)
@@ -128,6 +133,6 @@ python -m mypy src/fluxlit
 
 ## Status
 
-Shipped: unified gateway, `@app.page` / `discover_pages`, `fluxlit.toml`, typed `ApiClient`, health/readiness probes, optional gateway access logs, dev reload scopes, `fluxlit[auth]`, CI (incl. proxy smoke + Playwright e2e). **Roadmap:** [Read the Docs](https://fluxlit.readthedocs.io/en/stable/roadmap.html).
+Shipped: unified gateway, `@app.page` / `discover_pages`, `fluxlit.toml`, typed `ApiClient`, health/readiness probes, optional gateway access logs, **upstream `X-Request-ID` correlation** (HTTP + WebSocket to Streamlit), **configurable gateway timeouts / body limits / concurrency and `httpx` pool limits**, **JSON log formatter**, **Uvicorn graceful shutdown** setting for orchestrated deploys, dev reload scopes, `fluxlit[auth]`, CI (incl. proxy smoke + Playwright e2e). **Roadmap:** [Read the Docs](https://fluxlit.readthedocs.io/en/stable/roadmap.html).
 
 MIT — see [LICENSE](LICENSE).

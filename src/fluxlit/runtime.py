@@ -612,6 +612,7 @@ def create_gateway_app() -> ASGIApp:
             access_log=fl.settings.enable_gateway_access_log,
             api_prefix=api_prefix,
             root_mount=mount,
+            proxy_settings=fl.settings,
         ),
         mount,
     )
@@ -705,6 +706,7 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
         access_log=fl.settings.enable_gateway_access_log,
         api_prefix=api_prefix,
         root_mount=mount,
+        proxy_settings=fl.settings,
     )
     gateway_app = _inject_public_root_path(gateway_app, mount)
 
@@ -951,18 +953,32 @@ def run_unified(
                     "Streamlit does not. Use --reload-scope=full to restart Streamlit too.\n"
                 )
             sys.stderr.flush()
-            config = uvicorn.Config(
-                "fluxlit.runtime:create_gateway_app",
-                host=host,
-                port=port,
-                factory=True,
-                reload=True,
-                log_level=log_level,
-                root_path="",
-                proxy_headers=use_proxy,
-                forwarded_allow_ips=allow_ips,
-            )
+            _grace = fl.settings.uvicorn_graceful_shutdown_timeout_s
+            _reload_kw: dict[str, Any] = {
+                "host": host,
+                "port": port,
+                "factory": True,
+                "reload": True,
+                "log_level": log_level,
+                "root_path": "",
+                "proxy_headers": use_proxy,
+                "forwarded_allow_ips": allow_ips,
+            }
+            if _grace is not None:
+                _reload_kw["timeout_graceful_shutdown"] = _grace
+            config = uvicorn.Config("fluxlit.runtime:create_gateway_app", **_reload_kw)
         else:
+            _grace = fl.settings.uvicorn_graceful_shutdown_timeout_s
+            _plain_kw: dict[str, Any] = {
+                "host": host,
+                "port": port,
+                "log_level": log_level,
+                "root_path": "",
+                "proxy_headers": use_proxy,
+                "forwarded_allow_ips": allow_ips,
+            }
+            if _grace is not None:
+                _plain_kw["timeout_graceful_shutdown"] = _grace
             config = uvicorn.Config(
                 _inject_public_root_path(
                     build_gateway(
@@ -972,15 +988,11 @@ def run_unified(
                         access_log=fl.settings.enable_gateway_access_log,
                         api_prefix=fl.settings.api_mount_path,
                         root_mount=mount,
+                        proxy_settings=fl.settings,
                     ),
                     mount,
                 ),
-                host=host,
-                port=port,
-                log_level=log_level,
-                root_path="",
-                proxy_headers=use_proxy,
-                forwarded_allow_ips=allow_ips,
+                **_plain_kw,
             )
 
         server = uvicorn.Server(config)

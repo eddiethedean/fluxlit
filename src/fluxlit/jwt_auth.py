@@ -3,8 +3,6 @@
 Uses PyJWT with optional :class:`jwt.PyJWKClient` for JWKS (RS256/ES256) or HS256 for development.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, cast
@@ -77,7 +75,7 @@ class JWTBearer:
             raise ValueError(msg)
 
     @classmethod
-    def from_fluxlit_settings(cls, settings: FluxlitSettings) -> JWTBearer:
+    def from_fluxlit_settings(cls, settings: FluxlitSettings) -> "JWTBearer":
         """Build a bearer dependency from settings / ``FLUXLIT_JWT_*``.
 
         Uses :class:`~fluxlit.config.FluxlitSettings`. Provide **either** ``jwt_hs256_secret``
@@ -168,7 +166,10 @@ class JWTBearer:
             )
         jwt_mod = _require_pyjwt()
         try:
-            decoded = await anyio.to_thread.run_sync(self._decode_token_json, token)
+            decoded = await anyio.to_thread.run_sync(  # ty: ignore[unresolved-attribute]
+                self._decode_token_json,
+                token,
+            )
         except jwt_mod.ExpiredSignatureError as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
