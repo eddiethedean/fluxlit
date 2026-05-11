@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- **Docs:** Fix PyPI version badge image URL in `README.md` (use Shields `pypi/v` badge).
+
 ## 0.4.0
 
 - **Runtime (Windows):** ``fluxlit shutdown`` / ``shutdown_unified_process`` use ``taskkill /T`` instead of ``os.kill(SIGTERM)``; ``--force`` uses ``taskkill /T /F``. PID liveness uses ``OpenProcess`` (avoids locale-dependent ``tasklist`` parsing).
