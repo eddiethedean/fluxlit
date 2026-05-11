@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from fluxlit.json_types import JsonValue
+from fluxlit.config.json_types import JsonValue
 
 
 class FluxlitSettings(BaseSettings):
@@ -15,7 +15,7 @@ class FluxlitSettings(BaseSettings):
     ``.env`` file in the working directory if present. Unknown env keys are ignored.
 
     CLI commands such as ``fluxlit dev`` merge these with ``fluxlit.toml`` / ``pyproject``
-    ``[tool.fluxlit]`` and explicit flags; see :mod:`fluxlit.project_config` for precedence.
+    ``[tool.fluxlit]`` and explicit flags; see :mod:`fluxlit.config.project` for precedence.
 
     Key fields:
 
@@ -133,7 +133,7 @@ class FluxlitSettings(BaseSettings):
         ge=0,
         description=(
             "Max incoming request body bytes proxied to Streamlit; ``0`` means unlimited. "
-            "When exceeded the gateway responds with **413**."
+            "When exceeded, the gateway responds with **413**."
         ),
     )
     gateway_max_concurrent_upstream_http: int = Field(
@@ -278,3 +278,6 @@ class FluxlitSettings(BaseSettings):
         if r:
             return r
         return (self.streamlit_public_path or "").strip()
+
+
+__all__ = ["FluxlitSettings"]

@@ -81,8 +81,8 @@ For **TLS termination**, **HSTS**, **forwarded header trust**, and **CSP** guida
 
 ## Observability in production
 
-- Enable **`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`** only if your log pipeline can handle per-request volume; pair with filters and {mod}`fluxlit.logging_redact` where headers are copied into logs — {doc}`observability`.
-- For **JSON lines** (Loki, Datadog, Cloud Logging), attach {class}`~fluxlit.logging_json.JsonLogFormatter` to your root, `uvicorn`, and `fluxlit` loggers (sample `dictConfig` in {doc}`observability`).
+- Enable **`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`** only if your log pipeline can handle per-request volume; pair with filters and {mod}`fluxlit.logging.redact` where headers are copied into logs — {doc}`observability`.
+- For **JSON lines** (Loki, Datadog, Cloud Logging), attach {class}`~fluxlit.logging.JsonLogFormatter` to your root, `uvicorn`, and `fluxlit` loggers (sample `dictConfig` in {doc}`observability`).
 - **`FLUXLIT_ENABLE_REQUEST_LOGGING`** affects the **inner FastAPI** app only (not the gateway dispatch line).
 
 ## Runtime-injected environment

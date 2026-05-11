@@ -9,12 +9,12 @@ from fastapi import APIRouter, FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from fluxlit.application.api_bootstrap import wire_fluxlit_api
+from fluxlit.application.auth_attachment import AuthAttachment
 from fluxlit.application.page_registry import discover_streamlit_pages, register_streamlit_page
+from fluxlit.auth.jwt import JWTBearer
+from fluxlit.auth.oidc import GenericOIDCClient
 from fluxlit.client import ApiClient
-from fluxlit.config import FluxlitSettings
-from fluxlit.json_types import JsonValue
-from fluxlit.jwt_auth import JWTBearer
-from fluxlit.oidc import GenericOIDCClient, OIDCBFFConfig, register_oidc_bff_routes
+from fluxlit.config import FluxlitSettings, JsonValue
 
 
 class FluxLit:
@@ -90,6 +90,7 @@ class FluxLit:
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
         self._oidc_bff_attached: bool = False
+        self._auth = AuthAttachment(self)
         wire_fluxlit_api(self.api, self.settings)
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -178,7 +179,7 @@ class FluxLit:
         Requires ``jwt_issuer``, ``jwt_audience``, and either ``jwt_hs256_secret`` or
         ``jwt_jwks_url``. Raises :class:`ValueError` with env-oriented hints if misconfigured.
         """
-        return JWTBearer.from_fluxlit_settings(self.settings)
+        return self._auth.make_jwt_bearer()
 
     def attach_oidc_login(
         self,
@@ -201,30 +202,9 @@ class FluxLit:
             ValueError: If this method is called more than once on the same :class:`FluxLit`
                 instance (duplicate auth routes).
         """
-        if self._oidc_bff_attached:
-            msg = "attach_oidc_login() was already called on this FluxLit instance"
-            raise ValueError(msg)
-        secret = (first_party_secret or self.settings.oidc_bff_secret or "").strip()
-        if not secret:
-            msg = (
-                "OIDC BFF needs a signing secret: pass first_party_secret=... or set "
-                "FLUXLIT_OIDC_BFF_SECRET on FluxlitSettings"
-            )
-            raise ValueError(msg)
-        public_raw = bff_overrides.pop("public_base_url", None)
-        if public_raw is not None:
-            public_base = str(public_raw).strip()
-        else:
-            public_base = (self.settings.public_base_url or "").strip()
-        cfg = OIDCBFFConfig(
-            oidc=oidc,
-            first_party_secret=secret,
-            public_base_url=public_base,
-            **bff_overrides,
+        return self._auth.attach_oidc_login(
+            oidc, first_party_secret=first_party_secret, **bff_overrides
         )
-        router = register_oidc_bff_routes(self.api, cfg)
-        self._oidc_bff_attached = True
-        return router
 
     @property
     def pages(self) -> list[tuple[str, str, Callable[..., None]]]:

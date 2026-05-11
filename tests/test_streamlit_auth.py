@@ -5,16 +5,16 @@ from unittest.mock import MagicMock
 import httpx
 import pytest
 
-from fluxlit.client import ApiClient
-from fluxlit.streamlit_auth import (
+from fluxlit.auth.streamlit import (
     bearer_headers_from_session,
     exchange_auth_code_from_query,
     prepare_streamlit_api_client,
 )
+from fluxlit.client import ApiClient
 
 
 def test_query_param_raw_list_and_string() -> None:
-    from fluxlit.streamlit_auth import _query_param_raw
+    from fluxlit.auth.streamlit import _query_param_raw
 
     assert _query_param_raw({"k": ["a", "b"]}, "k") == "a"
     assert _query_param_raw({"k": []}, "k") is None
@@ -118,7 +118,7 @@ def test_prepare_streamlit_api_client_skips_exchange_when_session_has_token(
     def spy(*_a: object, **_k: object) -> None:
         calls.append(True)
 
-    monkeypatch.setattr("fluxlit.streamlit_auth.exchange_auth_code_from_query", spy)
+    monkeypatch.setattr("fluxlit.auth.streamlit.exchange_auth_code_from_query", spy)
     monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
     st = MagicMock()
     st.session_state = {"fluxlit_access_token": "cached"}

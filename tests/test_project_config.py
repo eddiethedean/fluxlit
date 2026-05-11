@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fluxlit.project_config import (
+from fluxlit.config import (
     ProjectConfig,
     load_project_config,
     resolve_binding,

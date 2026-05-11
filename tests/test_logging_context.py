@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fluxlit.logging_context import (
+from fluxlit.logging.context import (
     get_request_id,
     new_request_id,
     reset_request_id,

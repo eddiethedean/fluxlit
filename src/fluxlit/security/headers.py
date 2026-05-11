@@ -23,3 +23,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 "max-age=63072000; includeSubDomains",
             )
         return response
+
+
+__all__ = ["SecurityHeadersMiddleware"]

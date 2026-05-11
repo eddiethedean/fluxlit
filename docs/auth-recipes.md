@@ -71,7 +71,7 @@ Do **not** store long-lived refresh tokens in `st.session_state` or the browser.
 
 1. A **FastAPI** route such as `POST /api/auth/refresh` that reads an **HttpOnly** session cookie (or server-side session) and returns a new short-lived access token.
 2. In Streamlit, use {class}`~fluxlit.client.ApiClient` (or `for_fluxlit`) and on **401** from protected routes, call that refresh endpoint once, then retry the original request.
-3. Log and trace using redacted headers — see {mod}`fluxlit.logging_redact` if you add custom logging middleware.
+3. Log and trace using redacted headers — see {mod}`fluxlit.logging.redact` if you add custom logging middleware.
 
 ---
 

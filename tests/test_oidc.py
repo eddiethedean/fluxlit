@@ -7,7 +7,7 @@ from urllib.parse import parse_qs, urlparse
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from fluxlit.oidc import OIDCBFFConfig, register_oidc_bff_routes
+from fluxlit.auth.oidc import OIDCBFFConfig, register_oidc_bff_routes
 
 
 def _unsigned_id_token(sub: str) -> str:

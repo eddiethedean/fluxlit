@@ -7,7 +7,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from fluxlit.security_middleware import SecurityHeadersMiddleware
+from fluxlit.security import SecurityHeadersMiddleware
 
 
 async def _hello(_: Request) -> PlainTextResponse:

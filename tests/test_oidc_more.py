@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from starlette.testclient import TestClient
 
-from fluxlit.oidc import (
+from fluxlit.auth.oidc import (
     GenericOIDCClient,
     GenericOIDCClientConfig,
     OIDCBFFConfig,
@@ -64,7 +64,7 @@ def test_generic_oidc_load_discovery_and_build_authorization_url() -> None:
         client_secret="sec",
     )
     well_known = "https://idp.example/.well-known/openid-configuration"
-    with patch("fluxlit.oidc.httpx.Client") as mock_cls:
+    with patch("fluxlit.auth.oidc.httpx.Client") as mock_cls:
         mock_http = MagicMock()
         mock_cls.return_value.__enter__.return_value = mock_http
         mock_http.get.return_value = _resp(200, "GET", well_known, json=doc)
@@ -88,7 +88,7 @@ def test_generic_oidc_load_discovery_and_build_authorization_url() -> None:
 def test_generic_oidc_discovery_http_error() -> None:
     well_known = "https://idp.example/.well-known/openid-configuration"
     cfg = GenericOIDCClientConfig(issuer="https://idp.example", client_id="i", client_secret="s")
-    with patch("fluxlit.oidc.httpx.Client") as mock_cls:
+    with patch("fluxlit.auth.oidc.httpx.Client") as mock_cls:
         mock_http = MagicMock()
         mock_cls.return_value.__enter__.return_value = mock_http
         mock_http.get.return_value = _resp(404, "GET", well_known)
@@ -117,7 +117,7 @@ def test_generic_oidc_exchange_non_object_json_raises() -> None:
     )
     c._doc = OIDCDiscoveryDocument.model_validate(inner)  # noqa: SLF001
 
-    with patch("fluxlit.oidc.httpx.Client") as mock_cls:
+    with patch("fluxlit.auth.oidc.httpx.Client") as mock_cls:
         mock_http = MagicMock()
         mock_cls.return_value.__enter__.return_value = mock_http
         tok = "https://idp.example/oauth2/token"
@@ -138,7 +138,7 @@ def test_generic_oidc_exchange_http_error_propagates() -> None:
     )
     c._doc = OIDCDiscoveryDocument.model_validate(inner)  # noqa: SLF001
 
-    with patch("fluxlit.oidc.httpx.Client") as mock_cls:
+    with patch("fluxlit.auth.oidc.httpx.Client") as mock_cls:
         mock_http = MagicMock()
         mock_cls.return_value.__enter__.return_value = mock_http
         tok = "https://idp.example/oauth2/token"
@@ -271,7 +271,7 @@ def test_bff_callback_generic_oidc_uses_jwks_verify(monkeypatch: pytest.MonkeyPa
         captured["leeway"] = str(leeway)
         return "jwks-verified-sub"
 
-    monkeypatch.setattr("fluxlit.oidc._verify_id_token_jwks", fake_verify)
+    monkeypatch.setattr("fluxlit.auth.oidc._verify_id_token_jwks", fake_verify)
 
     inner = {
         "issuer": "https://idp.example",
@@ -367,7 +367,7 @@ def test_bff_callback_generic_oidc_custom_id_token_audience(
         captured["audience"] = audience
         return "sub-x"
 
-    monkeypatch.setattr("fluxlit.oidc._verify_id_token_jwks", fake_verify)
+    monkeypatch.setattr("fluxlit.auth.oidc._verify_id_token_jwks", fake_verify)
 
     inner = {
         "issuer": "https://idp.example",
@@ -407,7 +407,7 @@ def test_bff_callback_generic_oidc_custom_id_token_audience(
 
 def test_verify_id_token_jwks_invalid_token_raises_502() -> None:
     jwt_lib = pytest.importorskip("jwt")
-    from fluxlit.oidc import _verify_id_token_jwks
+    from fluxlit.auth.oidc import _verify_id_token_jwks
 
     jwks = MagicMock()
     sk = MagicMock()

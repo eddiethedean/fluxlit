@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fluxlit.page import PageFn
+from fluxlit.streamlit.page import PageFn
 
 
 def test_pagefn_protocol_is_importable() -> None:

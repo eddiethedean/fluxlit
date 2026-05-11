@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fluxlit.json_types import JsonValue
+from fluxlit.config import JsonValue
 
 
 def build_set_page_config_kwargs(
@@ -27,3 +27,6 @@ def build_set_page_config_kwargs(
             continue
         kwargs[key] = val
     return kwargs
+
+
+__all__ = ["build_set_page_config_kwargs"]

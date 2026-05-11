@@ -11,7 +11,7 @@ def test_streamlit_entrypoint_renders_info_when_no_pages(
     requires_streamlit_apptest,
 ) -> None:
     """
-    Uses Streamlit's built-in AppTest to validate `fluxlit.streamlit_main` renders a
+    Uses Streamlit's built-in AppTest to validate `fluxlit.streamlit.main` renders a
     stable UI when the app defines no pages.
     """
     from streamlit.testing.v1 import AppTest
@@ -27,7 +27,7 @@ def test_streamlit_entrypoint_renders_info_when_no_pages(
     monkeypatch.setenv("FLUXLIT_APP", "demo_app:app")
     monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:1/api")
 
-    entry = Path(__file__).resolve().parents[1] / "src" / "fluxlit" / "streamlit_main.py"
+    entry = Path(__file__).resolve().parents[1] / "src" / "fluxlit" / "streamlit" / "main.py"
     at = AppTest.from_file(str(entry)).run()
 
     assert at.title and at.title[0].value == "Test App"
@@ -56,7 +56,7 @@ def test_streamlit_entrypoint_runs_registered_page(
     monkeypatch.setenv("FLUXLIT_APP", "demo_pages_app:app")
     monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:1/api")
 
-    entry = Path(__file__).resolve().parents[1] / "src" / "fluxlit" / "streamlit_main.py"
+    entry = Path(__file__).resolve().parents[1] / "src" / "fluxlit" / "streamlit" / "main.py"
     at = AppTest.from_file(str(entry)).run()
 
     assert at.title and at.title[0].value in {"Home", "Paged App"}

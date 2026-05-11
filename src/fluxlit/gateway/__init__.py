@@ -7,7 +7,7 @@ the browser's ``Origin``; otherwise WebSocket same-origin checks fail and the UI
 stays blank/black.
 
 Request IDs are taken from ``X-Request-ID`` or generated, stored in
-:mod:`fluxlit.logging_context` for the duration of each request, and **re-sent to
+:mod:`fluxlit.logging` for the duration of each request, and **re-sent to
 Streamlit** on proxied HTTP and WebSocket hops as authoritative ``X-Request-ID`` (the
 gateway wins over any client-supplied value on that upstream leg).
 

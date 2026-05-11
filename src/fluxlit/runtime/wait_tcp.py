@@ -17,3 +17,10 @@ def _wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
             time.sleep(0.05)
     msg = f"Timed out waiting for {host}:{port}"
     raise TimeoutError(msg)
+
+
+def _invoke_wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
+    """Delegate to :data:`fluxlit.runtime._wait_for_tcp` so monkeypatches on the package work."""
+    import fluxlit.runtime as rt
+
+    rt._wait_for_tcp(host, port, timeout_s)

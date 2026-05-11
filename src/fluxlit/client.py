@@ -22,8 +22,8 @@ from httpx._types import (  # noqa: PLC2701 — mirrors httpx Client.request ann
 )
 from pydantic import BaseModel, TypeAdapter
 
-from fluxlit.json_types import JsonValue
-from fluxlit.logging_context import REQUEST_ID_HEADER, get_request_id
+from fluxlit.config import JsonValue
+from fluxlit.logging import REQUEST_ID_HEADER, get_request_id
 
 T = TypeVar("T")
 
@@ -58,7 +58,7 @@ class ApiClient:
             auth_header_factory: Callable returning headers (e.g. ``Authorization``) per request.
                 Use instead of putting long-lived secrets in Streamlit widget state.
             propagate_request_id: If True, send ``X-Request-ID`` when
-                :func:`fluxlit.logging_context.get_request_id` is set (usually empty in Streamlit).
+                :func:`fluxlit.logging.get_request_id` is set (usually empty in Streamlit).
         """
         env_base = os.environ.get("FLUXLIT_INTERNAL_API_BASE", "").rstrip("/")
         resolved = (base_url or env_base or "http://127.0.0.1:8000/api").rstrip("/")

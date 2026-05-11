@@ -18,7 +18,7 @@ import httpx
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from fluxlit.jwt_auth import _require_pyjwt, issue_hs256_access_token
+from fluxlit.auth.jwt import _require_pyjwt, issue_hs256_access_token
 
 
 class OIDCProvider(Protocol):
@@ -137,11 +137,11 @@ class GenericOIDCClient:
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             r.raise_for_status()
-            data = r.json()
-            if not isinstance(data, dict):
+            parsed = r.json()
+            if not isinstance(parsed, dict):
                 msg = "Token endpoint returned non-object JSON"
                 raise ValueError(msg)
-            return data
+            return parsed
 
 
 @dataclass
@@ -196,14 +196,7 @@ def register_oidc_bff_routes(
     *,
     router_prefix: str = "",
 ) -> APIRouter:
-    """Attach login, OAuth callback, and Streamlit-friendly token exchange routes.
-
-    After IdP callback, the user is redirected to ``streamlit_redirect_path`` with a
-    short-lived ``auth_code`` query parameter. Streamlit should call
-    ``POST {exchange_path}`` with that code (server-side via :class:`~fluxlit.client.ApiClient`)
-    to obtain a bearer token — see :func:`fluxlit.streamlit_auth.exchange_auth_code_from_query`
-    or :func:`fluxlit.streamlit_auth.prepare_streamlit_api_client`.
-    """
+    """Attach login, OAuth callback, and Streamlit-friendly token exchange routes."""
     router = APIRouter(prefix=router_prefix, tags=["auth"])
 
     def redirect_uri(request: Request) -> str:
@@ -340,11 +333,7 @@ def _with_query(*, base: str, path: str, query: dict[str, str]) -> str:
 
 
 def _subject_from_id_token_parse_only(id_token: str) -> str:
-    """Parse ``sub`` from an OIDC ``id_token`` without signature verification.
-
-    Used only for non-:class:`GenericOIDCClient` :class:`OIDCProvider` stubs. Production
-    flows should use :class:`GenericOIDCClient` so :func:`_verify_id_token_jwks` runs.
-    """
+    """Parse ``sub`` from an OIDC ``id_token`` without signature verification."""
     try:
         parts = id_token.split(".")
         if len(parts) != 3:
@@ -358,3 +347,13 @@ def _subject_from_id_token_parse_only(id_token: str) -> str:
     if not isinstance(sub, str) or not sub:
         raise HTTPException(status_code=502, detail="id_token missing sub")
     return sub
+
+
+__all__ = [
+    "GenericOIDCClient",
+    "GenericOIDCClientConfig",
+    "OIDCBFFConfig",
+    "OIDCProvider",
+    "pkce_pair",
+    "register_oidc_bff_routes",
+]

@@ -127,7 +127,7 @@ def home_alt(st, client: ApiClient) -> None:
 
 ### 3c. Correlation IDs (optional)
 
-If you run code in a context where {func}`fluxlit.logging_context.set_request_id` is active, enable:
+If you run code in a context where {func}`fluxlit.logging.context.set_request_id` is active, enable:
 
 ```python
 ApiClient(propagate_request_id=True)

@@ -10,14 +10,12 @@ The ``fluxlit`` console script (see :mod:`fluxlit.cli`) runs the combined dev/pr
 Optional auth ergonomics (after ``pip install "fluxlit[auth]"``):
 :meth:`fluxlit.app.FluxLit.make_jwt_bearer`,
 :meth:`fluxlit.app.FluxLit.attach_oidc_login`, and
-:func:`fluxlit.streamlit_auth.prepare_streamlit_api_client` reduce boilerplate when using
+:func:`fluxlit.auth.prepare_streamlit_api_client` reduce boilerplate when using
 ``FLUXLIT_JWT_*`` and OIDC BFF env vars.
 """
 
 from fluxlit.app import FluxLit
-from fluxlit.client import ApiClient
-from fluxlit.config import FluxlitSettings
-from fluxlit.jwt_auth import (
+from fluxlit.auth.jwt import (
     JWTAuthConfig,
     JWTBearer,
     RequireRoles,
@@ -25,7 +23,7 @@ from fluxlit.jwt_auth import (
     StandardClaims,
     issue_hs256_access_token,
 )
-from fluxlit.oidc import (
+from fluxlit.auth.oidc import (
     GenericOIDCClient,
     GenericOIDCClientConfig,
     OIDCBFFConfig,
@@ -33,11 +31,13 @@ from fluxlit.oidc import (
     pkce_pair,
     register_oidc_bff_routes,
 )
-from fluxlit.streamlit_auth import (
+from fluxlit.auth.streamlit import (
     bearer_headers_from_session,
     exchange_auth_code_from_query,
     prepare_streamlit_api_client,
 )
+from fluxlit.client import ApiClient
+from fluxlit.config import FluxlitSettings
 from fluxlit.testing import FluxLitTestClient
 from fluxlit.url_session import (
     InMemorySessionStore,

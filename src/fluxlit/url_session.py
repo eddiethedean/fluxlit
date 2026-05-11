@@ -19,8 +19,8 @@ import time
 from collections.abc import Mapping, MutableMapping
 from typing import Protocol, cast, runtime_checkable
 
-from fluxlit.json_types import JsonValue
-from fluxlit.streamlit_facade import StreamlitSessionFacade
+from fluxlit.config import JsonValue
+from fluxlit.streamlit.facade import StreamlitSessionFacade
 
 
 @runtime_checkable

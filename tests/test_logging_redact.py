@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fluxlit.logging_redact import (
+from fluxlit.logging.redact import (
     redact_authorization,
     redact_query_string,
     sanitize_headers,

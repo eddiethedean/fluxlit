@@ -302,7 +302,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 ### Relation to other phases
 
 - **Phase 3 (sessions):** may later **combine** URL sid with signed cookies or JWT for **identity**; this item is **continuity**, not authentication.
-- **Phase 4:** observability must **redact** session query params in access logs where possible. **Done** for gateway structured `query` (see `fluxlit.logging_redact.redact_query_string`).
+- **Phase 4:** observability must **redact** session query params in access logs where possible. **Done** for gateway structured `query` (see `fluxlit.logging.redact.redact_query_string`).
 
 ---
 

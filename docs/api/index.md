@@ -20,11 +20,11 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.project_config
+.. automodule:: fluxlit.config.project
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.logging_context
+.. automodule:: fluxlit.logging
    :members:
    :show-inheritance:
 
@@ -36,7 +36,7 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.logging_redact
+.. automodule:: fluxlit.logging.redact
    :members:
    :show-inheritance:
 
@@ -56,15 +56,15 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.jwt_auth
+.. automodule:: fluxlit.auth.jwt
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.oidc
+.. automodule:: fluxlit.auth.oidc
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.streamlit_auth
+.. automodule:: fluxlit.auth.streamlit
    :members:
    :show-inheritance:
 
@@ -72,11 +72,11 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.security_middleware
+.. automodule:: fluxlit.security
    :members:
    :show-inheritance:
 
-.. automodule:: fluxlit.page
+.. automodule:: fluxlit.streamlit.page
    :members:
    :show-inheritance:
 ```
@@ -89,4 +89,4 @@ The Typer CLI module ({mod}`fluxlit.cli`) is primarily used via the `fluxlit` co
    :show-inheritance:
 ```
 
-The Streamlit entry script **`fluxlit.streamlit_main`** is executed by `streamlit run` with `FLUXLIT_APP` set. It is not import-safe for autodoc (module-level initialization). See the source file `streamlit_main.py` in the repository.
+The Streamlit entry script **`fluxlit.streamlit.main`** is executed by `streamlit run` with `FLUXLIT_APP` set. It is not import-safe for autodoc (module-level initialization). See the source file `streamlit/main.py` in the repository.

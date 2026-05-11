@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from fluxlit.json_types import JsonValue
+from fluxlit.config import JsonValue
 from fluxlit.url_session import (
     InMemorySessionStore,
     ensure_url_session,

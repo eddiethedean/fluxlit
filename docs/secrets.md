@@ -7,7 +7,7 @@ For architecture and token placement, see {doc}`security` and {doc}`auth-recipes
 ## Principles
 
 - **Never bake secrets into images.** Build args and `Dockerfile` `ENV` for production secrets leak in layer history; inject at **runtime** (Kubernetes Secret, cloud secret manager → env or mounted file, CI/CD sealed secrets).
-- **Do not log secrets.** Avoid printing `os.environ`, full header dicts, or exception messages that echo user-controlled `Authorization` bodies. Use {mod}`fluxlit.logging_redact` when copying headers into logs or debug output.
+- **Do not log secrets.** Avoid printing `os.environ`, full header dicts, or exception messages that echo user-controlled `Authorization` bodies. Use {mod}`fluxlit.logging.redact` when copying headers into logs or debug output.
 - **Scope secrets to the process that needs them.** Long-lived **IdP client secrets** belong in the **FastAPI** / gateway environment, not in patterns that expose them to untrusted Streamlit widgets (see {doc}`security`).
 
 ## Kubernetes and cloud patterns
@@ -21,7 +21,7 @@ For architecture and token placement, see {doc}`security` and {doc}`auth-recipes
 Gateway access logs and custom middleware can accidentally record **`Authorization`**, cookies, or API keys. When building structured logs:
 
 - Prefer **allowlists** of field names; never dump `request.headers` wholesale into production indexes.
-- Use {mod}`fluxlit.logging_redact` helpers when you must log a **subset** of headers for support.
+- Use {mod}`fluxlit.logging.redact` helpers when you must log a **subset** of headers for support.
 
 See {doc}`observability` for JSON formatter examples and correlation IDs.
 

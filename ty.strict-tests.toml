@@ -1,5 +1,8 @@
 # Same discovery as [tool.ty.src] in pyproject.toml, but without the tests/** rule
 # overrides. Use from the repo root:
 #   ty check --config-file ty.strict-tests.toml
+#
+# Incremental alignment: tests/test_asgi_unified.py is checked clean under this file
+# (per-file: ty check --config-file ty.strict-tests.toml tests/test_asgi_unified.py).
 [src]
 include = ["src", "tests"]

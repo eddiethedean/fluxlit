@@ -17,7 +17,7 @@ from fluxlit.gateway.upstream_http import (
     forwarded_upstream_header_pairs,
     public_host_from_scope,
 )
-from fluxlit.logging_context import REQUEST_ID_HEADER
+from fluxlit.logging import REQUEST_ID_HEADER
 
 
 class _GatewayPayloadTooLarge(Exception):

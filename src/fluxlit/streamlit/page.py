@@ -18,3 +18,6 @@ class PageFn(Protocol):
     def __call__(self, st: Any, client: ApiClient, /) -> None:
         """Render the page; may use ``st`` widgets and ``client`` for HTTP calls."""
         ...
+
+
+__all__ = ["PageFn"]

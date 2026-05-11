@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from security import JWT_AUDIENCE, JWT_ISSUER, JWT_SECRET, JWT_TTL_SECONDS
 
-from fluxlit.jwt_auth import issue_hs256_access_token
+from fluxlit.auth.jwt import issue_hs256_access_token
 from fluxlit.testing import FluxLitTestClient
 
 

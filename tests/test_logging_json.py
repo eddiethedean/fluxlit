@@ -1,4 +1,4 @@
-"""Tests for :mod:`fluxlit.logging_json`."""
+"""Tests for :mod:`fluxlit.logging` JSON formatter."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import logging
 import sys
 from datetime import date, datetime, timezone
 
-from fluxlit.logging_json import JsonLogFormatter
+from fluxlit.logging.json_formatter import JsonLogFormatter
 
 
 def test_json_log_formatter_includes_extra_fields() -> None:

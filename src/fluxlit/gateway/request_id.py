@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from starlette.types import Scope
 
-from fluxlit.logging_context import REQUEST_ID_HEADER, new_request_id
+from fluxlit.logging import REQUEST_ID_HEADER, new_request_id
 
 
 def request_id_from_scope(scope: Scope) -> str:

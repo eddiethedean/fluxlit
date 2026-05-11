@@ -4,7 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, status
+from starlette.requests import Request
 
 AuthDependency = Callable[[Request], Any]
 """FastAPI dependency callable taking the incoming :class:`~fastapi.Request`."""
@@ -87,3 +88,11 @@ class TrustedProxyUser:
                 detail="Missing trusted user header",
             )
         return (raw or "").strip()
+
+
+__all__ = [
+    "AuthDependency",
+    "TrustedProxyUser",
+    "TrustedProxyUserConfig",
+    "proxy_user_header",
+]

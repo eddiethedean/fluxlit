@@ -93,14 +93,14 @@ Full page reload can drop Streamlit’s in-process session unless state is **reh
 | App | `fluxlit.app` | `FluxLit`, `@app.page`, FastAPI instance |
 | CLI | `fluxlit.cli` | `fluxlit dev`, `run`, `new`, `doctor`, `build` |
 | Config | `fluxlit.config` | `FluxlitSettings` / `FLUXLIT_*` |
-| Project file | `fluxlit.project_config` | `fluxlit.toml` / `[tool.fluxlit]` defaults |
+| Project file | `fluxlit.config.project` | `fluxlit.toml` / `[tool.fluxlit]` defaults |
 | Client | `fluxlit.client` | `ApiClient` for server-side calls into `/api` |
 | Testing | `fluxlit.testing` | `FluxLitTestClient` (API gateway TestClient + Streamlit AppTest helper); repo CI splits fast vs `slow`, coverage artifact, E2E, proxy smoke (see `docs/testing.md`) |
 | Gateway | `fluxlit.gateway` | ASGI dispatch and reverse proxy |
 | URL session | `fluxlit.url_session` | `SessionStore`, in-memory store, hydrate/persist helpers (Phase 2 follow-on; no cookies) |
-| Logging | `fluxlit.logging_context` | Request id context for gateway / API |
+| Logging | `fluxlit.logging` | Request id context for gateway / API |
 | Runtime | `fluxlit.runtime` | Load `FluxLit` by import path, spawn Streamlit, run Uvicorn |
-| Streamlit | `fluxlit.streamlit_main` | Streamlit script; reads `FLUXLIT_APP`, builds navigation |
+| Streamlit | `fluxlit.streamlit.main` | Streamlit script; reads `FLUXLIT_APP`, builds navigation |
 | Helpers | `fluxlit.api`, `fluxlit.auth` | Router helpers; auth placeholders |
 
 `fluxlit build` emits starter container files; a dedicated `fluxlit.deploy` module and richer K8s examples remain future work.

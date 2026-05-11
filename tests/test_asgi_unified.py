@@ -7,6 +7,7 @@ lifespan task (``httpx`` 0.28 ``ASGITransport`` has no ``lifespan=`` kwarg here)
 from __future__ import annotations
 
 import asyncio
+import importlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,21 +16,21 @@ from typing import Any, cast
 import httpx
 import pytest
 from starlette.testclient import TestClient
-from starlette.types import ASGIApp, Scope
 
+from fluxlit.asgi_types import ASGIApp, ASGIMessage, Scope
 from fluxlit.runtime import asgi_from_fluxlit, create_unified_app, load_fluxlit
 
 
 @asynccontextmanager
 async def _lifespan_running(asgi_app: ASGIApp) -> AsyncIterator[ASGIApp]:
     """Run ASGI lifespan in a background task; yield the same app for concurrent HTTP."""
-    q_in: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
-    q_out: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    q_in: asyncio.Queue[ASGIMessage] = asyncio.Queue()
+    q_out: asyncio.Queue[ASGIMessage] = asyncio.Queue()
 
-    async def receive() -> dict[str, Any]:
+    async def receive() -> ASGIMessage:
         return await q_in.get()
 
-    async def send(message: dict[str, Any]) -> None:
+    async def send(message: ASGIMessage) -> None:
         await q_out.put(message)
 
     scope: Scope = {  # type: ignore[assignment]
@@ -37,7 +38,11 @@ async def _lifespan_running(asgi_app: ASGIApp) -> AsyncIterator[ASGIApp]:
         "asgi": {"version": "3.0", "spec_version": "2.0"},
         "state": {},
     }
-    task = asyncio.create_task(asgi_app(scope, receive, send))
+
+    async def _run_lifespan() -> None:
+        await asgi_app(scope, receive, send)
+
+    task = asyncio.create_task(_run_lifespan())
     await q_in.put({"type": "lifespan.startup"})
     msg = await asyncio.wait_for(q_out.get(), timeout=30.0)
     if msg.get("type") == "lifespan.startup.failed":
@@ -158,15 +163,15 @@ async def test_lifespan_scope_includes_asgi_version_and_state(
             captured["state"] = scope.get("state")
         await inner(scope, receive, send)
 
-    fl.api = spy  # type: ignore[method-assign]
+    object.__setattr__(fl, "api", spy)
     asgi = asgi_from_fluxlit(fl, "tests.e2e.minimal_app:app")
-    q: list[dict[str, object]] = [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}]
-    sent: list[dict[str, object]] = []
+    q: list[ASGIMessage] = [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}]
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return q.pop(0)
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
     await asgi({"type": "lifespan"}, receive, send)
@@ -183,17 +188,17 @@ async def test_double_lifespan_startup_sends_two_completes(
     """Idempotent second ``lifespan.startup`` must not crash (Uvicorn edge cases)."""
     _minimal_asgi_env(monkeypatch)
     asgi = create_unified_app()
-    q: list[dict[str, object]] = [
+    q: list[ASGIMessage] = [
         {"type": "lifespan.startup"},
         {"type": "lifespan.startup"},
         {"type": "lifespan.shutdown"},
     ]
     sent: list[str] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return q.pop(0)
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(str(message.get("type")))
 
     await asgi({"type": "lifespan"}, receive, send)
@@ -208,13 +213,13 @@ async def test_shutdown_without_startup_sends_shutdown_complete(
     """Shutdown alone must complete cleanly (no inner task, no sidecar)."""
     _minimal_asgi_env(monkeypatch)
     asgi = create_unified_app()
-    q: list[dict[str, object]] = [{"type": "lifespan.shutdown"}]
-    sent: list[dict[str, object]] = []
+    q: list[ASGIMessage] = [{"type": "lifespan.shutdown"}]
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return q.pop(0)
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
     await asgi({"type": "lifespan"}, receive, send)
@@ -263,13 +268,13 @@ async def test_inner_lifespan_startup_failure_emits_startup_failed(
     monkeypatch.setenv("FLUXLIT_GATEWAY_PORT", "8000")
 
     asgi = create_unified_app()
-    q: list[dict[str, object]] = [{"type": "lifespan.startup"}]
-    sent: list[dict[str, object]] = []
+    q: list[ASGIMessage] = [{"type": "lifespan.startup"}]
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return q.pop(0)
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
     await asgi({"type": "lifespan"}, receive, send)
@@ -320,16 +325,16 @@ async def test_inner_lifespan_shutdown_failure_emits_shutdown_failed(
     monkeypatch.setenv("FLUXLIT_GATEWAY_PORT", "8000")
 
     asgi = create_unified_app()
-    q: list[dict[str, object]] = [
+    q: list[ASGIMessage] = [
         {"type": "lifespan.startup"},
         {"type": "lifespan.shutdown"},
     ]
-    sent: list[dict[str, object]] = []
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return q.pop(0)
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
     with pytest.raises(RuntimeError, match="shutdown boom"):
@@ -346,12 +351,12 @@ async def test_websocket_before_sidecar_sends_close_with_reason(
     """Pre-handshake close must include code (and reason per ASGI HTTP+WS spec)."""
     monkeypatch.setenv("FLUXLIT_APP", "tests.e2e.minimal_app:app")
     asgi = create_unified_app()
-    sent: list[dict[str, object]] = []
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return {"type": "websocket.connect"}
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
     scope: dict[str, Any] = {
@@ -376,15 +381,15 @@ async def test_http_503_body_shape_matches_asgi_http_spec(
     """503 responses must end the body with ``more_body: False``."""
     monkeypatch.setenv("FLUXLIT_APP", "tests.e2e.minimal_app:app")
     asgi = create_unified_app()
-    sent: list[dict[str, object]] = []
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, object]:
+    async def receive() -> ASGIMessage:
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    async def send(message: dict[str, object]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
-    scope: dict[str, object] = {
+    scope: dict[str, Any] = {
         "type": "http",
         "http_version": "1.1",
         "method": "GET",
@@ -465,14 +470,14 @@ async def test_api_post_chunked_request_body(
     monkeypatch.chdir(tmp_path)
     _minimal_asgi_env(monkeypatch)
 
-    import echo_chunk_app  # noqa: PLC0415
+    echo_chunk_app = importlib.import_module("echo_chunk_app")
 
     asgi = asgi_from_fluxlit(echo_chunk_app.app, "echo_chunk_app:app")
     chunks = [b"hel", b"lo"]
     idx = {"i": 0}
-    sent: list[dict[str, Any]] = []
+    sent: list[ASGIMessage] = []
 
-    async def receive() -> dict[str, Any]:
+    async def receive() -> ASGIMessage:
         i = idx["i"]
         if i < len(chunks):
             idx["i"] += 1
@@ -480,7 +485,7 @@ async def test_api_post_chunked_request_body(
             return {"type": "http.request", "body": chunks[i], "more_body": more}
         return {"type": "http.request", "body": b"", "more_body": False}
 
-    async def send(message: dict[str, Any]) -> None:
+    async def send(message: ASGIMessage) -> None:
         sent.append(message)
 
     scope: dict[str, Any] = {
@@ -555,7 +560,7 @@ async def test_fluxlit_asgi_custom_route_via_httpx(
     _minimal_asgi_env(monkeypatch)
     monkeypatch.setenv("FLUXLIT_APP", "asgi_ping_mod:app")
 
-    import asgi_ping_mod  # noqa: PLC0415
+    asgi_ping_mod = importlib.import_module("asgi_ping_mod")
 
     fl = asgi_ping_mod.app
     asgi = asgi_from_fluxlit(fl, "asgi_ping_mod:app")

@@ -24,7 +24,7 @@ class FluxLitTestClient:
     through :func:`fluxlit.gateway.build_gateway`, so paths include the configured
     ``api_prefix`` and ``/healthz`` behaves like production.
 
-    **Streamlit** — :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit_main`
+    **Streamlit** — :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit.main`
     with the same environment variables the runtime sets.
     """
 
@@ -68,7 +68,7 @@ class FluxLitTestClient:
         internal_api_base: str | None = None,
         extra_sys_path: str | Path | None = None,
     ) -> Any:
-        """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit_main`.
+        """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit.main`.
 
         Requires Streamlit >= 1.30 for ``AppTest``. Patches ``FLUXLIT_APP``,
         ``FLUXLIT_INTERNAL_API_BASE``, and ``FLUXLIT_API_PREFIX`` for the duration of the run.
@@ -89,7 +89,7 @@ class FluxLitTestClient:
 
         from streamlit.testing.v1 import AppTest
 
-        entry = Path(__file__).resolve().parent / "streamlit_main.py"
+        entry = Path(__file__).resolve().parent / "streamlit" / "main.py"
         internal = internal_api_base or f"http://127.0.0.1:1{self.api_prefix}"
 
         with (

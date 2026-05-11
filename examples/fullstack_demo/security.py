@@ -6,7 +6,7 @@ import os
 
 from passlib.context import CryptContext
 
-from fluxlit.jwt_auth import issue_hs256_access_token
+from fluxlit.auth.jwt import issue_hs256_access_token
 
 _pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

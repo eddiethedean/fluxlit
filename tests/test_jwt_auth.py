@@ -4,7 +4,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from starlette.testclient import TestClient
 
-from fluxlit.jwt_auth import (
+from fluxlit.auth.jwt import (
     JWTAuthConfig,
     JWTBearer,
     RequireRoles,
@@ -54,7 +54,7 @@ async def test_jwt_bearer_hs256_decode_uses_anyio_thread(monkeypatch: pytest.Mon
             raise TypeError("expected callable")
         return func(*args)
 
-    monkeypatch.setattr("fluxlit.jwt_auth.anyio.to_thread.run_sync", fake_run_sync)
+    monkeypatch.setattr("fluxlit.auth.jwt.anyio.to_thread.run_sync", fake_run_sync)
     from starlette.requests import Request
 
     scope = {
@@ -157,7 +157,7 @@ def test_require_roles_enforces_roles_claim(hs256_bearer: JWTBearer) -> None:
 
 
 def test_issue_hs256_requires_auth_extra(monkeypatch: pytest.MonkeyPatch) -> None:
-    import fluxlit.jwt_auth as ja
+    import fluxlit.auth.jwt as ja
 
     def boom() -> None:
         raise RuntimeError("no jwt")
@@ -352,7 +352,7 @@ def test_jwt_bearer_rs256_with_mocked_jwks_client(monkeypatch: pytest.MonkeyPatc
 def test_require_pyjwt_import_error_message(monkeypatch: pytest.MonkeyPatch) -> None:
     import builtins
 
-    import fluxlit.jwt_auth as ja
+    import fluxlit.auth.jwt as ja
 
     real_import = builtins.__import__
 

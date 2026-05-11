@@ -1,7 +1,7 @@
-"""Import :mod:`fluxlit.streamlit_main` with a fake ``streamlit`` to exercise module logic.
+"""Import :mod:`fluxlit.streamlit.main` with a fake ``streamlit`` to exercise module logic.
 
 Named ``test_fluxlit_a_*`` so collection runs it **before** ``test_fluxlit_testclient.py``
-(any ``AppTest.from_file`` on ``streamlit_main.py``). Coverage.py stops recording that
+(any ``AppTest.from_file`` on the Streamlit entry file). Coverage.py stops recording that
 path sensibly if AppTest runs first; importing the package module first avoids that.
 """
 
@@ -24,7 +24,7 @@ class StreamlitStop(Exception):
 @pytest.fixture
 def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     saved_streamlit = sys.modules.pop("streamlit", None)
-    saved_main = sys.modules.pop("fluxlit.streamlit_main", None)
+    saved_main = sys.modules.pop("fluxlit.streamlit.main", None)
 
     st: Any = types.ModuleType("streamlit")
     st._errors: list[str] = []
@@ -49,21 +49,21 @@ def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     try:
         yield st
     finally:
-        sys.modules.pop("fluxlit.streamlit_main", None)
+        sys.modules.pop("fluxlit.streamlit.main", None)
         sys.modules.pop("streamlit", None)
         if saved_streamlit is not None:
             sys.modules["streamlit"] = saved_streamlit
         if saved_main is not None:
-            sys.modules["fluxlit.streamlit_main"] = saved_main
+            sys.modules["fluxlit.streamlit.main"] = saved_main
 
 
 def test_streamlit_main_errors_when_env_missing(
     fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("FLUXLIT_APP", raising=False)
-    sys.modules.pop("fluxlit.streamlit_main", None)
+    sys.modules.pop("fluxlit.streamlit.main", None)
     with pytest.raises(StreamlitStop):
-        importlib.import_module("fluxlit.streamlit_main")
+        importlib.import_module("fluxlit.streamlit.main")
     assert fake_streamlit._errors and "FLUXLIT_APP is not set" in fake_streamlit._errors[0]
 
 
@@ -71,9 +71,9 @@ def test_streamlit_main_invalid_app_spec_raises(
     fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("FLUXLIT_APP", "nocolon")
-    sys.modules.pop("fluxlit.streamlit_main", None)
+    sys.modules.pop("fluxlit.streamlit.main", None)
     with pytest.raises(ValueError):
-        importlib.import_module("fluxlit.streamlit_main")
+        importlib.import_module("fluxlit.streamlit.main")
 
 
 def test_streamlit_main_no_pages_shows_hint(
@@ -85,8 +85,8 @@ def test_streamlit_main_no_pages_shows_hint(
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setenv("FLUXLIT_APP", "sm_np:app")
-    sys.modules.pop("fluxlit.streamlit_main", None)
-    importlib.import_module("fluxlit.streamlit_main")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+    importlib.import_module("fluxlit.streamlit.main")
     fake_streamlit.set_page_config.assert_called_once()
     fake_streamlit.title.assert_called_once_with("NP Title")
     fake_streamlit.info.assert_called_once()
@@ -106,7 +106,7 @@ def test_streamlit_main_with_pages_runs_navigation(
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setenv("FLUXLIT_APP", "sm_pg:app")
-    sys.modules.pop("fluxlit.streamlit_main", None)
-    importlib.import_module("fluxlit.streamlit_main")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+    importlib.import_module("fluxlit.streamlit.main")
     fake_streamlit.navigation.assert_called_once()
     fake_streamlit.navigation.return_value.run.assert_called_once()

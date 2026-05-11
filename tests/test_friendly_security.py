@@ -7,10 +7,10 @@ import pytest
 from starlette.testclient import TestClient
 
 from fluxlit import FluxLit
+from fluxlit.auth.jwt import JWTBearer
+from fluxlit.auth.oidc import GenericOIDCClient, GenericOIDCClientConfig
+from fluxlit.auth.streamlit import prepare_streamlit_api_client
 from fluxlit.config import FluxlitSettings
-from fluxlit.jwt_auth import JWTBearer
-from fluxlit.oidc import GenericOIDCClient, GenericOIDCClientConfig
-from fluxlit.streamlit_auth import prepare_streamlit_api_client
 
 
 def test_jwt_bearer_from_fluxlit_settings_hs256() -> None:
@@ -63,7 +63,7 @@ def test_flux_lit_attach_oidc_login_requires_secret() -> None:
 
 def test_flux_lit_attach_oidc_login_rejects_second_call(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GenericOIDCClient, "load_discovery_sync", lambda self: None)
-    from fluxlit.oidc import OIDCDiscoveryDocument
+    from fluxlit.auth.oidc import OIDCDiscoveryDocument
 
     oidc = GenericOIDCClient(
         GenericOIDCClientConfig(issuer="https://idp", client_id="c", client_secret="d")
@@ -86,7 +86,7 @@ def test_flux_lit_attach_oidc_login_rejects_second_call(monkeypatch: pytest.Monk
 
 def test_flux_lit_attach_oidc_login_registers_routes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(GenericOIDCClient, "load_discovery_sync", lambda self: None)
-    from fluxlit.oidc import OIDCDiscoveryDocument
+    from fluxlit.auth.oidc import OIDCDiscoveryDocument
 
     oidc = GenericOIDCClient(
         GenericOIDCClientConfig(issuer="https://idp", client_id="c", client_secret="d")

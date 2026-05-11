@@ -1,6 +1,7 @@
 """JWT bearer validation for FastAPI (requires ``pip install 'fluxlit[auth]'``).
 
-Uses PyJWT with optional :class:`jwt.PyJWKClient` for JWKS (RS256/ES256) or HS256 for development.
+Uses PyJWT with optional :class:`jwt.PyJWKClient` for JWKS (RS256/ES256) or HS256 for
+development.
 """
 
 from dataclasses import dataclass, field
@@ -8,8 +9,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, cast
 
 import anyio
-from fastapi import HTTPException, Request, status
+from fastapi import HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.requests import Request
 
 from fluxlit.config import FluxlitSettings
 
@@ -79,8 +81,8 @@ class JWTBearer:
         """Build a bearer dependency from settings / ``FLUXLIT_JWT_*``.
 
         Uses :class:`~fluxlit.config.FluxlitSettings`. Provide **either** ``jwt_hs256_secret``
-        (development) **or** ``jwt_jwks_url`` (RS256 /
-        JWKS), plus ``jwt_issuer`` and ``jwt_audience``. Error messages name the env vars.
+        (development) **or** ``jwt_jwks_url`` (RS256 / JWKS), plus ``jwt_issuer`` and
+        ``jwt_audience``. Error messages name the env vars.
         """
         issuer = (settings.jwt_issuer or "").strip()
         audience = (settings.jwt_audience or "").strip()
@@ -279,3 +281,13 @@ def issue_hs256_access_token(
     if extra_claims:
         payload.update(extra_claims)
     return cast(str, jwt_mod.encode(payload, secret, algorithm="HS256"))
+
+
+__all__ = [
+    "JWTAuthConfig",
+    "JWTBearer",
+    "RequireRoles",
+    "RequireScopes",
+    "StandardClaims",
+    "issue_hs256_access_token",
+]

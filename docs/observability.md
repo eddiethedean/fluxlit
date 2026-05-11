@@ -4,7 +4,7 @@
 
 ## Request IDs
 
-The gateway and optional FastAPI access logging use {data}`fluxlit.logging_context.REQUEST_ID_HEADER` (`X-Request-ID`). The ID is stored in a {class}`contextvars.ContextVar` for the duration of each request; see {mod}`fluxlit.logging_context`.
+The gateway and optional FastAPI access logging use {data}`fluxlit.logging.context.REQUEST_ID_HEADER` (`X-Request-ID`). The ID is stored in a {class}`contextvars.ContextVar` for the duration of each request; see {mod}`fluxlit.logging`.
 
 The gateway **replaces** `X-Request-ID` on the **Streamlit upstream** (HTTP and WebSocket) with that same resolved value so sidecar access logs can join to gateway and API lines.
 
@@ -31,15 +31,15 @@ When {attr}`~fluxlit.config.FluxlitSettings.enable_gateway_access_log` is `True`
 - `fluxlit_dispatch` — `api` or `streamlit`
 - `http_method_or_type` — HTTP method or `websocket`
 - `path` — ASGI path seen by the gateway
-- `query` — raw query string from the ASGI scope with **sensitive keys redacted** (default `fluxlit_sid`, plus {attr}`~fluxlit.config.FluxlitSettings.url_session_query_param` when set); see {mod}`fluxlit.logging_redact` and {doc}`url-session`
+- `query` — raw query string from the ASGI scope with **sensitive keys redacted** (default `fluxlit_sid`, plus {attr}`~fluxlit.config.FluxlitSettings.url_session_query_param` when set); see {mod}`fluxlit.logging.redact` and {doc}`url-session`
 
 With the default (`False`), the same line is logged at **DEBUG** only.
 
-If you enable gateway INFO logs in production, combine them with your normal log pipeline (filters, aggregators) and scrub or avoid echoing sensitive headers. For copying header dicts into logs or debug output, use {mod}`fluxlit.logging_redact`. Broader secrets and rotation guidance: {doc}`secrets`.
+If you enable gateway INFO logs in production, combine them with your normal log pipeline (filters, aggregators) and scrub or avoid echoing sensitive headers. For copying header dicts into logs or debug output, use {mod}`fluxlit.logging.redact`. Broader secrets and rotation guidance: {doc}`secrets`.
 
 ### JSON log lines (Loki / Datadog-style)
 
-Use {class}`~fluxlit.logging_json.JsonLogFormatter` so each log record is a **single JSON object** with at least `time`, `level`, `logger`, `message`, plus any attributes from ``logger.info(..., extra={...})`` (for example `request_id`, `fluxlit_dispatch`, `path` from gateway access logs).
+Use {class}`~fluxlit.logging.JsonLogFormatter` so each log record is a **single JSON object** with at least `time`, `level`, `logger`, `message`, plus any attributes from ``logger.info(..., extra={...})`` (for example `request_id`, `fluxlit_dispatch`, `path` from gateway access logs).
 
 Suggested field conventions for log stacks:
 
@@ -59,7 +59,7 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "json": {
-            "()": "fluxlit.logging_json.JsonLogFormatter",
+            "()": "fluxlit.logging.json_formatter.JsonLogFormatter",
         },
     },
     "handlers": {
@@ -119,7 +119,7 @@ The path must **not** be under your **`api_mount_path`** or it will shadow API r
 
 ## Python `logging` filters
 
-Use a {class}`logging.Filter` to drop noisy loggers or scrub fields before logs reach stdout or a log aggregator (in addition to {mod}`fluxlit.logging_redact` for header maps).
+Use a {class}`logging.Filter` to drop noisy loggers or scrub fields before logs reach stdout or a log aggregator (in addition to {mod}`fluxlit.logging.redact` for header maps).
 
 ## OpenTelemetry (recipe)
 

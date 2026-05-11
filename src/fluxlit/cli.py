@@ -1,7 +1,7 @@
 """Typer CLI: ``fluxlit dev``, ``run``, ``shutdown``, ``doctor``, ``build``, ``new``.
 
 The ``fluxlit`` setuptools entrypoint calls :func:`main`. Commands resolve defaults from
-:func:`fluxlit.project_config.load_project_config` and :class:`~fluxlit.config.FluxlitSettings`.
+:func:`fluxlit.config.load_project_config` and :class:`~fluxlit.config.FluxlitSettings`.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 import typer
 
-from fluxlit.project_config import load_project_config, resolve_binding, resolve_target
+from fluxlit.config import load_project_config, resolve_binding, resolve_target
 from fluxlit.runtime import run_unified, shutdown_unified_process
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)

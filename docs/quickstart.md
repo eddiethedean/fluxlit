@@ -82,7 +82,7 @@ FluxLit looks for **`app:app`** by default. You can set **`target`** in `fluxlit
 - **Health:** `/api/healthz` (liveness; hidden from OpenAPI).
 - **Readiness:** `/api/readyz` checks the Streamlit sidecar when running under `fluxlit dev` / `fluxlit run` (hidden from OpenAPI).
 
-For structured per-request logs at the gateway (optional), set `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1` and read {doc}`observability`. The same page covers **JSON log lines** (`fluxlit.logging_json`), **correlation** (`X-Request-ID` end-to-end to Streamlit), and **SLO / alerting** sketches for `healthz` / `readyz`.
+For structured per-request logs at the gateway (optional), set `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1` and read {doc}`observability`. The same page covers **JSON log lines** (`fluxlit.logging`), **correlation** (`X-Request-ID` end-to-end to Streamlit), and **SLO / alerting** sketches for `healthz` / `readyz`.
 
 For local development, `fluxlit dev --reload --reload-scope=full` reloads the gateway and restarts Streamlit on changes; the default `--reload-scope=gateway` reloads FastAPI only. See {doc}`cli`.
 

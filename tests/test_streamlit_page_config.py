@@ -1,10 +1,10 @@
-"""Unit tests for :mod:`fluxlit.streamlit_page_config` (no Streamlit import required)."""
+"""Unit tests for :mod:`fluxlit.streamlit.page_config` (no Streamlit import required)."""
 
 from __future__ import annotations
 
 import pytest
 
-from fluxlit.streamlit_page_config import build_set_page_config_kwargs
+from fluxlit.streamlit.page_config import build_set_page_config_kwargs
 
 
 def test_build_page_config_defaults_title_only() -> None:

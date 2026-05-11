@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 import time
 
-from fluxlit.json_types import JsonValue
+from fluxlit.config import JsonValue
 from fluxlit.url_session import (
     SessionStore,
     hydrate_url_session,

@@ -11,7 +11,7 @@
 - **0.5 roadmap (remaining):** **`examples/kubernetes/`** reference manifests; deployment scaling + multi-worker docs; **`docs/runbooks.md`**; **`docs/support-matrix.md`**; **`scripts/soak_http.sh`**; **`upgrade-smoke`** workflow; OpenAPI **contract** test; optional gateway **Prometheus** metrics (`fluxlit[metrics]`); observability updates (RED metrics, traceparent recipe, correlation limits).
 - **Configuration:** `FluxlitSettings` / `FluxLit` passthroughs for Streamlit (`streamlit_run_cli_args`, `streamlit_page_config` → `st.set_page_config`) and Starlette `CORSMiddleware` (`cors_middleware_kwargs`); `fastapi_kwargs` documented as the full `FastAPI(...)` hook.
 - **Gateway / operations:** authoritative `X-Request-ID` on proxied HTTP and WebSocket to Streamlit; `FluxlitSettings` for upstream connect/read timeouts, max proxied request body (**413**), concurrent upstream HTTP cap, shared `httpx.AsyncClient` connection limits, WebSocket open/ping/close/`max_size` tuning; `uvicorn_graceful_shutdown_timeout_s` wired into `fluxlit dev` / `fluxlit run` Uvicorn config when set.
-- **Logging:** `fluxlit.logging_json.JsonLogFormatter` (stdlib JSON, merges `extra` fields).
+- **Logging:** `fluxlit.logging.JsonLogFormatter` (stdlib JSON, merges `extra` fields).
 - **Docs:** `docs/observability.md` (correlation diagram, JSON `dictConfig`, SLO/alerting sketches), `docs/deployment.md` (Kubernetes graceful shutdown), `docs/configuration.md` gateway env table; README, index, quickstart, architecture, testing cross-links.
 - **Tests:** gateway correlation integration and proxy robustness modules; expanded `test_logging_json` / `test_config_settings`; `test_streamlit_page_config`; FastAPI `openapi_url` / CORS `expose_headers` coverage; unified lifespan asserting Streamlit argv includes `streamlit_run_cli_args`.
 - **Safety:** Reject `streamlit_run_cli_args` that override sidecar port/address/baseUrlPath; strip CORS middleware kwargs that duplicate FluxLit-controlled keys; always set FastAPI `title` / `root_path` from settings after `fastapi_kwargs` merge.
@@ -59,7 +59,7 @@
 
 ## 0.2.0
 
-- **Config:** `fluxlit.toml` and `pyproject.toml` `[tool.fluxlit]` for default `target`, bind options, and log level (`fluxlit.project_config`). Precedence: CLI → environment → project file → defaults.
+- **Config:** `fluxlit.toml` and `pyproject.toml` `[tool.fluxlit]` for default `target`, bind options, and log level (`fluxlit.config.project`). Precedence: CLI → environment → project file → defaults.
 - **CLI:** `fluxlit build` writes a starter `Dockerfile` and `.dockerignore`; `fluxlit doctor` reports PASS/WARN/FAIL checks (import, port bind, deps, `FLUXLIT_INTERNAL_API_BASE`) with optional `--warnings-only`.
 - **CLI:** `fluxlit dev` / `run` accept an omitted `target` when configured in a project file; `--reload-scope=gateway` documents gateway-only reload; stderr warns that Streamlit does not reload.
 - **Pages:** `FluxLit.discover_pages(directory, package=...)` imports sibling modules and calls `register(app)` for opt-in multipage packages.

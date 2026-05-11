@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI
 from jwt.algorithms import RSAAlgorithm
 from starlette.testclient import TestClient
 
-from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer, StandardClaims
+from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims
 
 
 @pytest.fixture

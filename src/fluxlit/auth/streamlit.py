@@ -28,11 +28,6 @@ def exchange_auth_code_from_query(
 
     Returns the access token when exchanged; otherwise ``None``. On HTTP errors from
     the exchange endpoint, raises :class:`httpx.HTTPStatusError`.
-
-    Typical usage at the top of a page::
-
-        exchange_auth_code_from_query(st, client)
-        token = st.session_state.get(\"fluxlit_access_token\")
     """
     code = _query_param_raw(st_module.query_params, query_key)
     if not code:
@@ -74,19 +69,8 @@ def prepare_streamlit_api_client(
     """One-step Streamlit helper: exchange ``auth_code`` (if present), return an ``ApiClient``.
 
     If a bearer token exists in ``session_key`` after the exchange (or was already there),
-    returns :meth:`ApiClient.for_fluxlit` so ``GET /me`` and other protected routes work.
-    Otherwise returns an **unauthenticated** client (public routes only).
-
-    The internal exchange call uses a short-lived unauthenticated client, then closes it
-    when upgrading to a bearer client so you do not leak two open connections.
-
-    Typical page body::
-
-        api = prepare_streamlit_api_client(st)
-        r = api.get(\"/me\")
-        if r.status_code == 401:
-            st.info(\"Open /api/auth/login\")
-            return
+    returns :meth:`ApiClient.for_fluxlit` so protected routes work. Otherwise returns an
+    unauthenticated client.
     """
     existing = st_module.session_state.get(session_key)
     if existing:
@@ -103,3 +87,10 @@ def prepare_streamlit_api_client(
         return bootstrap
     bootstrap.close()
     return ApiClient.for_fluxlit(bearer_token=str(raw), **client_options)
+
+
+__all__ = [
+    "bearer_headers_from_session",
+    "exchange_auth_code_from_query",
+    "prepare_streamlit_api_client",
+]

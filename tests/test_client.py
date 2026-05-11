@@ -60,7 +60,7 @@ def test_api_client_propagates_request_id_when_set(
         return httpx.Response(200)
 
     transport = httpx.MockTransport(handler)
-    from fluxlit.logging_context import REQUEST_ID_HEADER, set_request_id
+    from fluxlit.logging.context import REQUEST_ID_HEADER, set_request_id
 
     token = set_request_id("req-xyz")
     try:
@@ -71,7 +71,7 @@ def test_api_client_propagates_request_id_when_set(
             client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
             client.get("/ping")
     finally:
-        from fluxlit.logging_context import reset_request_id
+        from fluxlit.logging.context import reset_request_id
 
         reset_request_id(token)
     assert captured.get(REQUEST_ID_HEADER) == "req-xyz"

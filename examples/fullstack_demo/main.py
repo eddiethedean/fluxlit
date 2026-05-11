@@ -38,7 +38,7 @@ from sqlmodel import select
 
 from fluxlit import FluxLit
 from fluxlit.client import ApiClient
-from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer, StandardClaims
+from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims
 
 _bearer = JWTBearer(
     JWTAuthConfig(

@@ -90,7 +90,7 @@ log_level = "info"
 
 **Passthrough caveats:** Do not use `FLUXLIT_STREAMLIT_RUN_CLI_ARGS` to set sidecar `--server.port`, `--server.address`, or `--server.baseUrlPath` (FluxLit assigns these; overrides break the parent process and gateway). In `FLUXLIT_CORS_MIDDLEWARE_KWARGS`, do not repeat `allow_origins`, `allow_credentials`, `allow_methods`, or `allow_headers` (FluxLit sets those from the dedicated fields; duplicates are ignored). Constructor `fastapi_kwargs` cannot change FastAPI `title` or `root_path`; they always follow `FluxlitSettings` so the API matches the public mount and Streamlit.
 
-Gateway proxy fields also exist on {class}`~fluxlit.config.FluxlitSettings` as `gateway_*` / `uvicorn_graceful_shutdown_timeout_s` for use from Python (e.g. tests or `FluxLit(settings=...)`). JSON log formatting is not configured via env; attach {class}`~fluxlit.logging_json.JsonLogFormatter` in your logging setup — see {doc}`observability`.
+Gateway proxy fields also exist on {class}`~fluxlit.config.FluxlitSettings` as `gateway_*` / `uvicorn_graceful_shutdown_timeout_s` for use from Python (e.g. tests or `FluxLit(settings=...)`). JSON log formatting is not configured via env; attach {class}`~fluxlit.logging.JsonLogFormatter` in your logging setup — see {doc}`observability`.
 
 See the {mod}`fluxlit.config` API reference for the full settings model.
 

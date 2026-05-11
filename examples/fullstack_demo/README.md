@@ -51,7 +51,7 @@ pytest
 
 This example’s suite is self-contained (no `slow` / `e2e` markers). When working on **FluxLit itself** at the repo root, follow **[docs/testing.md](../../docs/testing.md)** (`-m "not slow"`, optional coverage, Playwright E2E).
 
-Tests use FluxLit’s **`FluxLitTestClient`** (`fluxlit.testing`): HTTP goes through **`build_gateway`** with the real **`/api`** prefix (same as production), and **`openapi()`** / **`api_get("/healthz")`** match what the combined app exposes. **`streamlit()`** runs Streamlit’s **`AppTest`** against `fluxlit.streamlit_main` with `FLUXLIT_APP=main:app`.
+Tests use FluxLit’s **`FluxLitTestClient`** (`fluxlit.testing`): HTTP goes through **`build_gateway`** with the real **`/api`** prefix (same as production), and **`openapi()`** / **`api_get("/healthz")`** match what the combined app exposes. **`streamlit()`** runs Streamlit’s **`AppTest`** against `fluxlit.streamlit.main` with `FLUXLIT_APP=main:app`.
 
 Each test gets a temporary `sqlite+rapsqlite` file and a FastAPI **`get_db`** override so `fullstack_demo.db` is never used.
 
