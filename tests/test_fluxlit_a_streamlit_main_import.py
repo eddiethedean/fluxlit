@@ -101,12 +101,24 @@ def test_streamlit_main_with_pages_runs_navigation(
         "app = FluxLit(title='PG')\n"
         "@app.page('/')\n"
         "def home(st, client):\n"
-        "    pass\n",
+        "    st.title('page ran')\n",
         encoding="utf-8",
     )
+
+    class Navigation:
+        def __init__(self, pages: list[Any]) -> None:
+            self.pages = pages
+
+        def run(self) -> None:
+            self.pages[0].fn()
+
+    fake_streamlit.Page = mock.Mock(
+        side_effect=lambda fn, **kwargs: types.SimpleNamespace(fn=fn, kwargs=kwargs)
+    )
+    fake_streamlit.navigation = mock.Mock(side_effect=lambda pages: Navigation(pages))
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setenv("FLUXLIT_APP", "sm_pg:app")
     sys.modules.pop("fluxlit.streamlit.main", None)
     importlib.import_module("fluxlit.streamlit.main")
     fake_streamlit.navigation.assert_called_once()
-    fake_streamlit.navigation.return_value.run.assert_called_once()
+    fake_streamlit.title.assert_called_once_with("page ran")

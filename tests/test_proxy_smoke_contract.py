@@ -14,6 +14,8 @@ def test_proxy_smoke_script_checks_0_6_contracts() -> None:
     assert "/api/request-id" in script
     assert "fluxlit_smoke_ok" in script
     assert "expected 413" in script
+    assert "CURL_INSECURE" in script
+    assert "_create_unverified_context" in script
     assert "_stcore/stream" in script
 
 

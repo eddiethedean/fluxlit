@@ -82,13 +82,16 @@ echo "Frontend shell OK"
 
 echo "Checking oversized proxied body returns 413"
 oversized_status="$(python3 - <<PY
+import os
+import ssl
 import urllib.error
 import urllib.request
 
 url = "${root_url}oversized"
 req = urllib.request.Request(url, data=b"x" * 256, method="POST")
+context = ssl._create_unverified_context() if os.environ.get("CURL_INSECURE") == "1" else None
 try:
-    urllib.request.urlopen(req, timeout=30)
+    urllib.request.urlopen(req, timeout=30, context=context)
     print("200")
 except urllib.error.HTTPError as exc:
     print(exc.code)
