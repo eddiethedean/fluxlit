@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.5.0 - 2026-05-11
+
 - **Tests / CI:** coverage job enforces **`--cov-fail-under=80`**; optional **`ty-check`** job (continue-on-error); E2E uploads **Playwright traces** on failure; weekly **`soak-scheduled`** workflow exercises `scripts/soak_http.sh` against `http.server`; shared fixtures **`gateway_test_client_factory`** / **`requires_streamlit_apptest`**; gateway header-filter, Prometheus counter, readiness (`302` / `readyz` 404), WebSocket **`slow`** reconnect stress, and **`DictSessionStore`** contract tests.
 - **URL session (Phase 2 follow-on):** `fluxlit.url_session` (`SessionStore`, `InMemorySessionStore`, `ensure_url_session`, `hydrate_url_session`, `persist_url_session`) for refresh continuity **without cookies**; user guide **`docs/url-session.md`**; AppTest + unit tests.
 - **Gateway logs:** structured `query` field on gateway access / debug logs with **redacted** session query values (`fluxlit_sid` and `FLUXLIT_URL_SESSION_QUERY_PARAM`); new `FluxlitSettings.url_session_query_param`.
@@ -15,9 +19,6 @@
 - **Docs:** `docs/observability.md` (correlation diagram, JSON `dictConfig`, SLO/alerting sketches), `docs/deployment.md` (Kubernetes graceful shutdown), `docs/configuration.md` gateway env table; README, index, quickstart, architecture, testing cross-links.
 - **Tests:** gateway correlation integration and proxy robustness modules; expanded `test_logging_json` / `test_config_settings`; `test_streamlit_page_config`; FastAPI `openapi_url` / CORS `expose_headers` coverage; unified lifespan asserting Streamlit argv includes `streamlit_run_cli_args`.
 - **Safety:** Reject `streamlit_run_cli_args` that override sidecar port/address/baseUrlPath; strip CORS middleware kwargs that duplicate FluxLit-controlled keys; always set FastAPI `title` / `root_path` from settings after `fastapi_kwargs` merge.
-
-## 0.5.0
-
 - **ASGI / Uvicorn:** `FluxLit` is a first-class ASGI app (`uvicorn app:app`); unified stack via `asgi_from_fluxlit` / `create_unified_app` with lifespan bridged to the inner FastAPI app, Streamlit sidecar lifecycle, and spec-shaped HTTP/WebSocket error responses.
 - **Imports:** `load_fluxlit` prefers a local `./<module>.py` when resolving targets (avoids `app.py` / `PYTHONPATH` shadowing); optional `FluxLit(import_target=...)` for explicit `module:attr`.
 - **CLI:** `fluxlit new` writes `fluxlit.toml` with `target` and `gateway_port`; mentions `uvicorn app:app`.

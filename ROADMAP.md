@@ -342,21 +342,21 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 - Operate like a service: observable, portable, and proxy-aware.
 
-**Tracking:** concrete delivery and acceptance criteria for the next wave of Phase 4 work are folded into **Version 0.5** above (metrics, tracing, hardened containers, K8s example, soak/load, runbooks).
+**Tracking:** the prioritized Phase 4 slice landed in **Version 0.5** above. Remaining work is now later 0.x / pre-1.0 hardening: broader load/chaos evidence, deeper OpenTelemetry hooks, and more deployment recipes.
 
 ### Features
 
-- **Health and readiness** for Kubernetes — **partial:** liveness (`/api/healthz`) and readiness (`/api/readyz` vs Streamlit) shipped; multi-probe charts and operator runbooks still TBD (**0.5**).
-- **Metrics:** Prometheus-friendly endpoints or OpenTelemetry hooks (**0.5**).
-- **Structured logging + tracing** correlation across gateway and API — **partial:** optional per-request gateway INFO logs with structured `extra`; full trace propagation still TBD (**0.5**).
-- **Docker:** official image or `Dockerfile` template; non-root user; multi-stage build (**0.5** hardening on template output).
-- **Kubernetes:** example Deployment + Service + Ingress annotations (**0.5**).
-- **`root_path` / `X-Forwarded-*`:** first-class docs and tests for subpath deployment (ongoing; **0.5** runbooks for common proxy failures).
+- **Health and readiness** for Kubernetes — liveness (`/api/healthz`) and readiness (`/api/readyz` vs Streamlit) shipped, with operator runbooks and Kubernetes examples.
+- **Metrics:** optional Prometheus RED metrics shipped; deeper OpenTelemetry instrumentation remains later 0.x work.
+- **Structured logging + tracing** correlation — request IDs and JSON logging helpers shipped; full distributed trace propagation remains later 0.x work.
+- **Docker:** generated and reference Dockerfiles use digest-pinned Python slim images and non-root users; read-only root remains documented for platforms that support the needed writable mounts.
+- **Kubernetes:** example Deployment, Service, and Ingress references shipped.
+- **`root_path` / `X-Forwarded-*`:** first-class docs and tests for subpath deployment are in place; broader proxy matrices remain later 0.x work.
 
 ### Success criteria
 
 - One-command container run with documented env vars.
-- Load test or soak notes for websocket proxy under concurrent users (baseline) — **0.5** soak/chaos items.
+- Load test or soak notes for websocket proxy under concurrent users (baseline) — initial soak tooling exists; broader load and chaos evidence remains later 0.x work.
 
 ---
 
