@@ -504,6 +504,22 @@ async def test_api_post_chunked_request_body(
 
 
 @pytest.mark.asyncio
+async def test_serial_healthz_burst_after_lifespan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Many sequential health checks succeed (chaos-style micro-stress on API path)."""
+    _minimal_asgi_env(monkeypatch)
+    asgi = create_unified_app()
+    async with _lifespan_running(asgi):
+        transport = httpx.ASGITransport(app=asgi, raise_app_exceptions=True)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            for _ in range(100):
+                r = await client.get("/api/healthz")
+                assert r.status_code == 200
+                assert r.json() == {"status": "ok"}
+
+
+@pytest.mark.asyncio
 async def test_concurrent_http_requests_after_lifespan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

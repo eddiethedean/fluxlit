@@ -1,6 +1,6 @@
 # Troubleshooting
 
-**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication) · {doc}`production-tls` · {doc}`secrets`
+**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication) · {doc}`runbooks` · {doc}`production-tls` · {doc}`secrets`
 
 ## First step: `fluxlit doctor`
 
@@ -84,6 +84,7 @@ On **Windows**, the first stop attempt uses ``taskkill /T``; with **`--force`**,
 
 - {doc}`architecture` — routing and sidecar model.
 - {doc}`deployment` — probes and containers.
+- {doc}`runbooks` — production-style incidents (`readyz`, blank UI, WebSockets, auth).
 - {doc}`production-tls` — reverse-proxy TLS and header trust.
 - {doc}`secrets` — avoiding credential leaks in logs; key rotation.
 - Repository **Issues** on GitHub for bugs; **Discussions** for usage questions if enabled.

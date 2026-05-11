@@ -18,6 +18,8 @@
 | [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html) · [Auth migration](https://fluxlit.readthedocs.io/en/stable/migration-auth.html) · [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html) · [Troubleshooting](https://fluxlit.readthedocs.io/en/stable/troubleshooting.html) | **Ops:** correlation IDs, JSON logs, gateway limits, graceful shutdown — [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) · [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html#kubernetes-graceful-shutdown) (Kubernetes) |
 | [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html) | [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html) · [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) · [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) · [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
 
+**Kubernetes:** reference `Deployment` + `Service` in [`examples/kubernetes/`](examples/kubernetes/) (probes, graceful shutdown, `preStop`). **Runbooks:** [Runbooks](https://fluxlit.readthedocs.io/en/stable/runbooks.html). **Support matrix:** [support-matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html).
+
 Longer product context: [PLAN.md](PLAN.md).
 
 ---

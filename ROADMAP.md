@@ -64,6 +64,8 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Horizontal scale** | First-class docs: **sticky sessions** vs replica count vs Streamlit session model; when to add an external session store (ties to **Phase 2 follow-on**). |
 | **Multi-worker stance** | Keep “**not supported** for unified in-process Uvicorn workers” explicit; document **supported alternatives** (e.g. one process per replica, or split gateway / Streamlit topology if a platform demands it). |
 
+**Implemented in `main` (deployment):** **`docs/deployment.md`** horizontal scale + multi-worker sections and K8s checklist; **`examples/kubernetes/`** reference manifests.
+
 ### Testing & quality
 
 | Feature | Description |
@@ -73,6 +75,8 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Chaos & failure injection** | Scripted scenarios: Streamlit killed, slow upstream, partial network partition — aligned with `tests/test_asgi_unified.py` failure modes. |
 | **Upgrade matrix** | CI matrix: **minimum and latest** supported Python, Streamlit, FastAPI/Starlette (or documented subset) to catch breakage early. |
 
+**Implemented in `main` (testing):** OpenAPI **contract** test + fixture; ASGI **serial burst** `healthz` test; **`scripts/soak_http.sh`**; **`.github/workflows/upgrade-smoke.yml`** (weekly / manual, latest Streamlit/FastAPI/Starlette + fast tests, `continue-on-error`); documented in **`docs/testing.md`**. Full per-push min/max dependency matrix remains optional cost tradeoff.
+
 ### Observability
 
 | Feature | Description |
@@ -81,6 +85,8 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Distributed tracing** | OpenTelemetry hooks with context propagation across the gateway → internal API hop (aligns with **Version 0.3** “correlation” row). |
 | **Runbooks** | One short runbook per common incident: **503 on `readyz`**, blank Streamlit, WebSocket failures behind nginx/Traefik, auth misconfig — linked from **troubleshooting** docs. |
 
+**Implemented in `main` (observability):** **`docs/runbooks.md`** + links from troubleshooting/deployment/index; optional gateway **Prometheus** RED metrics (`FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS`, `fluxlit[metrics]`); observability docs for **traceparent** / OTel recipe and **correlation limits** (gateway vs Streamlit process).
+
 ### Product, versioning & support
 
 | Feature | Description |
@@ -88,11 +94,13 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Semver & changelog discipline** | Clear **0.x** cadence; **CHANGELOG** entries per release; short **upgrade X → Y** checklist for breaking CLI/config/runtime changes. |
 | **Support matrix** | Published “supported combinations” (Python × Streamlit × FluxLit); optional **LTS** or extended-support branch policy if demand warrants. |
 
+**Implemented in `main` (product):** **`docs/support-matrix.md`**; maintainer **release checklist** in **`CONTRIBUTING.md`**.
+
 ### Success criteria (0.5)
 
 - Operators can answer **“is it healthy?”**, **“why did it fail?”**, and **“how do I roll safely?”** from docs + defaults without reading source.
 - CI blocks regressions on **authored** security/supply-chain gates agreed for the repo (audit/SBOM as adopted).
-- At least one **reference deployment** path (e.g. Kubernetes example) matches hardened Dockerfile and env contract.
+- At least one **reference deployment** path (e.g. Kubernetes example) matches hardened Dockerfile and env contract — see **`examples/kubernetes/`** in the repo.
 
 ### Relation to other roadmap items
 

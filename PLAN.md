@@ -162,4 +162,6 @@ Broader possibilities (post–1.0): plugins, shared UI patterns, background jobs
 - [ROADMAP.md](ROADMAP.md) — phased delivery and current status
 - [docs/production-tls.md](docs/production-tls.md) — TLS, HSTS, reverse-proxy trust, CSP notes
 - [docs/secrets.md](docs/secrets.md) — secrets in logs, stores, JWT/OIDC rotation
+- [docs/runbooks.md](docs/runbooks.md) — production incidents (`readyz`, WebSockets, auth)
+- [docs/support-matrix.md](docs/support-matrix.md) — Python / dependency support
 - [SECURITY.md](SECURITY.md) — reporting, `pip-audit`, SBOM artifact

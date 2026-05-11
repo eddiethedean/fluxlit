@@ -67,6 +67,18 @@ Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` mar
 
 - When you change **`examples/docker_compose/requirements.in`**, regenerate **`requirements.txt`** with **`pip-compile`** (see that example’s README) so the Docker image stays reproducible.
 
+## Releases (maintainers)
+
+For a **PyPI / tag** release of FluxLit itself:
+
+1. **CHANGELOG** — add a dated section under `CHANGELOG.md` (move items from **Unreleased** if present).
+2. **Version** — bump `version` in `pyproject.toml` (semver **0.x**; document breaking changes in CHANGELOG).
+3. **Upgrade note** — if CLI, env, or defaults changed behavior, add a short **“Upgrading X → Y”** bullet list in CHANGELOG (commands to run, renames, removals).
+4. **Tag** — `git tag vX.Y.Z` after merge to the release branch / `main` per your workflow.
+5. **Read the Docs** — confirm the **stable** build points at the new tag when applicable.
+
+Support expectations for Python and dependencies are summarized in **`docs/support-matrix.md`**.
+
 ## Pull requests
 
 - Include tests when changing routing/runtime behavior.

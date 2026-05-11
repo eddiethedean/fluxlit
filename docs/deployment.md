@@ -91,9 +91,28 @@ The parent process sets variables for the Streamlit child and for gateway code t
 
 ## Scaling and workers
 
-- **Single Uvicorn process** is the typical model: one gateway and **one** Streamlit child share localhost and env state.
-- Multiple replicas behind a load balancer each run their own Streamlit process; use **sticky sessions** or accept that Streamlit sessions are per-replica unless you add external session affinity.
-- Uvicorn **multiple workers** (`--workers` greater than 1) with the unified stack is **not** a supported configuration for one container: extra workers would not share the same Streamlit subprocess contract. Scale **horizontally** with more pods/instances instead.
+### Single process (default)
+
+- **One Uvicorn worker** is the supported model: one gateway ASGI app and **one** Streamlit child share loopback and process-local state (upstream URL file, OIDC BFF in-memory stores, etc.).
+- **Uvicorn `--workers` > 1** is **not supported** for this unified stack in one OS process: extra workers would each try to own a Streamlit subprocess and shared resources would diverge. Do not enable multi-worker on one pod to “use all CPUs”; scale **out** instead (see below).
+
+### Horizontal scale (multiple replicas)
+
+Behind a **Layer 7 load balancer** or Kubernetes **Service** with multiple endpoints:
+
+- Each replica runs **its own** gateway + Streamlit pair. **Streamlit’s default session** is tied to the server-side script run and WebSocket; after a hard refresh or new connection, users may land on a **different replica** and see a **new session** unless you add **affinity**.
+- **Sticky sessions** (session affinity / cookie-based or IP-hash) route the same browser to the same replica for a period. That improves continuity for interactive UIs but is **not** a full multi-replica session store: long-lived affinity tables, draining nodes, and failures still drop local state.
+- **When to add an external session store:** if you need **consistent application state across replicas** without sticky sessions (or in addition to them), you must persist state outside the process (database, Redis, etc.). A future **URL-bound server session** (Phase 2 follow-on in [ROADMAP.md](https://github.com/eddiethedean/fluxlit/blob/main/ROADMAP.md)) is the product direction for cookie-free continuity; until then, document your own store for cross-replica continuity.
+
+### Supported alternatives to multi-worker
+
+- **One process per replica** (Kubernetes Pod, ECS task, VM): scale replica count; tune CPU for a single process.
+- **Split topology** (advanced): run Streamlit and the API on different hosts and point `FLUXLIT_STREAMLIT_UPSTREAM` at the Streamlit origin—only if your platform requires separate services and you accept operational complexity.
+- **Multiple Uvicorn workers for API-only** does not apply to `FluxLit` unified mode; use plain FastAPI + separate Streamlit hosting if you truly need multi-worker HTTP for the API only.
+
+### Reference: Kubernetes
+
+A minimal **Deployment + Service** that matches the hardened image contract (probes, graceful shutdown, non-root) lives in **`examples/kubernetes/`** in the repository. Copy and adjust image name, resources, and `ConfigMap` / `Secret` wiring for your cluster.
 
 ## Checklist
 
@@ -104,6 +123,7 @@ The parent process sets variables for the Streamlit child and for gateway code t
 - [ ] Optional: set **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** (and Kubernetes `terminationGracePeriodSeconds` / `preStop`) per {ref}`kubernetes-graceful-shutdown` above.
 - [ ] Secrets in env or a secrets manager — not baked into images; `.env` excluded from Docker context (default `.dockerignore` from `fluxlit build` already ignores `.env`). See {doc}`secrets`.
 - [ ] **`FLUXLIT_FORWARDED_ALLOW_IPS`** tightened when **`FLUXLIT_TRUST_PROXY`** is on (not `*` in untrusted networks). See {doc}`production-tls`.
+- [ ] For Kubernetes: start from **`examples/kubernetes/`** and align probes and `terminationGracePeriodSeconds` with {ref}`kubernetes-graceful-shutdown`.
 
 ## Related
 
@@ -112,3 +132,4 @@ The parent process sets variables for the Streamlit child and for gateway code t
 - {doc}`secrets` — secret stores, logs, JWT/OIDC rotation.
 - {doc}`testing` — proxy smoke and E2E for regression coverage.
 - {doc}`troubleshooting` — common deployment and routing failures.
+- {doc}`runbooks` — `readyz` 503, blank Streamlit, WebSocket and auth incidents.

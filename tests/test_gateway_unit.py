@@ -713,3 +713,20 @@ def test_build_gateway_502_when_upstream_resolver_returns_empty() -> None:
     r = client.get("/streamlit-only-path")
     assert r.status_code == 502
     assert "Streamlit upstream" in r.text
+
+
+def test_build_gateway_prometheus_metrics_endpoint() -> None:
+    pytest.importorskip("prometheus_client")
+    from fluxlit.config import FluxlitSettings
+
+    settings = FluxlitSettings(enable_gateway_prometheus_metrics=True)
+    gw = build_gateway(
+        FastAPI(),
+        "http://127.0.0.1:9",
+        api_prefix="/api",
+        proxy_settings=settings,
+    )
+    client = TestClient(gw)
+    r = client.get("/__fluxlit/metrics")
+    assert r.status_code == 200
+    assert "fluxlit_gateway_requests_total" in r.text

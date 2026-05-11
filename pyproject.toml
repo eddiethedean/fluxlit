@@ -53,6 +53,10 @@ dev = [
   # JWT/OIDC tests and type-checking import PyJWT
   "PyJWT[crypto]>=2.8.0",
   "cryptography>=42.0.0",
+  "prometheus-client>=0.20",
+]
+metrics = [
+  "prometheus-client>=0.20",
 ]
 e2e = [
   "pytest-playwright>=0.5",

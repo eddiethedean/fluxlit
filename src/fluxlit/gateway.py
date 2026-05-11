@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+import time
 import urllib.parse
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
@@ -39,6 +41,57 @@ from fluxlit.logging_context import (
 )
 
 _gateway_log = logging.getLogger("fluxlit.gateway")
+
+_gateway_prom_uninitialized = object()
+_gateway_prom_cached: Any = _gateway_prom_uninitialized
+_gateway_prom_lock = threading.Lock()
+
+
+def _get_gateway_prom_metrics() -> tuple[Any, Any] | None:
+    """Lazily construct Prometheus metrics (once per process) or None if unavailable."""
+    global _gateway_prom_cached
+    with _gateway_prom_lock:
+        if _gateway_prom_cached is not _gateway_prom_uninitialized:
+            if _gateway_prom_cached is False:
+                return None
+            return cast("tuple[Any, Any]", _gateway_prom_cached)
+        try:
+            from prometheus_client import Counter, Histogram
+
+            _gateway_prom_cached = (
+                Counter(
+                    "fluxlit_gateway_requests_total",
+                    "Gateway requests observed at dispatch",
+                    labelnames=("dispatch", "method_kind"),
+                ),
+                Histogram(
+                    "fluxlit_gateway_request_duration_seconds",
+                    "Wall time for one gateway request (dispatch wall clock)",
+                    labelnames=("dispatch",),
+                    buckets=(
+                        0.001,
+                        0.005,
+                        0.01,
+                        0.025,
+                        0.05,
+                        0.1,
+                        0.25,
+                        0.5,
+                        1.0,
+                        2.5,
+                        5.0,
+                        10.0,
+                    ),
+                ),
+            )
+        except ImportError:
+            _gateway_log.warning(
+                "enable_gateway_prometheus_metrics is set but prometheus_client is not "
+                "installed; install fluxlit[metrics] or prometheus-client"
+            )
+            _gateway_prom_cached = False
+            return None
+        return cast("tuple[Any, Any]", _gateway_prom_cached)
 
 
 @dataclass(frozen=True)
@@ -208,18 +261,59 @@ def build_gateway(
     prefix = api_prefix.rstrip("/") or "/api"
     mount = normalize_root_mount(root_mount)
 
+    prom_metrics: tuple[Any, Any] | None = None
+    prom_path = "/__fluxlit/metrics"
+    if proxy_settings and proxy_settings.enable_gateway_prometheus_metrics:
+        prom_metrics = _get_gateway_prom_metrics()
+        raw_mp = (proxy_settings.gateway_prometheus_metrics_path or "/__fluxlit/metrics").strip()
+        prom_path = raw_mp if raw_mp.startswith("/") else f"/{raw_mp}"
+        if prom_path == prefix or prom_path.startswith(f"{prefix}/"):
+            _gateway_log.warning(
+                "gateway_prometheus_metrics_path must not start with api_mount_path %r; "
+                "disabling Prometheus metrics for this gateway build",
+                prefix,
+            )
+            prom_metrics = None
+
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
             await api_app(scope, receive, send)
             return
         rid = _request_id_from_scope(scope)
         token = set_request_id(rid)
+        t0 = time.perf_counter()
+        dispatch = "unknown"
+        skip_prom_observe = False
         try:
             method_or_type = scope.get("method") or scope["type"]
             path_in = scope.get("path") or ""
             path, streamlit_path = split_gateway_paths(path_in, mount)
             is_api = path == prefix or path.startswith(f"{prefix}/")
             dispatch = "api" if is_api else "streamlit"
+            if (
+                prom_metrics
+                and scope["type"] == "http"
+                and str(scope.get("method", "GET")).upper() == "GET"
+                and path == prom_path
+            ):
+                from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+                skip_prom_observe = True
+                body = generate_latest()
+                ct = CONTENT_TYPE_LATEST
+                if isinstance(ct, str):
+                    ct_b = ct.encode("ascii")
+                else:
+                    ct_b = ct
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [(b"content-type", ct_b)],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
             log_extra = {
                 "fluxlit_dispatch": dispatch,
                 "http_method_or_type": method_or_type,
@@ -231,6 +325,13 @@ def build_gateway(
                 _gateway_log.info(log_msg, *log_args, extra=log_extra)
             else:
                 _gateway_log.debug(log_msg, *log_args, extra=log_extra)
+            if prom_metrics:
+                mk = (
+                    "WEBSOCKET"
+                    if scope["type"] == "websocket"
+                    else str(scope.get("method", "GET")).upper()
+                )
+                prom_metrics[0].labels(dispatch=dispatch, method_kind=mk).inc()
             if is_api:
                 inner = dict(scope)
                 inner["path"] = path
@@ -286,6 +387,15 @@ def build_gateway(
                 return
             await _not_found(send)
         finally:
+            if (
+                prom_metrics
+                and not skip_prom_observe
+                and scope.get("type") in {"http", "websocket"}
+            ):
+                try:
+                    prom_metrics[1].labels(dispatch=dispatch).observe(time.perf_counter() - t0)
+                except Exception:  # noqa: S110
+                    pass
             reset_request_id(token)
 
     return app

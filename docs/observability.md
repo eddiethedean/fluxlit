@@ -105,6 +105,17 @@ readinessProbe:
 
 Example **Prometheus** alert sketch (adjust labels and `job` to your setup): fire when `rate(http_requests_total{path="/api/readyz",status="503"}[5m])` is above a small threshold while healthz success stays high — indicating Streamlit or upstream misconfiguration rather than total process death.
 
+## Gateway Prometheus metrics (RED)
+
+When **`FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1`** and **`prometheus-client`** is installed (`pip install "fluxlit[metrics]"` or include in your image), the gateway exposes **`GET`** on **`FLUXLIT_GATEWAY_PROMETHEUS_METRICS_PATH`** (default **`/__fluxlit/metrics`**) in Prometheus text format.
+
+- **`fluxlit_gateway_requests_total`** — labels **`dispatch`** (`api` vs `streamlit`) and **`method_kind`** (HTTP method or `WEBSOCKET`).
+- **`fluxlit_gateway_request_duration_seconds`** — histogram by **`dispatch`** (wall time for one gateway request; scrape path responses are excluded).
+
+The path must **not** be under your **`api_mount_path`** or it will shadow API routes (the runtime logs a warning and disables metrics). Secure the endpoint at your ingress (allow only Prometheus scrapers) or keep metrics disabled in untrusted networks.
+
+**USE-style saturation** (CPU, memory, file descriptors) is not emitted by FluxLit core; scrape the node or cAdvisor / kube-state-metrics alongside these application counters.
+
 ## Python `logging` filters
 
 Use a {class}`logging.Filter` to drop noisy loggers or scrub fields before logs reach stdout or a log aggregator (in addition to {mod}`fluxlit.logging_redact` for header maps).
@@ -118,6 +129,15 @@ FluxLit does not bundle OpenTelemetry. A typical approach:
 3. **Streamlit subprocess:** runs in a **separate process**; treat it as its own service for tracing unless you add custom propagation via env vars.
 
 Because the browser hits a **single port**, ingress spans should label whether work happened on the API (`/api/...`) or the Streamlit proxy path.
+
+### Trace context (W3C `traceparent`)
+
+The gateway already forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets. For **OpenTelemetry** or other tracers, you can additionally propagate **`traceparent`** / **`tracestate`** from your edge if your proxy injects them; ensure your Streamlit and FastAPI instrumentation agree on the same trace ID format. There is **no built-in** OTel span around the gateway today — add spans in your app or use auto-instrumentation on `app.api` as in the bullets above.
+
+## Correlation limits (gateway vs Streamlit)
+
+- **Gateway-centered IDs:** `X-Request-ID` is set in the **gateway** ASGI process and forwarded to the Streamlit upstream. Gateway access logs and nginx can align on that header.
+- **Streamlit subprocess:** Streamlit page code runs in the **child process**. The parent’s {class}`contextvars.ContextVar` used for `get_request_id()` in the gateway is **not** automatically visible inside arbitrary Streamlit callbacks. For server-side `httpx` calls from Streamlit to `/api`, use {class}`~fluxlit.client.ApiClient` with **`propagate_request_id=True`** **only when** your code has set a correlation id in that process (or pass headers explicitly). Do not assume the browser’s request id appears in Streamlit without your own propagation.
 
 ## Readiness
 

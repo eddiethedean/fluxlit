@@ -1,0 +1,100 @@
+# Reference Kubernetes Deployment + Service for FluxLit (Version 0.5 roadmap).
+# Replace YOUR_REGISTRY/fluxlit-app:0.5.0 with your built image.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluxlit-app
+  labels:
+    app: fluxlit-app
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+  selector:
+    app: fluxlit-app
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fluxlit-app
+  labels:
+    app: fluxlit-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fluxlit-app
+  template:
+    metadata:
+      labels:
+        app: fluxlit-app
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: fluxlit
+          # Replace with your image (see examples/docker_compose or docker/proxy-deployment).
+          image: YOUR_REGISTRY/fluxlit-app:0.5.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: FLUXLIT_GATEWAY_HOST
+              value: "0.0.0.0"
+            - name: FLUXLIT_GATEWAY_PORT
+              value: "8000"
+            # Align with terminationGracePeriodSeconds (see docs/deployment.md).
+            # - name: FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S
+            #   value: "25"
+          args:
+            - fluxlit
+            - run
+            - app:app
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --no-pidfile
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/readyz
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 2
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              memory: "2Gi"
+          # Optional: enforce read-only root after validating writable paths for Streamlit.
+          # securityContext:
+          #   readOnlyRootFilesystem: true
+          #   allowPrivilegeEscalation: false
+          # volumeMounts:
+          #   - name: tmp
+          #     mountPath: /tmp
+          #   - name: streamlit-cache
+          #     mountPath: /home/appuser/.streamlit
+      # volumes:
+      #   - name: tmp
+      #     emptyDir: {}
+      #   - name: streamlit-cache
+      #     emptyDir: {}

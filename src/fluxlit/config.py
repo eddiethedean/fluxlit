@@ -95,6 +95,21 @@ class FluxlitSettings(BaseSettings):
             "(fluxlit_dispatch, path); default is DEBUG only."
         ),
     )
+    enable_gateway_prometheus_metrics: bool = Field(
+        default=False,
+        description=(
+            "If True, expose Prometheus metrics on the gateway ASGI app and increment "
+            "RED-style counters/histograms. Requires ``prometheus-client`` "
+            "(``pip install 'fluxlit[metrics]'`` or add to your image)."
+        ),
+    )
+    gateway_prometheus_metrics_path: str = Field(
+        default="/__fluxlit/metrics",
+        description=(
+            "HTTP GET path (after ``root_path`` strip) for Prometheus text exposition. "
+            "Must not start with ``api_mount_path`` or you will shadow API routes."
+        ),
+    )
     gateway_upstream_connect_timeout_s: float = Field(
         default=30.0,
         ge=0.0,

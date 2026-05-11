@@ -61,6 +61,30 @@ docker compose -f docker/proxy-deployment/docker-compose.yml up --build
 
 See [docker/proxy-deployment/README.md](../docker/proxy-deployment/README.md) for full-path, TLS, and `run-all-proxy-smokes.sh`.
 
+## OpenAPI contract
+
+`tests/test_openapi_contract.py` compares the **default** `FluxLit` OpenAPI document (empty `paths`, fixed `servers`) to **`tests/fixtures/openapi_contract_minimal.json`**. If you add a route to the default FastAPI surface without opting out of the schema, CI fails until you update the fixture intentionally.
+
+## Chaos and failure injection
+
+- **`tests/test_asgi_unified.py`** — lifespan, concurrent and **serial burst** `healthz`, streaming request bodies, **sidecar exit** → 503, chunked POST to API.
+- **`tests/test_gateway_proxy_robust.py`** — upstream **connect** / **read timeout** → **502**, body limits, WebSocket edge kwargs.
+
+## Soak / load (local)
+
+With **`fluxlit run`** (or any HTTP server) listening on port 8000:
+
+```bash
+chmod +x scripts/soak_http.sh
+COUNT=500 BASE_URL=http://127.0.0.1:8000 ./scripts/soak_http.sh
+```
+
+Adjust `PATH_SUFFIX` (default `/api/healthz`) or `COUNT` for longer runs. Watch gateway CPU and logs; pair with {doc}`observability` if you enable access logs.
+
+## Upgrade matrix (latest deps)
+
+The **[`.github/workflows/upgrade-smoke.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/upgrade-smoke.yml)** workflow runs **weekly** (Mondays) and **`workflow_dispatch`**: it installs **latest** `streamlit`, `fastapi`, and `starlette` from PyPI, then runs the fast pytest suite. It uses **`continue-on-error: true`** so failures surface as signals for maintainers without blocking merges. Supported version ranges for releases are documented in {doc}`support-matrix`.
+
 ## E2E
 
 Default pytest config ignores `tests/e2e`; **pass the directory explicitly** so those tests are collected (see [`tests/conftest.py`](https://github.com/eddiethedean/fluxlit/blob/main/tests/conftest.py) for optional `pytest-playwright` registration).
@@ -85,7 +109,8 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 
 | Area | Examples |
 |------|----------|
-| Unified ASGI | `tests/test_asgi_unified.py` — lifespan + concurrent HTTP, httpx + `TestClient`, streaming bodies, sidecar failure |
+| Unified ASGI | `tests/test_asgi_unified.py` — lifespan + concurrent/serial HTTP, httpx + `TestClient`, streaming bodies, sidecar failure |
+| OpenAPI contract | `tests/test_openapi_contract.py` — default app schema vs fixture |
 | Readiness | `tests/test_health_probe.py`, `tests/test_gateway_readyz.py`, `tests/test_app.py` (`readyz`) |
 | Gateway logging | `tests/test_gateway_access_log.py` |
 | Gateway correlation + `httpx` wiring | `tests/test_gateway_correlation_integration.py` (threaded upstream, `build_gateway` + `proxy_settings`) |

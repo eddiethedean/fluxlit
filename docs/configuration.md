@@ -60,6 +60,8 @@ log_level = "info"
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side {class}`~fluxlit.client.ApiClient` (should include `/api`). |
 | `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log API requests (method, path, status) at INFO with request id context. |
 | `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG` | If true, log each **gateway** request at INFO with structured `extra` (`fluxlit_dispatch`, path, method/type); default is DEBUG-only. See {doc}`observability`. |
+| `FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS` | If true, expose Prometheus text metrics on the gateway (requires `prometheus-client`). See {doc}`observability`. |
+| `FLUXLIT_GATEWAY_PROMETHEUS_METRICS_PATH` | HTTP GET path for metrics (default **`/__fluxlit/metrics`**); must not start with `api_mount_path`. |
 | `FLUXLIT_GATEWAY_UPSTREAM_CONNECT_TIMEOUT_S` | `httpx` connect timeout (seconds) for gateway → Streamlit HTTP proxy (default **30**). |
 | `FLUXLIT_GATEWAY_UPSTREAM_READ_TIMEOUT_S` | `httpx` read timeout (seconds) for that proxy (default **120**). |
 | `FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES` | Max incoming request body bytes proxied to Streamlit; **0** = unlimited. When exceeded the gateway responds with **413**. |
