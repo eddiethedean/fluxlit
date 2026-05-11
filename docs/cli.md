@@ -65,6 +65,14 @@ On **Windows**, **`--force` runs ``taskkill /T /F``** (POSIX uses ``SIGKILL``). 
 
 - Exits **`1`** if any check is **FAIL**, unless **`--warnings-only`** is set (then always **0**).
 - **WARN** does not fail the run; fix when practical (Streamlit version, proxy trust on subpaths, etc.).
+- Use **`--json`** in CI or deployment scripts for a stable machine-readable shape:
+
+```bash
+fluxlit doctor app:app --json
+```
+
+The JSON object contains `status`, `target`, `warnings_only`, and a `checks` array
+with `name`, `status`, and `detail` for each diagnostic.
 
 ## Reload (`dev` only)
 

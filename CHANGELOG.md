@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **0.6 development:** canonical smoke app shared by E2E/proxy/load paths; expanded `fluxlit doctor` diagnostics; stable gateway log and Prometheus metric contracts; optional no-dependency tracing hooks; URL-session external-store recipe and platform docs; scaffold profiles; local smoke/load/chaos scripts.
+- **0.6 development:** canonical smoke app shared by E2E/proxy/load paths; expanded `fluxlit doctor` diagnostics including `--json`; stable gateway log and Prometheus metric contracts; optional no-dependency tracing hooks plus an OpenTelemetry example; runnable URL-session external-store examples and platform docs; scaffold profiles; richer local smoke/load/chaos scripts; broader Docker proxy smoke matrix.
 
 ## 0.5.0 - 2026-05-11
 

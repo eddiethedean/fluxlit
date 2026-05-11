@@ -13,6 +13,8 @@ services:
       context: ../..
       dockerfile: docker/proxy-deployment/Dockerfile
     restart: unless-stopped
+    environment:
+      FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES: "64"
     healthcheck:
       test:
         [

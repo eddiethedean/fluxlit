@@ -6,6 +6,7 @@ The ``fluxlit`` setuptools entrypoint calls :func:`main`. Commands resolve defau
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import socket
@@ -561,6 +562,28 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
     return rows
 
 
+def _doctor_payload(
+    rows: list[tuple[str, CheckStatus, str]],
+    *,
+    target: str,
+    warnings_only: bool,
+) -> dict[str, object]:
+    has_fail = any(status == "FAIL" for _, status, _ in rows)
+    has_warn = any(status == "WARN" for _, status, _ in rows)
+    status = (
+        "fail" if has_fail and not warnings_only else "warn" if has_fail or has_warn else "pass"
+    )
+    return {
+        "status": status,
+        "target": target,
+        "warnings_only": warnings_only,
+        "checks": [
+            {"name": name, "status": check_status, "detail": detail}
+            for name, check_status, detail in rows
+        ],
+    }
+
+
 @app.command()
 def doctor(
     target: str | None = typer.Argument(
@@ -572,6 +595,11 @@ def doctor(
         "--warnings-only",
         help="Always exit 0 (still print FAIL lines).",
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON instead of human-readable text.",
+    ),
 ) -> None:
     """Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).
 
@@ -580,14 +608,17 @@ def doctor(
     pc = load_project_config()
     resolved_target = resolve_target(target, pc)
 
-    typer.echo("FluxLit doctor")
-    typer.echo("")
-
     rows = _doctor_checks(resolved_target)
-    for name, status, message in rows:
-        typer.echo(f"{status:4}  {name}: {message}")
-
-    typer.echo("")
+    if json_output:
+        typer.echo(
+            json.dumps(_doctor_payload(rows, target=resolved_target, warnings_only=warnings_only))
+        )
+    else:
+        typer.echo("FluxLit doctor")
+        typer.echo("")
+        for name, status, message in rows:
+            typer.echo(f"{status:4}  {name}: {message}")
+        typer.echo("")
     if not warnings_only and any(s == "FAIL" for _, s, _ in rows):
         raise typer.Exit(code=1)
 

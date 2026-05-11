@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -28,6 +29,61 @@ def test_doctor_prints_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert "PASS" in res.stdout
     assert "import_target:" in res.stdout
     assert "demo_cli_app:app" in res.stdout
+
+
+def test_doctor_json_outputs_structured_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "demo_cli_json_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='CLI JSON App', settings=FluxlitSettings(gateway_port=59211))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "demo_cli_json_app:app", "--json"])
+    assert res.exit_code == 0
+    payload = json.loads(res.stdout)
+    assert payload["status"] in {"pass", "warn"}
+    assert payload["target"] == "demo_cli_json_app:app"
+    assert {
+        "name": "import_target",
+        "status": "PASS",
+        "detail": "demo_cli_json_app:app",
+    } in payload["checks"]
+
+
+def test_doctor_json_failure_reports_fail_status(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "broken_json_app.py"
+    module_path.write_text("# not a FluxLit instance\napp = 123\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "broken_json_app:app", "--json"])
+    assert res.exit_code == 1
+    payload = json.loads(res.stdout)
+    assert payload["status"] == "fail"
+    assert any(c["name"] == "import_target" and c["status"] == "FAIL" for c in payload["checks"])
+
+
+def test_doctor_json_warnings_only_exits_zero(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "broken_json_warn_app.py"
+    module_path.write_text("# not a FluxLit instance\napp = 123\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "broken_json_warn_app:app", "--json", "--warnings-only"])
+    assert res.exit_code == 0
+    payload = json.loads(res.stdout)
+    assert payload["status"] == "warn"
+    assert payload["warnings_only"] is True
 
 
 def test_doctor_warns_when_internal_api_path_mismatches_mount(

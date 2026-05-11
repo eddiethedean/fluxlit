@@ -151,27 +151,52 @@ only after you have a cardinality budget.
 
 Use a {class}`logging.Filter` to drop noisy loggers or scrub fields before logs reach stdout or a log aggregator (in addition to {mod}`fluxlit.logging.redact` for header maps).
 
-## OpenTelemetry (recipe)
+## OpenTelemetry tracing hook recipe
 
-FluxLit does not bundle OpenTelemetry. A typical approach:
+FluxLit does not bundle OpenTelemetry. Keep OTel dependencies in your app image
+and bridge the no-dependency FluxLit hook into your tracer. A runnable example is
+available in `examples/otel_tracing/`:
 
-1. **FastAPI:** use `opentelemetry-instrumentation-fastapi` and mount the tracer on `app.api` (the inner FastAPI app on your {class}`~fluxlit.app.FluxLit` instance).
-2. **Outbound HTTP:** instrument `httpx` if you propagate traces from the API to upstreams.
-3. **Streamlit subprocess:** runs in a **separate process**; treat it as its own service for tracing unless you add custom propagation via env vars.
+```bash
+python -m pip install -e .
+python -m pip install -r examples/otel_tracing/requirements.txt
+fluxlit run examples.otel_tracing.app:app --no-pidfile
+```
 
-Because the browser hits a **single port**, ingress spans should label whether work happened on the API (`/api/...`) or the Streamlit proxy path.
+Minimal hook shape:
 
-For lightweight custom integrations, FluxLit exposes
-{func}`fluxlit.set_trace_hook`, {func}`fluxlit.reset_trace_hook`, and
-{func}`fluxlit.trace_span`. A hook receives a span name such as
-`fluxlit.gateway.request` and low-cardinality attributes including
-`fluxlit.dispatch`, `http.method_or_type`, `url.path`, and `request_id`. Use the
-hook to bridge into OpenTelemetry or another tracer without adding an OTel
-dependency to FluxLit core.
+```python
+from contextlib import contextmanager
+
+from fluxlit import set_trace_hook
+
+
+@contextmanager
+def otel_trace_hook(name, attributes):
+    with tracer.start_as_current_span(name) as span:
+        for key, value in attributes.items():
+            if value is not None:
+                span.set_attribute(key, value)
+        yield
+
+
+set_trace_hook(otel_trace_hook)
+```
+
+Gateway dispatch emits spans named `fluxlit.gateway.request` with low-cardinality
+attributes including `fluxlit.dispatch`, `http.method_or_type`, `url.path`, and
+`request_id`. Because the browser hits a **single port**, ingress spans should
+label whether work happened on the API (`/api/...`) or the Streamlit proxy path.
+
+For a fuller deployment, also consider:
+
+1. **FastAPI:** use `opentelemetry-instrumentation-fastapi` on `app.api`.
+2. **Outbound HTTP:** instrument `httpx` if you propagate traces to upstreams.
+3. **Streamlit subprocess:** treat it as its own service unless you add custom propagation.
 
 ### Trace context (W3C `traceparent`)
 
-The gateway already forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets. For **OpenTelemetry** or other tracers, you can additionally propagate **`traceparent`** / **`tracestate`** from your edge if your proxy injects them; ensure your Streamlit and FastAPI instrumentation agree on the same trace ID format. There is **no built-in** OTel span around the gateway today — add spans in your app or use auto-instrumentation on `app.api` as in the bullets above.
+The gateway already forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets. For **OpenTelemetry** or other tracers, you can additionally propagate **`traceparent`** / **`tracestate`** from your edge if your proxy injects them; ensure your Streamlit and FastAPI instrumentation agree on the same trace ID format.
 
 ## Correlation limits (gateway vs Streamlit)
 

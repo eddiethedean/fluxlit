@@ -22,7 +22,9 @@ _curl() {
 }
 
 api_url="${BASE}${PREFIX}/api/healthz"
+ready_url="${BASE}${PREFIX}/api/readyz"
 smoke_url="${BASE}${PREFIX}/api/smoke"
+request_id_url="${BASE}${PREFIX}/api/request-id"
 root_url="${BASE}${PREFIX}/"
 
 wait_curl() {
@@ -49,11 +51,24 @@ echo "$api_out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
   || { echo "FAIL: unexpected health JSON: $api_out"; exit 1; }
 echo "API OK"
 
+echo "Checking readiness: ${ready_url}"
+ready_out="$(_curl -sfS --max-time 30 "$ready_url")"
+echo "$ready_out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ready"' \
+  || { echo "FAIL: unexpected readiness JSON: $ready_out"; exit 1; }
+echo "Readiness OK"
+
 echo "Checking smoke API: ${smoke_url}"
 smoke_out="$(_curl -sfS --max-time 30 "$smoke_url")"
 echo "$smoke_out" | grep -q '"marker"[[:space:]]*:[[:space:]]*"fluxlit_smoke_ok"' \
   || { echo "FAIL: unexpected smoke JSON: $smoke_out"; exit 1; }
 echo "Smoke API OK"
+
+echo "Checking request id header through proxy: ${request_id_url}"
+rid="proxy-smoke-$RANDOM"
+rid_out="$(_curl -sfS --max-time 30 -H "X-Request-ID: ${rid}" "$request_id_url")"
+echo "$rid_out" | grep -q "\"request_id\"[[:space:]]*:[[:space:]]*\"${rid}\"" \
+  || { echo "FAIL: request id not preserved: $rid_out"; exit 1; }
+echo "Request ID OK"
 
 echo "Waiting for Streamlit shell: ${root_url}"
 wait_curl "$root_url" "gateway root"
@@ -63,6 +78,24 @@ html="$(_curl -sfS --max-time 30 "$root_url")"
 echo "$html" | grep -qiE 'streamlit|_stcore|stApp' \
   || { echo "FAIL: page does not look like Streamlit"; echo "$html" | head -c 500; exit 1; }
 echo "Frontend shell OK"
+
+echo "Checking oversized proxied body returns 413"
+oversized_status="$(python3 - <<PY
+import urllib.error
+import urllib.request
+
+url = "${root_url}oversized"
+req = urllib.request.Request(url, data=b"x" * 256, method="POST")
+try:
+    urllib.request.urlopen(req, timeout=30)
+    print("200")
+except urllib.error.HTTPError as exc:
+    print(exc.code)
+PY
+)"
+[[ "$oversized_status" == "413" ]] \
+  || { echo "FAIL: expected 413 for oversized proxy body, got ${oversized_status}"; exit 1; }
+echo "Oversized body OK"
 
 if [[ -z "${SKIP_WS:-}" ]]; then
   if ! python3 -c "import websockets" 2>/dev/null; then

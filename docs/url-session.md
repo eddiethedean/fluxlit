@@ -44,11 +44,20 @@ Treat the query string as part of your **public URL contract**. Any link or `st.
 - **TTL:** {class}`~fluxlit.url_session.InMemorySessionStore` supports TTL; cap size with `max_entries`.
 - **Logging:** do not log raw tokens at INFO. The gateway structured log field `query` redacts `fluxlit_sid` and your configured `url_session_query_param`.
 
-## External store recipe
+## External store recipes
 
 For multiple replicas, implement {class}`~fluxlit.url_session.SessionStore` with a
 shared backend. Keep the implementation in your app or infrastructure package so
 FluxLit core does not need to depend on Redis, SQL drivers, or cloud SDKs.
+
+Runnable examples live in `examples/session_stores/`:
+
+```bash
+fluxlit run examples.session_stores.app:app --no-pidfile
+```
+
+The demo uses the stdlib SQLite store by default. Set
+`FLUXLIT_SESSION_SQLITE_PATH` to choose the database file.
 
 ```python
 import json

@@ -101,7 +101,10 @@ chmod +x scripts/soak_http.sh
 COUNT=500 BASE_URL=http://127.0.0.1:8000 PATH_SUFFIX=/api/smoke ./scripts/soak_http.sh
 ```
 
-Adjust `PATH_SUFFIX` (default `/api/healthz`) or `COUNT` for longer runs. Watch gateway CPU and logs; pair with {doc}`observability` if you enable access logs.
+Set `OUTPUT_FORMAT=json` or `OUTPUT_FORMAT=markdown` for a machine-readable or
+report-friendly summary with approximate p50/p95/p99 latency in milliseconds.
+Adjust `PATH_SUFFIX` (default `/api/healthz`) or `COUNT` for longer runs. Watch
+gateway CPU and logs; pair with {doc}`observability` if you enable access logs.
 
 ## Chaos checks (local)
 
@@ -110,6 +113,15 @@ process, and verifies that the gateway exits instead of serving a broken UI:
 
 ```bash
 ./scripts/chaos_streamlit_kill.sh
+```
+
+Additional local/manual checks:
+
+```bash
+./scripts/chaos_slow_upstream.sh
+./scripts/chaos_oversized_body.sh
+./scripts/chaos_dropped_websocket.sh
+./scripts/chaos_graceful_shutdown.sh
 ```
 
 Keep chaos scripts local/manual unless they are explicitly marked slow in CI; they

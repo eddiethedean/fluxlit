@@ -106,27 +106,19 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install websockets
 
-      - name: Strip-prefix proxy
+      - name: Proxy matrix
         working-directory: docker/proxy-deployment
         run: |
-          docker compose -f docker-compose.yml up -d --build
-          ./smoke-test.sh
-          docker compose -f docker-compose.yml down -v
+          ./run-all-proxy-smokes.sh
 
-      - name: Full-path proxy
+      - name: Cleanup proxy smoke containers
+        if: always()
         working-directory: docker/proxy-deployment
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.fullpath.yml up -d --build
-          BASE_URL=http://127.0.0.1:8081 ./smoke-test.sh
-          docker compose -f docker-compose.yml -f docker-compose.fullpath.yml down -v
-
-      - name: HTTPS proxy
-        working-directory: docker/proxy-deployment
-        run: |
-          ./generate-test-certs.sh
-          docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
-          CURL_INSECURE=1 BASE_URL=https://127.0.0.1:8444 ./smoke-test.sh
-          docker compose -f docker-compose.yml -f docker-compose.https.yml down -v
+          docker compose -f docker-compose.yml -f docker-compose.root.yml down -v || true
+          docker compose -f docker-compose.yml down -v || true
+          docker compose -f docker-compose.yml -f docker-compose.fullpath.yml down -v || true
+          docker compose -f docker-compose.yml -f docker-compose.https.yml down -v || true
 
   e2e:
     runs-on: ubuntu-latest

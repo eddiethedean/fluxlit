@@ -131,6 +131,7 @@ A minimal **Deployment + Service** that matches the hardened image contract (pro
 ## Checklist
 
 - [ ] `fluxlit doctor` passes (or only acceptable WARNs).
+- [ ] Optional CI gate: `fluxlit doctor app:app --json` is parsed and checked for unexpected `FAIL` diagnostics.
 - [ ] `FLUXLIT_GATEWAY_HOST` / bind address matches container/platform (often `0.0.0.0`).
 - [ ] Proxy: `FLUXLIT_TRUST_PROXY`, `FLUXLIT_ROOT_PATH`, and `FLUXLIT_PUBLIC_BASE_URL` (for OAuth) set correctly.
 - [ ] Readiness probe uses `/api/readyz` when Streamlit must be up before receiving traffic.

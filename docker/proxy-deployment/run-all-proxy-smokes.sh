@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run strip-prefix, full-path, and HTTPS proxy smoke tests (sequential, same host).
+# Run root, strip-prefix, full-path, and HTTPS proxy smoke tests (sequential).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
@@ -10,11 +10,17 @@ if ! python3 -c "import websockets" 2>/dev/null; then
 fi
 
 cleanup() {
+  docker compose -f docker-compose.yml -f docker-compose.root.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml -f docker-compose.fullpath.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml -f docker-compose.https.yml down -v 2>/dev/null || true
 }
 trap cleanup EXIT
+
+echo "=== Root proxy (8082) ==="
+docker compose -f docker-compose.yml -f docker-compose.root.yml up -d --build
+PUBLIC_PREFIX="" BASE_URL=http://127.0.0.1:8082 ./smoke-test.sh
+docker compose -f docker-compose.yml -f docker-compose.root.yml down -v
 
 echo "=== Strip-prefix proxy (8080) ==="
 docker compose -f docker-compose.yml up -d --build
