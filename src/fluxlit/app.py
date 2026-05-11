@@ -2,49 +2,19 @@
 
 from __future__ import annotations
 
-import importlib
-import logging
-import pkgutil
-from collections.abc import Callable, Mapping, Sequence
-from types import FunctionType
-from typing import Any, cast
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from fastapi import APIRouter, FastAPI
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import RequestResponseEndpoint
-from starlette.middleware.cors import CORSMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from fluxlit.application.api_bootstrap import wire_fluxlit_api
+from fluxlit.application.page_registry import discover_streamlit_pages, register_streamlit_page
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
-from fluxlit.health import probe_streamlit_ready
 from fluxlit.json_types import JsonValue
 from fluxlit.jwt_auth import JWTBearer
-from fluxlit.logging_context import (
-    REQUEST_ID_HEADER,
-    new_request_id,
-    reset_request_id,
-    set_request_id,
-)
 from fluxlit.oidc import GenericOIDCClient, OIDCBFFConfig, register_oidc_bff_routes
-from fluxlit.security_middleware import SecurityHeadersMiddleware
-
-_api_log = logging.getLogger("fluxlit.api")
-
-# Passed explicitly to CORSMiddleware; duplicates in **kwargs raise TypeError at runtime.
-_CORS_MIDDLEWARE_EXCLUSIVE_KWARGS = frozenset(
-    {"allow_origins", "allow_credentials", "allow_methods", "allow_headers"}
-)
-
-
-def _cors_middleware_extras(
-    cors_middleware_kwargs: Mapping[str, JsonValue],
-) -> dict[str, JsonValue]:
-    """Drop keys FluxLit always sets on ``CORSMiddleware`` so ``**extras`` never duplicates."""
-    skip = _CORS_MIDDLEWARE_EXCLUSIVE_KWARGS
-    return {k: v for k, v in cors_middleware_kwargs.items() if k not in skip}
 
 
 class FluxLit:
@@ -120,55 +90,7 @@ class FluxLit:
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
         self._oidc_bff_attached: bool = False
-
-        if self.settings.enable_security_headers:
-            self.api.add_middleware(SecurityHeadersMiddleware)
-        if self.settings.cors_allow_origins:
-            self.api.add_middleware(
-                CORSMiddleware,
-                allow_origins=list(self.settings.cors_allow_origins),
-                allow_credentials=self.settings.cors_allow_credentials,
-                allow_methods=["*"],
-                allow_headers=["*"],
-                **cast(
-                    dict[str, Any],
-                    _cors_middleware_extras(self.settings.cors_middleware_kwargs),
-                ),
-            )
-
-        if self.settings.enable_request_logging:
-
-            @self.api.middleware("http")
-            async def _fluxlit_request_log(
-                request: Request, call_next: RequestResponseEndpoint
-            ) -> Response:
-                rid = request.headers.get(REQUEST_ID_HEADER) or new_request_id()
-                token = set_request_id(rid)
-                try:
-                    response = await call_next(request)
-                    _api_log.info(
-                        "%s %s -> %s",
-                        request.method,
-                        request.url.path,
-                        response.status_code,
-                    )
-                    return response
-                finally:
-                    reset_request_id(token)
-
-        @self.api.get("/healthz", include_in_schema=False)
-        def _healthz() -> dict[str, str]:
-            return {"status": "ok"}
-
-        @self.api.get("/readyz", include_in_schema=False, response_model=None)
-        async def _readyz() -> JSONResponse:
-            ok, detail = await probe_streamlit_ready()
-            if ok:
-                return JSONResponse(content={"status": "ready", "streamlit": detail})
-            return JSONResponse(
-                status_code=503,
-                content={"status": "not_ready", "detail": detail},
-            )
+        wire_fluxlit_api(self.api, self.settings)
 
     def __setattr__(self, name: str, value: object) -> None:
         if name == "api":
@@ -221,32 +143,7 @@ class FluxLit:
             If a page module's ``register(app)`` raises after earlier modules ran,
             pages from those modules remain registered (best-effort; no rollback).
         """
-        parent = importlib.import_module(package)
-        paths = getattr(parent, "__path__", None)
-        if paths is None:
-            msg = f"{package!r} must be a package to discover pages"
-            raise TypeError(msg)
-        subpkg = f"{package}.{directory}"
-        try:
-            importlib.import_module(subpkg)
-        except ImportError as e:
-            msg = f"Cannot import page package {subpkg!r}: {e}"
-            raise ImportError(msg) from e
-
-        pkg = importlib.import_module(subpkg)
-        for modinfo in sorted(
-            pkgutil.iter_modules(pkg.__path__, f"{subpkg}."),
-            key=lambda m: m.name,
-        ):
-            if modinfo.ispkg or modinfo.name.rpartition(".")[-1].startswith("_"):
-                continue
-            mod = importlib.import_module(modinfo.name)
-            register = getattr(mod, "register", None)
-            if register is None:
-                continue
-            register(self)
-
-        self._pages.sort(key=lambda t: (t[0], t[1]))
+        discover_streamlit_pages(self, directory, package=package)
         return self
 
     def page(
@@ -266,14 +163,7 @@ class FluxLit:
             Decorator that registers the function and returns it unchanged.
         """
 
-        def decorator(fn: Callable[..., None]) -> Callable[..., None]:
-            default_title = "Page"
-            if isinstance(fn, FunctionType):
-                default_title = fn.__name__.replace("_", " ").title()
-            self._pages.append((path, title or default_title, fn))
-            return fn
-
-        return decorator
+        return register_streamlit_page(self, path, title=title)
 
     def get_client(self) -> ApiClient:
         """Return an :class:`~fluxlit.client.ApiClient` for server-side API calls.

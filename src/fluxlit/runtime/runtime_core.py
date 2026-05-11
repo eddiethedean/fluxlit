@@ -12,18 +12,25 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable, Mapping, MutableMapping, Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import uvicorn
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from fluxlit.asgi_types import ASGIMessage
 from fluxlit.gateway import build_gateway, normalize_root_mount
+from fluxlit.runtime.reload_watcher import _start_streamlit_reload_watcher
+from fluxlit.runtime.upstream_state import (
+    STREAMLIT_UPSTREAM_FILE_ENV,
+    read_streamlit_upstream_url,
+    update_streamlit_upstream_file,
+    write_streamlit_upstream_state,
+)
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit as FluxLitType
@@ -36,74 +43,8 @@ class _StreamlitPopenKwargs(TypedDict, total=False):
 
 
 DEFAULT_PIDFILE_NAME = ".fluxlit-dev.pid"
-STREAMLIT_UPSTREAM_FILE_ENV = "FLUXLIT_STREAMLIT_UPSTREAM_FILE"
 # Streamlit cold start can exceed the default 30s on slow disks / CI.
 _STREAMLIT_TCP_WAIT_S = 60.0
-
-
-def read_streamlit_upstream_url() -> str:
-    """Current Streamlit base URL from :func:`write_streamlit_upstream_state` or plain env."""
-    fp = (os.environ.get(STREAMLIT_UPSTREAM_FILE_ENV) or "").strip()
-    if fp:
-        try:
-            raw = Path(fp).read_text(encoding="utf-8").strip()
-        except OSError:
-            raw = ""
-        if raw:
-            return raw.rstrip("/")
-    return (os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM") or "").strip().rstrip("/")
-
-
-def write_streamlit_upstream_state(url: str) -> Path:
-    """Write *url* to a temp file and set env for the gateway resolver and subprocesses."""
-    fd, name = tempfile.mkstemp(prefix="fluxlit-upstream-", suffix=".txt", text=True)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(url.strip())
-    path = Path(name)
-    os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = url.strip()
-    os.environ[STREAMLIT_UPSTREAM_FILE_ENV] = str(path)
-    return path
-
-
-def update_streamlit_upstream_file(path: Path, url: str) -> None:
-    """Replace the on-disk upstream URL (e.g. after restarting Streamlit on a new port)."""
-    path.write_text(url.strip(), encoding="utf-8")
-    os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = url.strip()
-
-
-def _start_streamlit_reload_watcher(
-    on_change: Callable[[], None],
-    *,
-    debounce_s: float,
-    stop_flag: Callable[[], bool],
-) -> None:
-    """Background thread: debounced filesystem watch → ``on_change`` (Streamlit restart)."""
-
-    def run() -> None:
-        try:
-            from watchfiles import watch
-        except ImportError:
-            sys.stderr.write(
-                "[fluxlit] --reload-scope=full requires the `watchfiles` package "
-                "(install the same `fluxlit` environment).\n"
-            )
-            sys.stderr.flush()
-            return
-        debounce_ms = int(max(50, debounce_s * 1000))
-        try:
-            for _changes in watch(Path.cwd(), debounce=debounce_ms):
-                if stop_flag():
-                    return
-                try:
-                    on_change()
-                except Exception as e:
-                    sys.stderr.write(f"[fluxlit] Streamlit sidecar reload failed: {e}\n")
-                    sys.stderr.flush()
-        except Exception as e:
-            sys.stderr.write(f"[fluxlit] Streamlit file watch exited: {e}\n")
-            sys.stderr.flush()
-
-    threading.Thread(target=run, daemon=True).start()
 
 
 def find_free_port() -> int:
@@ -244,17 +185,11 @@ def load_fluxlit(target: str) -> FluxLitType:
     return obj
 
 
-def _wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
-    """Block until ``host:port`` accepts a TCP connection or ``timeout_s`` elapses."""
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        try:
-            with socket.create_connection((host, port), timeout=0.5):
-                return
-        except OSError:
-            time.sleep(0.05)
-    msg = f"Timed out waiting for {host}:{port}"
-    raise TimeoutError(msg)
+def _invoke_wait_for_tcp(host: str, port: int, timeout_s: float = 30.0) -> None:
+    """Delegate to :data:`fluxlit.runtime._wait_for_tcp` so monkeypatches on the package work."""
+    import fluxlit.runtime as rt
+
+    rt._wait_for_tcp(host, port, timeout_s)
 
 
 def _build_streamlit_env(*, target: str, api_prefix: str, internal_api_base: str) -> dict[str, str]:
@@ -692,7 +627,7 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
             api_mount_path=api_prefix,
         )
 
-    runner = Path(__file__).resolve().parent / "streamlit_main.py"
+    runner = Path(__file__).resolve().parent.parent / "streamlit_main.py"
     streamlit_port = find_free_port()
     pub = fl.settings.public_mount_path()
     cmd = _build_streamlit_cmd(
@@ -731,13 +666,13 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
             lifespan_scope["asgi"] = asgi_info
 
             # ASGI lifespan messages are dynamic dicts; the inner app expects MutableMapping.
-            lifespan_queue: asyncio.Queue[MutableMapping[str, Any]] = asyncio.Queue()
+            lifespan_queue: asyncio.Queue[ASGIMessage] = asyncio.Queue()
             inner_task: asyncio.Task[None] | None = None
 
-            async def bridge_receive() -> MutableMapping[str, Any]:
+            async def bridge_receive() -> ASGIMessage:
                 return await lifespan_queue.get()
 
-            async def bridge_send(message: MutableMapping[str, Any]) -> None:
+            async def bridge_send(message: ASGIMessage) -> None:
                 await send(message)
 
             while True:
@@ -758,7 +693,11 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
                             popen_kwargs["start_new_session"] = True
 
                         streamlit_proc = subprocess.Popen(cmd, **popen_kwargs)
-                        _wait_for_tcp("127.0.0.1", streamlit_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+                        _invoke_wait_for_tcp(
+                            "127.0.0.1",
+                            streamlit_port,
+                            timeout_s=_STREAMLIT_TCP_WAIT_S,
+                        )
                         upstream_url = f"http://127.0.0.1:{streamlit_port}"
                     except Exception as e:
                         if streamlit_proc is not None:
@@ -893,7 +832,7 @@ def run_unified(
             ``FLUXLIT_NO_PIDFILE`` is ``1`` / ``true`` / ``yes``).
     """
     streamlit_port = find_free_port()
-    runner = Path(__file__).resolve().parent / "streamlit_main.py"
+    runner = Path(__file__).resolve().parent.parent / "streamlit_main.py"
 
     fl = load_fluxlit(target)
 
@@ -938,7 +877,7 @@ def run_unified(
     upstream_state_path: Path | None = None
     no_pf = os.environ.get("FLUXLIT_NO_PIDFILE", "").strip().lower() in {"1", "true", "yes"}
     try:
-        _wait_for_tcp("127.0.0.1", streamlit_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+        _invoke_wait_for_tcp("127.0.0.1", streamlit_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
         upstream = f"http://127.0.0.1:{streamlit_port}"
         os.environ["FLUXLIT_APP"] = target
         os.environ["FLUXLIT_API_PREFIX"] = api_prefix
@@ -1048,7 +987,7 @@ def run_unified(
                     new_proc = subprocess.Popen(cmd_local, **popen_kwargs)
                     proc_box[0] = new_proc
                     try:
-                        _wait_for_tcp("127.0.0.1", new_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+                        _invoke_wait_for_tcp("127.0.0.1", new_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
                     except TimeoutError:
                         _terminate_process(new_proc)
                         sys.stderr.write(

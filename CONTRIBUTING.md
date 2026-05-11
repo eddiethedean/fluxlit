@@ -10,6 +10,13 @@ cd fluxlit
 python -m pip install -e ".[dev]"
 ```
 
+## Public API stability
+
+Refactors should keep the **documented public surface** stable unless you are shipping a semver breaking release (see **Releases** below).
+
+- **Stable:** symbols exported from [`src/fluxlit/__init__.py`](src/fluxlit/__init__.py), the `fluxlit` CLI entrypoint ([`src/fluxlit/cli.py`](src/fluxlit/cli.py)), and documented kwargs on `FluxLit`, `build_gateway`, `run_unified`, and related settings types.
+- **Internal:** names prefixed with a single leading underscore (e.g. `_proxy_http` used only in tests), anything under a `fluxlit._*` package if introduced later, and modules not listed in `__all__`. Prefer extending behavior via new optional parameters or new public helpers rather than renaming stable entrypoints.
+
 ## Quality checks
 
 ```bash
@@ -19,7 +26,7 @@ python -m pytest -n auto -m "not slow"
 python -m mypy src/fluxlit
 ```
 
-Optional **[ty](https://docs.astral.sh/ty/)** (Astral static analysis; CI runs it as a non-blocking signal): `pip install ty` and `ty check` from the repo root after `pip install -e ".[metrics]"` if you want optional imports resolved.
+Optional **[ty](https://docs.astral.sh/ty/)** (Astral static analysis; CI runs it as a non-blocking signal): `pip install ty` and `ty check` from the repo root after `pip install -e ".[metrics]"` if you want optional imports resolved. CI pins `ty` to match local expectations. For **stricter** checking on `tests/` (same rules as `src/`), run `ty check --config-file ty.strict-tests.toml` (may report many diagnostics until tests are tightened).
 
 Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, Docker proxy smoke, and the **`--cov-fail-under`** gate used on CI.
 
