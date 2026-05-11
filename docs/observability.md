@@ -34,7 +34,7 @@ When {attr}`~fluxlit.config.FluxlitSettings.enable_gateway_access_log` is `True`
 
 With the default (`False`), the same line is logged at **DEBUG** only.
 
-If you enable gateway INFO logs in production, combine them with your normal log pipeline (filters, aggregators) and scrub or avoid echoing sensitive headers. For copying header dicts into logs or debug output, use {mod}`fluxlit.logging_redact`.
+If you enable gateway INFO logs in production, combine them with your normal log pipeline (filters, aggregators) and scrub or avoid echoing sensitive headers. For copying header dicts into logs or debug output, use {mod}`fluxlit.logging_redact`. Broader secrets and rotation guidance: {doc}`secrets`.
 
 ### JSON log lines (Loki / Datadog-style)
 
@@ -122,3 +122,8 @@ Because the browser hits a **single port**, ingress spans should label whether w
 ## Readiness
 
 `GET /api/readyz` (hidden from OpenAPI) probes the Streamlit sidecar when `FLUXLIT_STREAMLIT_UPSTREAM` is set; see {mod}`fluxlit.health`. The probe requires a **2xx** response from `GET` on the upstream root (not merely “any HTTP answer”). For Kubernetes-style probe configuration and curl examples, see {doc}`deployment`. If probes fail in production, see {doc}`troubleshooting`.
+
+## See also
+
+- {doc}`secrets` — keep credentials out of log pipelines.
+- {doc}`production-tls` — align log and probe URLs with production TLS and proxy trust.

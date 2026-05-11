@@ -1,6 +1,7 @@
 # Build from repository root:
 #   docker build -f docker/proxy-deployment/Dockerfile .
-FROM python:3.12-slim
+# python:3.12-slim @ sha256:ec948fa5f90f4f8907e89f4800cfd2d2e91e391a4bce4a6afa77ba265bc3a2fe
+FROM python@sha256:ec948fa5f90f4f8907e89f4800cfd2d2e91e391a4bce4a6afa77ba265bc3a2fe
 
 WORKDIR /build
 RUN pip install --no-cache-dir --upgrade pip
@@ -12,6 +13,11 @@ COPY src ./src
 COPY docker/proxy-deployment/app ./sample-app
 
 RUN pip install --no-cache-dir .
+
+RUN useradd --create-home --uid 1000 appuser \
+    && chown -R appuser:appuser /build
+
+USER appuser
 
 # COPY placed app under /build/sample-app (see COPY … ./sample-app above)
 WORKDIR /build/sample-app

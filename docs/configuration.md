@@ -2,6 +2,8 @@
 
 **Use this guide** to set ports, proxy trust, subpaths (`FLUXLIT_ROOT_PATH`), auth-related env vars, and project defaults in `fluxlit.toml`. **Precedence is always:** CLI flags beat environment variables; env beats the project file; then built-in defaults.
 
+For **TLS at the edge**, **HSTS**, tightening **`FLUXLIT_FORWARDED_ALLOW_IPS`** when **`FLUXLIT_TRUST_PROXY`** is on, and **CSP** notes for Streamlit-heavy apps, see {doc}`production-tls`. For **secrets in logs**, secret managers, and **JWT / OIDC rotation**, see {doc}`secrets`.
+
 (runtime-env)=
 
 ## Runtime-managed environment variables

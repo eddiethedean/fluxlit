@@ -96,6 +96,8 @@ Run with `fluxlit dev app:app`. The browser calls **`/api/me`** with `Authorizat
 
 ## Related topics
 
+- {doc}`secrets` — logs, secret stores, JWT/OIDC rotation runbook.
+- {doc}`production-tls` — HSTS, proxy trust, CSP notes, TLS validation.
 - {doc}`migration-auth` — incremental adoption of JWT and OIDC.
 - {doc}`auth-recipes` — full examples: JWKS, OIDC BFF, forward-auth, API keys, CORS.
 - {doc}`configuration` — `FLUXLIT_ENABLE_SECURITY_HEADERS`, CORS, `FLUXLIT_PUBLIC_BASE_URL`.

@@ -55,6 +55,8 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Secrets lifecycle** | Guidance and checks: no secrets in logs; integration patterns for secret stores; **JWT / OIDC secret rotation** runbook. |
 | **TLS & edge headers** | Production checklist: **HSTS**, **CSP** notes for Streamlit-typical layouts, strict **`forwarded_allow_ips`** when trusting proxies; validate against real TLS termination (same as production). |
 
+**Implemented in `main` (0.5.x):** CI uploads a **CycloneDX JSON** SBOM (same `.[auth]` install as `pip-audit`); `fluxlit build`, `examples/docker_compose/Dockerfile`, and `docker/proxy-deployment/Dockerfile` use **digest-pinned** `python:3.12-slim` and **`USER appuser`**; the Compose example ships **`requirements.in` / `requirements.txt`** from **`pip-compile`**; operator docs live in **`docs/secrets.md`**, **`docs/production-tls.md`**, and **`SECURITY.md`** (SBOM download). **Read-only root** remains documented (Kubernetes + tmpfs / writable paths) rather than forced in every reference image.
+
 ### Deployment & scale
 
 | Feature | Description |

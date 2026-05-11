@@ -199,4 +199,4 @@ export FLUXLIT_PUBLIC_BASE_URL=https://app.example.com
 fluxlit doctor app:app
 ```
 
-See {doc}`security` for threats and token placement, and {doc}`auth-recipes` for copy-paste examples (forward-auth, API keys, JWKS).
+See {doc}`security` for threats and token placement, {doc}`secrets` for rotation and avoiding leaks in logs, {doc}`production-tls` for proxies and TLS, and {doc}`auth-recipes` for copy-paste examples (forward-auth, API keys, JWKS).

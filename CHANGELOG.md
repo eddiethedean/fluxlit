@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Supply chain & containers:** CI uploads a **CycloneDX** SBOM (`cyclonedx-sbom` artifact) alongside **`pip-audit`** on `.[auth]`; `fluxlit build`, `examples/docker_compose`, and `docker/proxy-deployment` use **digest-pinned** Python slim and **non-root** `appuser`; Compose example adds **`requirements.in` / `requirements.txt`** via **`pip-compile`**.
+- **Docs:** **`docs/production-tls.md`** (TLS, HSTS, `forwarded_allow_ips`, CSP notes), **`docs/secrets.md`** (logs, secret stores, JWT/OIDC rotation); cross-links from README, index, deployment, configuration, security, observability, auth-recipes, troubleshooting, architecture, quickstart, testing, CONTRIBUTING, example READMEs, and **`ROADMAP.md`** security row status.
 - **Configuration:** `FluxlitSettings` / `FluxLit` passthroughs for Streamlit (`streamlit_run_cli_args`, `streamlit_page_config` → `st.set_page_config`) and Starlette `CORSMiddleware` (`cors_middleware_kwargs`); `fastapi_kwargs` documented as the full `FastAPI(...)` hook.
 - **Gateway / operations:** authoritative `X-Request-ID` on proxied HTTP and WebSocket to Streamlit; `FluxlitSettings` for upstream connect/read timeouts, max proxied request body (**413**), concurrent upstream HTTP cap, shared `httpx.AsyncClient` connection limits, WebSocket open/ping/close/`max_size` tuning; `uvicorn_graceful_shutdown_timeout_s` wired into `fluxlit dev` / `fluxlit run` Uvicorn config when set.
 - **Logging:** `fluxlit.logging_json.JsonLogFormatter` (stdlib JSON, merges `extra` fields).

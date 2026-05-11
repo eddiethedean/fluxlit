@@ -46,6 +46,10 @@ open htmlcov/index.html
 
 CI uploads `coverage.xml` as a workflow artifact for inspection (no enforced percentage gate yet).
 
+## Security audit and SBOM (CI)
+
+The **`security-audit`** workflow installs **`pip-audit`** and **`cyclonedx-bom`**, runs **`pip install -e ".[auth]"`**, then **`pip-audit`** and **`cyclonedx-py environment`** to produce **`cyclonedx-sbom.json`**. The SBOM is uploaded as workflow artifact **`cyclonedx-sbom`** (same dependency surface as the audit). See [SECURITY.md](https://github.com/eddiethedean/fluxlit/blob/main/SECURITY.md) in the repository for local commands and retention notes.
+
 ## Docker proxy smoke (integration)
 
 From the repo root:

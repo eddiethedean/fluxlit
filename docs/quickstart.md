@@ -133,7 +133,9 @@ See {doc}`configuration` and {doc}`cli` for flags, env vars, and commands.
 |-------|-----|
 | Reverse proxies, subpaths, OAuth base URL | {doc}`configuration` |
 | Containers, probes, scaling | {doc}`deployment` |
+| TLS, HSTS, `forwarded_allow_ips`, CSP notes | {doc}`production-tls` |
+| Secrets in logs, secret stores, key rotation | {doc}`secrets` |
 | Structured logs, JSON formatters, correlation, SLO notes, readiness details | {doc}`observability` |
 | JWT / OIDC / Streamlit callers | {doc}`auth-recipes`, {doc}`security` |
-| Markers, E2E, proxy smoke | {doc}`testing` |
+| Markers, E2E, proxy smoke, `pip-audit` / SBOM CI | {doc}`testing` |
 | Import errors, 503 readyz, API paths from Streamlit | {doc}`troubleshooting` |

@@ -273,8 +273,11 @@ def test_build_writes_docker_files(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert res.exit_code == 0
     df = tmp_path / "out" / "Dockerfile"
     assert df.is_file()
-    assert "fluxlit" in df.read_text(encoding="utf-8")
-    assert 'CMD ["fluxlit", "run", "app:app"]' in df.read_text(encoding="utf-8")
+    body = df.read_text(encoding="utf-8")
+    assert "fluxlit" in body
+    assert 'CMD ["fluxlit", "run", "app:app"]' in body
+    assert "USER appuser" in body
+    assert "FROM python@sha256:" in body
     assert (tmp_path / "out" / ".dockerignore").is_file()
 
 

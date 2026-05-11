@@ -17,6 +17,8 @@ New here? Follow {doc}`quickstart` end-to-end first (about five minutes). Use {d
 | Set ports, env vars, or deploy behind nginx / a subpath | {doc}`configuration` |
 | Use `fluxlit dev`, `fluxlit run`, reload, or Docker | {doc}`cli` · {doc}`deployment` |
 | Tune gateway proxy timeouts, body limits, logs, or Kubernetes shutdown | {doc}`configuration` · {doc}`observability` · {doc}`deployment` |
+| TLS, HSTS, reverse-proxy trust, CSP notes | {doc}`production-tls` |
+| Secrets, logs, JWT/OIDC rotation | {doc}`secrets` |
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` · `pip install "fluxlit[auth]"` |
 | Fix errors (imports, 503 readiness, wrong API paths) | {doc}`troubleshooting` · `fluxlit doctor` |
 | Browse Python types and functions | {doc}`api/index` |
@@ -44,6 +46,8 @@ architecture
 configuration
 cli
 deployment
+production-tls
+secrets
 observability
 rate-limiting
 security

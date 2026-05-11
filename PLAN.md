@@ -160,3 +160,6 @@ Broader possibilities (post–1.0): plugins, shared UI patterns, background jobs
 
 - [README](README.md) — install, quick start, CLI, configuration
 - [ROADMAP.md](ROADMAP.md) — phased delivery and current status
+- [docs/production-tls.md](docs/production-tls.md) — TLS, HSTS, reverse-proxy trust, CSP notes
+- [docs/secrets.md](docs/secrets.md) — secrets in logs, stores, JWT/OIDC rotation
+- [SECURITY.md](SECURITY.md) — reporting, `pip-audit`, SBOM artifact

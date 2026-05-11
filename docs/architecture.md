@@ -52,6 +52,8 @@ These routes are registered with **`include_in_schema=False`** so they do not ap
 
 Further product context: see the [architecture and product plan](https://github.com/eddiethedean/fluxlit/blob/main/PLAN.md) in the repository.
 
+TLS termination, reverse-proxy trust, and operator security checklists: {doc}`production-tls` · {doc}`secrets` · {doc}`security`.
+
 ## Automated tests
 
 Gateway routing, HTTP/WebSocket proxying, `root_path`, readiness (`/api/readyz`), and auth helpers are covered by Pytest (fast matrix, optional `slow` subprocess checks, Playwright E2E, and Docker-based proxy smoke). See {doc}`testing` and {doc}`observability`.

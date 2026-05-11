@@ -23,7 +23,7 @@ Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. S
 
 ## Documentation (Sphinx)
 
-Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository. User-facing guides include **[docs/deployment.md](docs/deployment.md)** (containers, probes, scaling) and **[docs/troubleshooting.md](docs/troubleshooting.md)**.
+Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository. User-facing guides include **[docs/deployment.md](docs/deployment.md)** (containers, probes, scaling), **[docs/troubleshooting.md](docs/troubleshooting.md)**, **[docs/production-tls.md](docs/production-tls.md)** (TLS, HSTS, `forwarded_allow_ips`, CSP notes), and **[docs/secrets.md](docs/secrets.md)** (logs, secret stores, JWT/OIDC rotation).
 
 Build locally:
 
@@ -54,6 +54,7 @@ Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` mar
 ## Security
 
 - Report undisclosed vulnerabilities privately per [`SECURITY.md`](SECURITY.md) (GitHub Security Advisories), not via a public issue.
+- **CI** runs **`pip-audit`** on `pip install -e ".[auth]"` and uploads a **CycloneDX JSON** SBOM for the same environment (artifact **`cyclonedx-sbom`** on the `security-audit` workflow run). See **SECURITY.md** for download notes.
 - Optional local dependency audit (**same scope as CI** — core + `auth`):
 
   ```bash
@@ -63,6 +64,8 @@ Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` mar
   ```
 
   For a broader scan (includes dev/docs/Streamlit transitive deps), install `".[dev,auth,docs]"` before `pip-audit`.
+
+- When you change **`examples/docker_compose/requirements.in`**, regenerate **`requirements.txt`** with **`pip-compile`** (see that example’s README) so the Docker image stays reproducible.
 
 ## Pull requests
 

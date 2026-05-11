@@ -1,6 +1,6 @@
 # Troubleshooting
 
-**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication)
+**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication) · {doc}`production-tls` · {doc}`secrets`
 
 ## First step: `fluxlit doctor`
 
@@ -57,7 +57,7 @@ In **unit tests** without `FLUXLIT_STREAMLIT_UPSTREAM`, `readyz` may return **20
 - Enable **`FLUXLIT_TRUST_PROXY=1`** (or `--proxy-headers`) so scheme and host match the public URL.
 - For OAuth, set **`FLUXLIT_PUBLIC_BASE_URL`** to the public origin.
 
-See {doc}`configuration` (reverse proxies).
+See {doc}`configuration` (reverse proxies) and {doc}`production-tls` (forwarded headers, HSTS, validating TLS the same way as production).
 
 ## Authentication
 
@@ -84,4 +84,6 @@ On **Windows**, the first stop attempt uses ``taskkill /T``; with **`--force`**,
 
 - {doc}`architecture` — routing and sidecar model.
 - {doc}`deployment` — probes and containers.
+- {doc}`production-tls` — reverse-proxy TLS and header trust.
+- {doc}`secrets` — avoiding credential leaks in logs; key rotation.
 - Repository **Issues** on GitHub for bugs; **Discussions** for usage questions if enabled.

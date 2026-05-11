@@ -75,7 +75,7 @@ Unknown scopes are rejected by the CLI and again in the runtime before the Strea
 - **`--force` / `-f`** — overwrite existing `Dockerfile` / `.dockerignore`.
 - The **`target`** embedded in `CMD` follows the same resolution rules as other commands.
 
-Customize the generated Dockerfile for multi-stage builds, non-root users, and dependency installs (`requirements.txt`, Poetry, etc.).
+The template ships with a **digest-pinned** `python:3.12-slim` base and **`USER appuser`** (UID 1000). For production, add your own **dependency lockfile** (`pip-tools`, `uv`, Poetry export, etc.); see {doc}`deployment` and **`examples/docker_compose/`** for a `pip-compile` example. You can still switch to multi-stage builds or a different base by editing the generated files.
 
 ## Entry point
 

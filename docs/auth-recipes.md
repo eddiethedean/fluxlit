@@ -370,4 +370,10 @@ Equivalent environment variables: `FLUXLIT_ENABLE_SECURITY_HEADERS`, `FLUXLIT_CO
 
 ---
 
+## Secret and key rotation
+
+JWT signing keys, OIDC client secrets, and BFF secrets are rotated **out of band** (IdP console, secret manager). Operational steps—HS256 vs JWKS, rolling pods, avoiding header leaks in logs—are in {doc}`secrets`.
+
+---
+
 See {doc}`security` for the threat model and {doc}`migration-auth` for a phased rollout.

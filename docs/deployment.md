@@ -70,11 +70,14 @@ Ordering: ingress / kube-proxy stop sending new connections → **SIGTERM** → 
 
 ## Docker and Compose
 
-- **`fluxlit build`** writes a minimal `Dockerfile` and `.dockerignore` into the current directory (or `-o` / `--output`). Adjust the generated files for your dependency layout, base image, non-root user, and image size. The template uses `CMD ["fluxlit", "run", "<target>"]` and sets `FLUXLIT_GATEWAY_HOST=0.0.0.0`.
-- A runnable **Compose** example lives in the repository at **`examples/docker_compose/`** (installs `fluxlit` from PyPI, exposes port 8000).
+- **`fluxlit build`** writes a minimal `Dockerfile` and `.dockerignore` into the current directory (or `-o` / `--output`). Adjust the generated files for your dependency layout, base image digest, non-root user, and image size. The template uses a **digest-pinned** `python:3.12-slim` base, runs as **`appuser`**, `CMD ["fluxlit", "run", "<target>"]`, and sets `FLUXLIT_GATEWAY_HOST=0.0.0.0`. Refresh the `FROM python@sha256:…` line when you intentionally upgrade the base image (match `docker pull python:3.12-slim` then inspect **RepoDigests**).
+- **Production images** should install from a **committed lockfile** (`pip-tools` / `uv`, etc.) your app controls; `fluxlit build` stays minimal on purpose.
+- A runnable **Compose** example lives in the repository at **`examples/docker_compose/`** (`requirements.txt` from **`pip-compile`**, exposes port 8000).
 - For **nginx**, TLS, and subpath smoke tests, see **`docker/proxy-deployment/`** in the repo.
 
 Do **not** run `fluxlit dev` with `--reload` in production images.
+
+For **TLS termination**, **HSTS**, **forwarded header trust**, and **CSP** guidance, see {doc}`production-tls`. For **secrets**, **logs**, and **JWT/OIDC rotation**, see {doc}`secrets`.
 
 ## Observability in production
 
@@ -99,10 +102,13 @@ The parent process sets variables for the Streamlit child and for gateway code t
 - [ ] Proxy: `FLUXLIT_TRUST_PROXY`, `FLUXLIT_ROOT_PATH`, and `FLUXLIT_PUBLIC_BASE_URL` (for OAuth) set correctly.
 - [ ] Readiness probe uses `/api/readyz` when Streamlit must be up before receiving traffic.
 - [ ] Optional: set **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** (and Kubernetes `terminationGracePeriodSeconds` / `preStop`) per {ref}`kubernetes-graceful-shutdown` above.
-- [ ] Secrets in env or a secrets manager — not baked into images; `.env` excluded from Docker context (default `.dockerignore` from `fluxlit build` already ignores `.env`).
+- [ ] Secrets in env or a secrets manager — not baked into images; `.env` excluded from Docker context (default `.dockerignore` from `fluxlit build` already ignores `.env`). See {doc}`secrets`.
+- [ ] **`FLUXLIT_FORWARDED_ALLOW_IPS`** tightened when **`FLUXLIT_TRUST_PROXY`** is on (not `*` in untrusted networks). See {doc}`production-tls`.
 
 ## Related
 
 - {doc}`cli` — `run`, `build`, `shutdown`, PID file options.
+- {doc}`production-tls` — HSTS, CSP notes, `forwarded_allow_ips`, TLS validation.
+- {doc}`secrets` — secret stores, logs, JWT/OIDC rotation.
 - {doc}`testing` — proxy smoke and E2E for regression coverage.
 - {doc}`troubleshooting` — common deployment and routing failures.

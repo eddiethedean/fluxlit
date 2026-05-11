@@ -6,9 +6,10 @@ Security fixes are applied to the **current release line** on [PyPI](https://pyp
 
 | Version   | Support note                                      |
 | --------- | ------------------------------------------------- |
-| **0.4.x** | Active                                            |
-| **0.3.x** | Best-effort fixes; upgrade to 0.4.x recommended |
-| **0.2.x** | Best-effort fixes; upgrade to 0.4.x recommended |
+| **0.5.x** | Active                                            |
+| **0.4.x** | Best-effort fixes; upgrade to 0.5.x recommended   |
+| **0.3.x** | Best-effort fixes; upgrade to 0.5.x recommended   |
+| **0.2.x** | Best-effort fixes; upgrade to 0.5.x recommended   |
 | **< 0.2** | Upgrade recommended; limited backporting        |
 
 Pre-release installs (e.g. from `main`) should track the latest commit for fixes.
@@ -25,6 +26,7 @@ Include affected versions, component (gateway, `ApiClient`, JWT/OIDC helpers, et
 ## Dependency and supply chain
 
 - **CI** runs **`pip-audit`** after `pip install -e ".[auth]"` (default dependencies plus the **`auth`** extra: PyJWT, cryptography). That matches what security-sensitive deployments typically install without pulling in contributor-only tools.
+- **SBOM:** the same workflow job builds a **CycloneDX JSON** SBOM with **`cyclonedx-py environment`** (root metadata from `pyproject.toml`) and uploads it as a workflow artifact named **`cyclonedx-sbom`**. Download it from the GitHub Actions run summary (artifact retention follows repository/org settings).
 - **Local** — same as CI:
 
   ```bash
@@ -38,6 +40,7 @@ Include affected versions, component (gateway, `ApiClient`, JWT/OIDC helpers, et
 ## Hardening references
 
 - Runtime and Streamlit/API security patterns: [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html) (documentation).
+- [Secrets and rotation](https://fluxlit.readthedocs.io/en/stable/secrets.html), [Production TLS and proxies](https://fluxlit.readthedocs.io/en/stable/production-tls.html).
 - JWT/OIDC usage: [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html).
 - How auth and `ApiClient` logging are tested (including that bearer secrets must not appear in debug logs): [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html).
 - Structured logging and OpenTelemetry-style notes: [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html).

@@ -24,9 +24,10 @@ The **`slowapi`** library integrates with Starlette/FastAPI and can key limits b
 
 ## Reverse proxy
 
-For production, many teams prefer **nginx**, **Envoy**, or cloud WAF rate limits **in front of** FluxLit. Ensure `X-Forwarded-For` and trust settings match {doc}`configuration` when deriving client IPs.
+For production, many teams prefer **nginx**, **Envoy**, or cloud WAF rate limits **in front of** FluxLit. Ensure `X-Forwarded-For` and trust settings match {doc}`configuration` when deriving client IPs; see {doc}`production-tls` for tightening **`FLUXLIT_FORWARDED_ALLOW_IPS`**.
 
 ## Related
 
 - {doc}`deployment` — edge placement and health probes.
+- {doc}`production-tls` — forwarded headers and TLS at the edge.
 - {doc}`observability` — gateway access logs and request IDs.

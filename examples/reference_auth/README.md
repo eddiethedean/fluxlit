@@ -7,7 +7,7 @@ Minimal **FluxLit** app showing:
 - A Streamlit page: the runtime-injected `client` for `POST /dev/login`, then
   `ApiClient.for_fluxlit` + `get_model` for authenticated reads
 
-For **production-style logging** (JSON lines, gateway access logs, upstream timeouts), see the FluxLit docs: [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) and [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html).
+For **production-style logging** (JSON lines, gateway access logs, upstream timeouts), see [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) and [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html). For **secrets in logs** and **JWT / OIDC rotation**, see [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html).
 
 **Do not** use `POST /dev/login` in production; replace it with your IdP and
 `register_oidc_bff_routes` or your own OAuth flow.
