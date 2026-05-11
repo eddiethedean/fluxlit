@@ -1,19 +1,36 @@
-# FluxLit
+# FluxLit documentation
 
-Production-oriented unified runtime for **FastAPI** and **Streamlit**: one public port, one CLI, and a single **FluxLit** app object for HTTP APIs plus Streamlit UI pages.
+**One port.** Your **FastAPI** routes and **Streamlit** UI share a single address—no hand-rolled reverse proxy in development, and a clear story for production.
 
-**[PyPI](https://pypi.org/project/fluxlit/)** · **[GitHub](https://github.com/eddiethedean/fluxlit)**
+**Install:** `pip install fluxlit` (Python **3.10+**) · **[PyPI](https://pypi.org/project/fluxlit/)** · **[GitHub](https://github.com/eddiethedean/fluxlit)**
 
-## At a glance
+```{tip}
+New here? Follow {doc}`quickstart` end-to-end first (about five minutes). Use {doc}`troubleshooting` if the app will not start or URLs look wrong.
+```
 
-- **Sidecar model:** Streamlit runs in a subprocess; a Starlette ASGI **gateway** (Uvicorn) serves one public port.
-- **Routing:** paths under `/api` (configurable) go to FastAPI; everything else is proxied to Streamlit, including WebSockets.
-- **Streamlit to API:** page handlers receive a server-side {class}`~fluxlit.client.ApiClient` (base URL includes `/api`). It does **not** send bearer tokens by default; use {meth}`~fluxlit.client.ApiClient.for_fluxlit` or an `auth_header_factory` for protected routes, or {func}`~fluxlit.streamlit_auth.prepare_streamlit_api_client` after OIDC (requires `pip install "fluxlit[auth]"`).
-- **Developer workflow:** `fluxlit dev`, `fluxlit run`, project file (`fluxlit.toml` / `[tool.fluxlit]`), `fluxlit doctor`, `fluxlit build`, `fluxlit shutdown`.
-- **Operations:** `GET /api/healthz` (liveness) and `GET /api/readyz` (readiness vs Streamlit when upstream is configured); optional structured gateway logs — {doc}`deployment`, {doc}`observability`.
-- **Tests:** default contributor command and CI use `pytest -n auto --ignore=tests/e2e -m "not slow"`; coverage, `slow`, E2E, and Docker proxy smoke are documented in {doc}`testing`.
+## Choose your path
 
-Python **3.10+** required. Install: `pip install fluxlit`. For JWT/OIDC/BFF patterns: `pip install "fluxlit[auth]"` and start with {doc}`auth-recipes`. When something will not start or routes look wrong, try {doc}`troubleshooting`.
+| I want to… | Start here |
+|------------|------------|
+| Run a minimal API + Streamlit app locally | {doc}`quickstart` |
+| Understand how requests reach FastAPI vs Streamlit | {doc}`architecture` |
+| Set ports, env vars, or deploy behind nginx / a subpath | {doc}`configuration` |
+| Use `fluxlit dev`, `fluxlit run`, reload, or Docker | {doc}`cli` · {doc}`deployment` |
+| Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` · `pip install "fluxlit[auth]"` |
+| Fix errors (imports, 503 readiness, wrong API paths) | {doc}`troubleshooting` · `fluxlit doctor` |
+| Browse Python types and functions | {doc}`api/index` |
+
+## Ideas to remember
+
+- **Sidecar:** Streamlit runs in a **child process**. Uvicorn serves the **gateway** on the port you open in the browser.
+- **Routing:** Paths under **`/api`** (default) go to FastAPI. **Everything else** (including `/_stcore/...` WebSockets) is proxied to Streamlit.
+- **From Streamlit, call the API** with the injected `client` using paths like `"/users"`—**not** `"/api/users"`. The runtime sets the base URL for you.
+- **Secured routes:** the default page `client` has **no** `Authorization` header. Use {meth}`~fluxlit.client.ApiClient.for_fluxlit` or the patterns in {doc}`auth-recipes`.
+- **Health:** **`GET /api/healthz`** (API up). **`GET /api/readyz`** (Streamlit sidecar reachable when using `fluxlit dev` / `fluxlit run`). Details: {doc}`deployment`, {doc}`observability`.
+
+```{note}
+Contributors: the default test command and CI matrix are in {doc}`testing`. Repository guidelines: {doc}`contributing`.
+```
 
 ```{toctree}
 ---
@@ -23,15 +40,15 @@ caption: User guide
 quickstart
 architecture
 configuration
+cli
 deployment
+observability
+rate-limiting
 security
 migration-auth
 auth-recipes
-cli
-testing
-observability
-rate-limiting
 troubleshooting
+testing
 contributing
 ```
 

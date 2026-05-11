@@ -1,5 +1,7 @@
 # Configuration
 
+**Use this guide** to set ports, proxy trust, subpaths (`FLUXLIT_ROOT_PATH`), auth-related env vars, and project defaults in `fluxlit.toml`. **Precedence is always:** CLI flags beat environment variables; env beats the project file; then built-in defaults.
+
 (runtime-env)=
 
 ## Runtime-managed environment variables

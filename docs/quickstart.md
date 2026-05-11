@@ -1,5 +1,11 @@
 # Quick start
 
+**Goal:** run a tiny app where **Streamlit** shows data from a **FastAPI** route, both on **one URL** (default `http://127.0.0.1:8000`).
+
+```{tip}
+**Common gotcha:** inside `@app.page` handlers, use `client.get("/users")`, not `client.get("/api/users")`. The client already points at the API prefix.
+```
+
 ## Install
 
 ```bash
@@ -14,7 +20,9 @@ cd fluxlit
 pip install -e ".[dev]"
 ```
 
-Run the default fast suite (same idea as CI): `python -m pytest -n auto --ignore=tests/e2e -m "not slow"`. Coverage, `slow`, E2E, and Docker proxy checks are in {doc}`testing`.
+```{note}
+Contributor tests: `python -m pytest -n auto --ignore=tests/e2e -m "not slow"`. More in {doc}`testing`.
+```
 
 ## Scaffold (optional)
 
@@ -46,13 +54,15 @@ def home(st, client):
 
 ## Run
 
-Default import path is `app:app`, or set `target` in `fluxlit.toml` / `pyproject.toml` `[tool.fluxlit]`:
+From the directory that contains `app.py`:
 
 ```bash
 fluxlit dev
-# or
+# or, if your module path differs:
 fluxlit dev app:app
 ```
+
+FluxLit looks for **`app:app`** by default. You can set **`target`** in `fluxlit.toml` or `pyproject.toml` under **`[tool.fluxlit]`** instead of typing it every time—see {doc}`configuration`.
 
 - Open the URL Uvicorn prints (default `http://127.0.0.1:8000`).
 - **API:** `GET /api/users` (prefix configurable via {attr}`~fluxlit.config.FluxlitSettings.api_mount_path`).

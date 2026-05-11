@@ -1,6 +1,8 @@
 # Deployment
 
-FluxLit serves **one public port**: the ASGI **gateway** (Uvicorn) proxies API traffic to FastAPI and everything else to a **Streamlit subprocess**. Production deployments should treat that port as the only ingress from browsers; see {doc}`architecture` for the request path.
+**You are in the right place if** you are shipping FluxLit with Docker or Kubernetes, wiring health checks, or choosing between `fluxlit dev` and **`fluxlit run`**.
+
+FluxLit serves **one public port**: the ASGI **gateway** (Uvicorn) proxies API traffic to FastAPI and everything else to a **Streamlit subprocess**. Point browsers and load balancers at that port only; see {doc}`architecture` for the request path.
 
 ## Production entrypoint
 

@@ -1,5 +1,7 @@
 # Observability
 
+**Why read this:** request IDs for support tickets, optional **one-line-per-request** gateway logs for HTTP debugging, readiness (`/api/readyz`) behavior, and a recipe for OpenTelemetry later.
+
 ## Request IDs
 
 The gateway and optional FastAPI access logging use {data}`fluxlit.logging_context.REQUEST_ID_HEADER` (`X-Request-ID`). The ID is stored in a {class}`contextvars.ContextVar` for the duration of each request; see {mod}`fluxlit.logging_context`.

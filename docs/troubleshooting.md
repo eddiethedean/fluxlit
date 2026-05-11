@@ -1,5 +1,7 @@
 # Troubleshooting
 
+**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication)
+
 ## First step: `fluxlit doctor`
 
 Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports **PASS**, **WARN**, or **FAIL** for imports, dependencies, gateway bind, `FLUXLIT_INTERNAL_API_BASE`, Streamlit version, JWT/OIDC env vs PyJWT, and subpath/proxy hints.

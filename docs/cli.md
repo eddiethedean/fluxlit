@@ -2,6 +2,10 @@
 
 The `fluxlit` console script (or `python -m fluxlit`) is built with Typer.
 
+```{tip}
+**`fluxlit dev`** — local development; optional `--reload` and `--reload-scope`. **`fluxlit run`** — production-style process (no reloader). Both start the same **gateway + Streamlit** stack.
+```
+
 ## Resolving `target`
 
 The optional **`[target]`** argument is a **`module:attribute`** import path (e.g. `app:app`) pointing at your {class}`~fluxlit.app.FluxLit` instance.

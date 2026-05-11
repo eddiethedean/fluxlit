@@ -35,6 +35,15 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 html_theme = "furo"
 html_title = f"{project} {version}"
 html_static_path = ["_static"]
+html_theme_options = {
+    "source_repository": "https://github.com/eddiethedean/fluxlit",
+    "source_branch": "main",
+    "source_directory": "docs/",
+    "light_css_variables": {
+        "font-stack": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        "font-stack--monospace": "ui-monospace, 'Cascadia Code', monospace",
+    },
+}
 
 language = "en"
 

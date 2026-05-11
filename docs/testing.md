@@ -1,5 +1,9 @@
 # Testing
 
+```{note}
+**App developers** can skip this page unless you contribute to FluxLit or run the full CI matrix locally. End users should start with {doc}`quickstart` and {doc}`troubleshooting`.
+```
+
 FluxLit’s tests fall into three bands: **fast** Pytest (default CI and local), **`slow`** subprocess checks, and **E2E** Playwright under `tests/e2e`. Docker-based **proxy smoke** exercises nginx-style routing. This page lists commands; {doc}`contributing` summarizes contributor workflow.
 
 ## Quick start

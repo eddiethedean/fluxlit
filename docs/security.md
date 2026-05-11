@@ -1,5 +1,7 @@
 # Security architecture
 
+**Read this before** putting real user data behind FluxLit: how the gateway splits API vs UI, where tokens should live, and how to avoid common leaks (XSS, Referer, forward-auth).
+
 FluxLit serves **one public origin**: the gateway forwards `/api` to FastAPI and everything else (including WebSockets) to Streamlit. Authentication must account for **two execution contexts** — API route handlers and **server-side** Streamlit code — plus whatever runs in the user’s browser.
 
 Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recipes`; upgrading an existing app is covered in {doc}`migration-auth`.

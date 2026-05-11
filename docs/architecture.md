@@ -1,5 +1,7 @@
 # Architecture
 
+Read this page when you want a **mental model** of how a single browser request becomes either a FastAPI handler or Streamlit traffic.
+
 FluxLit combines **FastAPI** for HTTP APIs and **Streamlit** for interactive UIs behind **one primary port** and one **FluxLit** application object.
 
 ## Request path
