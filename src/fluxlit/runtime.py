@@ -281,7 +281,8 @@ def _pid_running(pid: int) -> bool:
         if handle:
             kernel32.CloseHandle(handle)
             return True
-        return kernel32.GetLastError() == ERROR_ACCESS_DENIED
+        # ``GetLastError`` is often typed as ``Any`` in stubs; coerce for ``no-any-return``.
+        return int(kernel32.GetLastError()) == ERROR_ACCESS_DENIED
 
     try:
         os.kill(pid, 0)
