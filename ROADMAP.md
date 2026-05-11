@@ -29,9 +29,9 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
 
-**Next: later 0.x**
+**Next: Version 0.6**
 
-- Later 0.x work should deepen production proof points: broader load/chaos coverage, external session-store recipes, OpenTelemetry hooks, dependency compatibility matrices, and any breaking-change cleanup needed before a future 1.0.
+- Version 0.6 should deepen production proof points: broader load/chaos coverage, external session-store recipes, OpenTelemetry hooks, dependency compatibility matrices, and any breaking-change cleanup needed before a future 1.0.
 
 ---
 
@@ -109,6 +109,59 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Phase 4 (Production runtime):** 0.5 **implements the prioritized subset** (metrics, tracing correlation, K8s example, soak notes); remaining Phase 4 bullets stay until done or folded into later 0.x.
 - **Phase 2 follow-on (URL-bound session):** shipped for in-process and app-provided stores; remaining work is production recipes for external stores and multi-replica continuity.
 - **Version 0.3:** security headers, correlation, and doctor extensions **feed** 0.5 TLS/proxy/runbook work.
+
+---
+
+## Version 0.6 — Production proof points & ecosystem hardening (planned)
+
+**Theme:** Turn the 0.5 production-hardening foundation into repeatable evidence: load/chaos results, richer tracing hooks, multi-replica state recipes, and compatibility signals that help teams adopt FluxLit with fewer bespoke decisions.
+
+### Reliability evidence
+
+| Feature | Description |
+|---------|-------------|
+| **Load baselines** | Publish repeatable HTTP and WebSocket load runs for the unified gateway, including expected machine shape, user-count assumptions, limits, and failure modes. |
+| **Chaos scenarios** | Script and document Streamlit kill/restart, slow upstream, oversized body, dropped WebSocket, and gateway shutdown scenarios so operators know what degradation looks like. |
+| **Proxy matrix** | Expand nginx / Traefik / full-path / strip-prefix coverage into a documented compatibility matrix with known-good config snippets and smoke commands. |
+| **Readiness diagnostics** | Extend `fluxlit doctor` and runbooks with targeted checks for upstream reachability, root-path mismatches, proxy header trust, WebSocket upgrade paths, and stale sidecar state files. |
+| **Release smoke app** | Maintain a small canonical smoke app used by local scripts, Docker proxy smokes, and release verification so docs, examples, and CI exercise the same public contract. |
+
+### State and scale
+
+| Feature | Description |
+|---------|-------------|
+| **External URL-session store recipes** | Provide Redis or database-backed `SessionStore` examples for `fluxlit.url_session`, with TTL, rotation, redaction, and multi-replica notes. |
+| **Replica playbooks** | Document sticky-session tradeoffs, external state requirements, and rollout/drain guidance for Kubernetes and similar orchestrators. |
+| **Example hardening** | Add production-minded variants of the reference apps that show secrets, auth, session continuity, and deployment wiring together without turning examples into frameworks. |
+| **Platform recipes** | Add focused guides for common hosts such as Render/Fly.io/Railway-style containers, ECS/Fargate, and Posit Connect/Workbench where root paths and process models often differ. |
+| **Configuration validation** | Add clearer startup or `doctor` diagnostics for invalid combinations such as multi-worker unified mode, public base URL / root path mismatches, and unsafe proxy trust defaults. |
+
+### Developer and migration experience
+
+| Feature | Description |
+|---------|-------------|
+| **Upgrade guide** | Publish a concise `0.5 -> 0.6` guide that separates behavior changes, deprecations, new defaults, and optional hardening steps. |
+| **Scaffold profiles** | Consider `fluxlit new` profiles for minimal, auth-ready, and deployment-ready examples so users can start from a realistic shape without copying large demos. |
+| **Extension points** | Document stable extension hooks for auth, session stores, logging, tracing, and custom deployment wrappers so downstream apps do not depend on private modules. |
+| **Failure messages** | Improve user-facing errors for import-target failures, Streamlit startup failures, invalid sidecar args, and proxy body-limit rejections with direct remediation hints. |
+
+### Observability and compatibility
+
+| Feature | Description |
+|---------|-------------|
+| **OpenTelemetry hooks** | Add small, optional tracing integration points for gateway dispatch, upstream proxy calls, and internal API calls without requiring OTel as a core dependency. |
+| **Dependency matrix** | Promote latest-dependency smoke signals into a clearer support policy for Python, FastAPI/Starlette, Streamlit, Uvicorn, and httpx ranges. |
+| **Release hygiene** | Decide which 0.x deprecations or compatibility shims should be removed, documented, or carried forward before 1.0 planning. |
+| **Log schema reference** | Document stable field names for gateway access logs, JSON formatter extras, request IDs, redacted query strings, and error classes so teams can build dashboards safely. |
+| **Metrics contract** | Define which Prometheus metric names and labels are stable enough for alerts, and which remain experimental to avoid accidental cardinality or compatibility promises. |
+
+### Success criteria (0.6)
+
+- Operators can reproduce at least one load test, one chaos test, and one proxy smoke path locally or in CI-like automation.
+- Multi-replica deployments have a documented session-continuity path that does not rely only on process memory.
+- Tracing and metrics guidance explains what FluxLit emits, what it intentionally does not emit, and how to correlate gateway, API, and Streamlit-side evidence.
+- New projects can choose a scaffold or example path that matches their deployment intent without reading the runtime source.
+- Release notes, upgrade guidance, and support-matrix changes make it clear what is stable, experimental, or intentionally deferred to 1.0.
 
 ---
 
