@@ -400,7 +400,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 |------|--------|--------|
 | Unified ASGI (v0.5 prep) | `tests/test_asgi_unified.py`: lifespan + concurrent HTTP, httpx + `TestClient`, streaming body, sidecar failure | Soak/chaos suites as **0.5** lands |
 | Gateway HTTP | TestClient + threaded upstream (gzip, redirects); forwarded-header assertions; access-log on/off; `readyz` with fake upstream | More edge cases (timeouts, trailers) |
-| Gateway WebSocket | Echo/proxy happy path against `/_stcore/stream` | Automated stability / reconnect cases |
+| Gateway WebSocket | Echo/proxy + **`slow`** multi-session stress (`tests/test_gateway_ws_echo.py`) | Heavier reconnect soak remains optional / manual |
 | Runtime orchestration | Subprocess `run_unified` + `/api/healthz` (`slow`); upstream state read/write; invalid `reload_scope` before Streamlit spawn; reload-watcher unit test | Optional deeper lifecycle tests |
 | Health / readiness | Async probe tests (200/500/refused); `readyz` via gateway + FluxLit | Broader failure modes and timeouts |
 | Auth (Phase 3 / v0.3) | Fake JWKS server, JWT/OIDC edge cases; `ApiClient` must not log bearer secrets | Broader IdP matrices |

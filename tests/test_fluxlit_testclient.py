@@ -69,11 +69,10 @@ def test_fluxlit_testclient_openapi_type_error_when_not_object() -> None:
             client.openapi()
 
 
-def test_fluxlit_testclient_streamlit_runs(tmp_path: Path) -> None:
-    streamlit = pytest.importorskip("streamlit")
-    if tuple(int(x) for x in streamlit.__version__.split(".")[:2]) < (1, 30):
-        pytest.skip("Streamlit AppTest not available in this version")
-
+def test_fluxlit_testclient_streamlit_runs(
+    tmp_path: Path,
+    requires_streamlit_apptest,
+) -> None:
     module_path = tmp_path / "demo_tc_app.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n\napp = FluxLit(title='TC App')\n",

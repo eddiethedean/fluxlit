@@ -331,9 +331,7 @@ def build_gateway(
                 "fluxlit_dispatch": dispatch,
                 "http_method_or_type": method_or_type,
                 "path": path_in,
-                "query": redact_query_string(
-                    qs_dec, sensitive_keys=log_sensitive_query_keys
-                ),
+                "query": redact_query_string(qs_dec, sensitive_keys=log_sensitive_query_keys),
             }
             log_msg = "gateway %s %s request_id=%s"
             log_args = (method_or_type, path_in, rid)

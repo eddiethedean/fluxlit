@@ -6,16 +6,14 @@ import pytest
 
 
 def test_streamlit_entrypoint_renders_info_when_no_pages(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    requires_streamlit_apptest,
 ) -> None:
     """
     Uses Streamlit's built-in AppTest to validate `fluxlit.streamlit_main` renders a
     stable UI when the app defines no pages.
     """
-    streamlit = pytest.importorskip("streamlit")
-    if tuple(int(x) for x in streamlit.__version__.split(".")[:2]) < (1, 30):
-        pytest.skip("Streamlit AppTest not available in this version")
-
     from streamlit.testing.v1 import AppTest
 
     # Create a temporary module containing a FluxLit instance with no pages.
@@ -37,12 +35,10 @@ def test_streamlit_entrypoint_renders_info_when_no_pages(
 
 
 def test_streamlit_entrypoint_runs_registered_page(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    requires_streamlit_apptest,
 ) -> None:
-    streamlit = pytest.importorskip("streamlit")
-    if tuple(int(x) for x in streamlit.__version__.split(".")[:2]) < (1, 30):
-        pytest.skip("Streamlit AppTest not available in this version")
-
     from streamlit.testing.v1 import AppTest
 
     module_path = tmp_path / "demo_pages_app.py"

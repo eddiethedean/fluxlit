@@ -45,6 +45,19 @@ class _Root404Handler(BaseHTTPRequestHandler):
         return
 
 
+class _Root302Handler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        if self.path in {"/", ""}:
+            self.send_response(302)
+            self.send_header("Location", "/elsewhere")
+            self.end_headers()
+        else:
+            self.send_error(404)
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
+
+
 @pytest.fixture
 def http_root_ok() -> Generator[str, None, None]:
     port = find_free_port()
@@ -84,6 +97,19 @@ def http_root_404() -> Generator[str, None, None]:
         thread.join(timeout=10)
 
 
+@pytest.fixture
+def http_root_302() -> Generator[str, None, None]:
+    port = find_free_port()
+    server = HTTPServer(("127.0.0.1", port), _Root302Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=10)
+
+
 @pytest.mark.asyncio
 async def test_probe_ready_when_upstream_returns_200(
     http_root_ok: str,
@@ -106,6 +132,18 @@ async def test_probe_not_ready_on_upstream_500(
     ok, detail = await probe_streamlit_ready(timeout_s=2.0)
     assert ok is False
     assert "500" in detail
+
+
+@pytest.mark.asyncio
+async def test_probe_not_ready_on_upstream_302(
+    http_root_302: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", http_root_302)
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    ok, detail = await probe_streamlit_ready(timeout_s=2.0)
+    assert ok is False
+    assert "302" in detail
 
 
 @pytest.mark.asyncio

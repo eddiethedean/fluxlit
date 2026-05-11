@@ -44,7 +44,14 @@ python -m pytest -n auto \
 open htmlcov/index.html
 ```
 
-CI uploads `coverage.xml` as a workflow artifact for inspection (no enforced percentage gate yet).
+The **`coverage`** CI job runs the same measurement with **`--cov-fail-under=80`** so merges cannot silently collapse overall line coverage (current baseline is ~85%; the floor leaves headroom for platform noise). Reproduce the gate locally:
+
+```bash
+python -m pytest -n auto -m "not slow" \
+  --cov=fluxlit --cov-report=term-missing --cov-fail-under=80
+```
+
+CI uploads `coverage.xml` as a workflow artifact. Third-party PR comment bots (Codecov, etc.) remain optional if you want diff-based coverage later.
 
 ## Security audit and SBOM (CI)
 
@@ -81,6 +88,8 @@ COUNT=500 BASE_URL=http://127.0.0.1:8000 ./scripts/soak_http.sh
 
 Adjust `PATH_SUFFIX` (default `/api/healthz`) or `COUNT` for longer runs. Watch gateway CPU and logs; pair with {doc}`observability` if you enable access logs.
 
+The **[`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml)** workflow runs **weekly** (and **`workflow_dispatch`**) against `python -m http.server` to ensure `scripts/soak_http.sh` still works; it does **not** start FluxLit.
+
 ## Upgrade matrix (latest deps)
 
 The **[`.github/workflows/upgrade-smoke.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/upgrade-smoke.yml)** workflow runs **weekly** (Mondays) and **`workflow_dispatch`**: it installs **latest** `streamlit`, `fastapi`, and `starlette` from PyPI, then runs the fast pytest suite. It uses **`continue-on-error: true`** so failures surface as signals for maintainers without blocking merges. Supported version ranges for releases are documented in {doc}`support-matrix`.
@@ -92,10 +101,16 @@ Default pytest config ignores `tests/e2e`; **pass the directory explicitly** so 
 ```bash
 python -m pip install -e ".[dev,e2e]"
 python -m playwright install --with-deps chromium
-python -m pytest tests/e2e -m e2e
+python -m pytest tests/e2e -m e2e --tracing=retain-on-failure
 ```
 
 The suite starts a real unified gateway (including Streamlit WebSocket traffic) and includes a **`FLUXLIT_ROOT_PATH`** / subpath regression (browser shell + `GET …/api/healthz` under the prefix).
+
+On **CI failures**, the workflow uploads **`test-results/`** as artifact **`playwright-traces`** for inspection.
+
+## Optional type check (`ty`)
+
+CI runs **[`ty check`](https://docs.astral.sh/ty/)** in a **`ty-check`** job with **`continue-on-error: true`** (installs **`fluxlit[metrics]`** so optional imports resolve). Run locally after `pip install ty` (and optional `pip install -e ".[metrics]"`) from the repo root.
 
 ## Readiness
 
@@ -111,10 +126,13 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 |------|----------|
 | Unified ASGI | `tests/test_asgi_unified.py` — lifespan + concurrent/serial HTTP, httpx + `TestClient`, streaming bodies, sidecar failure |
 | OpenAPI contract | `tests/test_openapi_contract.py` — default app schema vs fixture |
+| URL session (no cookies) | `tests/test_url_session.py`, `tests/test_url_session_apptest.py`, `tests/test_url_session_contract.py` |
+| Gateway Prometheus | `tests/test_gateway_unit.py` (requires `prometheus_client` / `fluxlit[metrics]`) |
 | Readiness | `tests/test_health_probe.py`, `tests/test_gateway_readyz.py`, `tests/test_app.py` (`readyz`) |
 | Gateway logging | `tests/test_gateway_access_log.py` |
 | Gateway correlation + `httpx` wiring | `tests/test_gateway_correlation_integration.py` (threaded upstream, `build_gateway` + `proxy_settings`) |
 | Gateway proxy edge cases | `tests/test_gateway_proxy_robust.py` (`_gateway_opts`, 502/413 paths, WebSocket connect kwargs) |
+| Gateway WebSocket | `tests/test_gateway_ws_echo.py` — echo proxy; **`slow`** repeated connect/disconnect stress |
 | JSON logging formatter | `tests/test_logging_json.py` |
 | Upstream state | `tests/test_runtime_upstream.py` |
 | Reload | `tests/test_streamlit_reload_watcher.py`, `tests/test_runtime_extra.py`, CLI tests for `--reload-scope` |
@@ -123,8 +141,9 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 
 ## Conventions
 
+- Shared fixtures live in [`tests/conftest.py`](https://github.com/eddiethedean/fluxlit/blob/main/tests/conftest.py): **`gateway_test_client_factory`** wraps `build_gateway` + `TestClient`; **`requires_streamlit_apptest`** centralizes the Streamlit ≥1.30 **AppTest** skip.
 - Prefer **FluxLitTestClient** (see [test_fluxlit_testclient.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_fluxlit_testclient.py)) when you need the real gateway stack.
-- Use Streamlit **AppTest** for UI logic where versions allow.
+- Use Streamlit **AppTest** for UI logic where versions allow (request the **`requires_streamlit_apptest`** fixture).
 - Gateway routing and proxy behavior: [test_gateway.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway.py), [test_gateway_unit.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_unit.py), [test_gateway_forwarded.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_forwarded.py), [test_gateway_http_upstream.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_http_upstream.py), [test_gateway_correlation_integration.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_correlation_integration.py), [test_gateway_proxy_robust.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_proxy_robust.py).
 
 For runtime or routing issues while developing, see {doc}`troubleshooting`.

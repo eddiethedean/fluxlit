@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import textwrap
 
-import pytest
 
-
-def test_url_session_rehydrates_on_second_run_with_same_query_params() -> None:
-    streamlit = pytest.importorskip("streamlit")
-    if tuple(int(x) for x in streamlit.__version__.split(".")[:2]) < (1, 30):
-        pytest.skip("Streamlit AppTest not available in this version")
-
+def test_url_session_rehydrates_on_second_run_with_same_query_params(
+    requires_streamlit_apptest,
+) -> None:
     from streamlit.testing.v1 import AppTest
 
     script = textwrap.dedent(

@@ -94,6 +94,16 @@ def test_filter_request_headers_strips_x_forwarded() -> None:
     assert _filter_request_headers(raw) == [(b"X-Custom", b"1")]
 
 
+def test_filter_request_headers_strips_te_trailers_token_and_transfer_encoding() -> None:
+    raw = [
+        (b"Te", b"trailers"),
+        (b"trailers", b"bogus"),
+        (b"Transfer-Encoding", b"chunked"),
+        (b"X-Custom", b"1"),
+    ]
+    assert _filter_request_headers(raw) == [(b"X-Custom", b"1")]
+
+
 def test_port_from_host_header_ipv4_and_bracket_ipv6() -> None:
     assert _port_from_host_header("127.0.0.1:8777") == 8777
     assert _port_from_host_header("[::1]:8777") == 8777
@@ -730,3 +740,38 @@ def test_build_gateway_prometheus_metrics_endpoint() -> None:
     r = client.get("/__fluxlit/metrics")
     assert r.status_code == 200
     assert "fluxlit_gateway_requests_total" in r.text
+
+
+def _fluxlit_gateway_requests_total(text: str, *, dispatch: str, method_kind: str) -> float:
+    for line in text.splitlines():
+        if not line.startswith("fluxlit_gateway_requests_total{"):
+            continue
+        if f'dispatch="{dispatch}"' in line and f'method_kind="{method_kind}"' in line:
+            return float(line.rsplit(None, 1)[-1])
+    return 0.0
+
+
+def test_prometheus_request_counter_increments_for_streamlit_and_api_dispatch() -> None:
+    pytest.importorskip("prometheus_client")
+    from fluxlit.config import FluxlitSettings
+
+    settings = FluxlitSettings(enable_gateway_prometheus_metrics=True)
+    gw = build_gateway(
+        FastAPI(),
+        "http://127.0.0.1:9",
+        api_prefix="/api",
+        proxy_settings=settings,
+    )
+    client = TestClient(gw)
+    m0 = client.get("/__fluxlit/metrics").text
+    n_st_0 = _fluxlit_gateway_requests_total(m0, dispatch="streamlit", method_kind="GET")
+    client.get("/some-proxied-path")
+    m1 = client.get("/__fluxlit/metrics").text
+    n_st_1 = _fluxlit_gateway_requests_total(m1, dispatch="streamlit", method_kind="GET")
+    assert n_st_1 >= n_st_0 + 1.0
+
+    n_api_0 = _fluxlit_gateway_requests_total(m1, dispatch="api", method_kind="GET")
+    client.get("/api/healthz")
+    m2 = client.get("/__fluxlit/metrics").text
+    n_api_1 = _fluxlit_gateway_requests_total(m2, dispatch="api", method_kind="GET")
+    assert n_api_1 >= n_api_0 + 1.0

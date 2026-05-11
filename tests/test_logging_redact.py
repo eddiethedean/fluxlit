@@ -51,9 +51,7 @@ def test_redact_query_string_fluxlit_sid() -> None:
 
 
 def test_redact_query_string_custom_key() -> None:
-    out = redact_query_string(
-        "my_sid=abc&x=1", sensitive_keys=frozenset({"my_sid"})
-    )
+    out = redact_query_string("my_sid=abc&x=1", sensitive_keys=frozenset({"my_sid"}))
     assert "abc" not in out
     assert "redacted" in out.lower()
 

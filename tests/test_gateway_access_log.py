@@ -6,10 +6,8 @@ import logging
 
 import pytest
 from fastapi import FastAPI
-from starlette.testclient import TestClient
 
 from fluxlit.config import FluxlitSettings
-from fluxlit.gateway import build_gateway
 
 
 def _mini_api() -> FastAPI:
@@ -22,15 +20,15 @@ def _mini_api() -> FastAPI:
     return api
 
 
-def test_gateway_access_log_emits_info_with_extra(caplog: pytest.LogCaptureFixture) -> None:
+def test_gateway_access_log_emits_info_with_extra(
+    caplog: pytest.LogCaptureFixture,
+    gateway_test_client_factory,
+) -> None:
     caplog.set_level(logging.INFO, logger="fluxlit.gateway")
-    gateway = build_gateway(
-        _mini_api(),
-        "http://127.0.0.1:9",
-        api_prefix="/api",
+    client = gateway_test_client_factory(
+        api_app=_mini_api(),
         access_log=True,
     )
-    client = TestClient(gateway)
     client.get("/api/healthz", headers={"X-Request-ID": "access-log-test"})
     api_records = [
         r for r in caplog.records if r.name == "fluxlit.gateway" and r.levelno == logging.INFO
@@ -42,16 +40,14 @@ def test_gateway_access_log_emits_info_with_extra(caplog: pytest.LogCaptureFixtu
 
 def test_gateway_debug_log_extra_includes_redacted_query(
     caplog: pytest.LogCaptureFixture,
+    gateway_test_client_factory,
 ) -> None:
     caplog.set_level(logging.DEBUG, logger="fluxlit.gateway")
-    gateway = build_gateway(
-        _mini_api(),
-        "http://127.0.0.1:9",
-        api_prefix="/api",
+    client = gateway_test_client_factory(
+        api_app=_mini_api(),
         access_log=False,
         proxy_settings=FluxlitSettings(url_session_query_param="fluxlit_sid"),
     )
-    client = TestClient(gateway)
     client.get("/api/healthz?fluxlit_sid=topsecret&other=ok")
     rec = next(r for r in caplog.records if r.name == "fluxlit.gateway")
     q = getattr(rec, "query", "")
@@ -62,10 +58,10 @@ def test_gateway_debug_log_extra_includes_redacted_query(
 
 def test_gateway_access_log_default_stays_debug_for_streamlit_path(
     caplog: pytest.LogCaptureFixture,
+    gateway_test_client_factory,
 ) -> None:
     caplog.set_level(logging.INFO, logger="fluxlit.gateway")
-    gateway = build_gateway(_mini_api(), "http://127.0.0.1:9", api_prefix="/api", access_log=False)
-    client = TestClient(gateway)
+    client = gateway_test_client_factory(api_app=_mini_api(), access_log=False)
     client.get("/some-streamlit-path")
     info_gateway = [
         r for r in caplog.records if r.name == "fluxlit.gateway" and r.levelno == logging.INFO

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Tests / CI:** coverage job enforces **`--cov-fail-under=80`**; optional **`ty-check`** job (continue-on-error); E2E uploads **Playwright traces** on failure; weekly **`soak-scheduled`** workflow exercises `scripts/soak_http.sh` against `http.server`; shared fixtures **`gateway_test_client_factory`** / **`requires_streamlit_apptest`**; gateway header-filter, Prometheus counter, readiness (`302` / `readyz` 404), WebSocket **`slow`** reconnect stress, and **`DictSessionStore`** contract tests.
 - **URL session (Phase 2 follow-on):** `fluxlit.url_session` (`SessionStore`, `InMemorySessionStore`, `ensure_url_session`, `hydrate_url_session`, `persist_url_session`) for refresh continuity **without cookies**; user guide **`docs/url-session.md`**; AppTest + unit tests.
 - **Gateway logs:** structured `query` field on gateway access / debug logs with **redacted** session query values (`fluxlit_sid` and `FLUXLIT_URL_SESSION_QUERY_PARAM`); new `FluxlitSettings.url_session_query_param`.
 - **Kubernetes:** `examples/kubernetes/ingress.example.yaml` reference Ingress (not applied by default).

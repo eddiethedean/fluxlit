@@ -19,7 +19,9 @@ python -m pytest -n auto -m "not slow"
 python -m mypy src/fluxlit
 ```
 
-Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, and Docker proxy smoke.
+Optional **[ty](https://docs.astral.sh/ty/)** (Astral static analysis; CI runs it as a non-blocking signal): `pip install ty` and `ty check` from the repo root after `pip install -e ".[metrics]"` if you want optional imports resolved.
+
+Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, Docker proxy smoke, and the **`--cov-fail-under`** gate used on CI.
 
 ## Documentation (Sphinx)
 

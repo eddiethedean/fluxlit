@@ -1,0 +1,24 @@
+# Minimal smoke for scripts/soak_http.sh (does not start FluxLit).
+# Weekly signal that the script still works; use workflow_dispatch for ad-hoc runs.
+name: soak-http-script
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+
+jobs:
+  soak-script-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: soak_http.sh against stdlib http.server
+        run: |
+          python -m http.server 19876 --bind 127.0.0.1 &
+          sleep 1
+          chmod +x scripts/soak_http.sh
+          COUNT=40 BASE_URL=http://127.0.0.1:19876 PATH_SUFFIX=/ ./scripts/soak_http.sh

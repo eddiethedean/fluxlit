@@ -80,3 +80,18 @@ def test_websocket_proxy_echo_under_subpath(ws_echo_upstream: str) -> None:
         ) as ws:
             ws.send_text("subpath")
             assert ws.receive_text() == "subpath"
+
+
+@pytest.mark.slow
+def test_websocket_proxy_echo_repeated_sessions(ws_echo_upstream: str) -> None:
+    """Many short-lived WebSocket sessions (stability / reconnect-style signal)."""
+    gateway = build_gateway(FastAPI(), ws_echo_upstream, api_prefix="/api")
+    with TestClient(gateway) as client:
+        for i in range(25):
+            with client.websocket_connect(
+                "/_stcore/stream",
+                subprotocols=["streamlit"],
+            ) as ws:
+                msg = f"burst-{i}"
+                ws.send_text(msg)
+                assert ws.receive_text() == msg
