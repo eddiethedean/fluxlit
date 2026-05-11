@@ -107,6 +107,28 @@ def test_flux_lit_attach_oidc_login_registers_routes(monkeypatch: pytest.MonkeyP
     assert c.get("/auth/login", follow_redirects=False).status_code == 302
 
 
+def test_flux_lit_attach_oidc_login_public_base_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(GenericOIDCClient, "load_discovery_sync", lambda self: None)
+    from fluxlit.auth.oidc import OIDCDiscoveryDocument
+
+    oidc = GenericOIDCClient(
+        GenericOIDCClientConfig(issuer="https://idp", client_id="c", client_secret="d")
+    )
+    oidc._doc = OIDCDiscoveryDocument.model_validate(  # noqa: SLF001
+        {
+            "issuer": "https://idp",
+            "authorization_endpoint": "https://idp/a",
+            "token_endpoint": "https://idp/t",
+            "jwks_uri": "https://idp/j",
+        }
+    )
+    app = FluxLit(settings=FluxlitSettings(oidc_bff_secret="bff" * 11))
+    app.attach_oidc_login(oidc, public_base_url="https://public.example/app")
+    c = TestClient(app.api)
+    loc = c.get("/auth/login", follow_redirects=False).headers["location"]
+    assert "redirect_uri=https%3A%2F%2Fpublic.example%2Fapp%2Fauth%2Fcallback" in loc
+
+
 def test_prepare_streamlit_api_client_returns_bearer_when_session_warmed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

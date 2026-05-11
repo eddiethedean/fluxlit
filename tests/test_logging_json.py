@@ -97,6 +97,22 @@ def test_json_log_formatter_serializes_date_and_arbitrary_object() -> None:
     assert data["obj"].startswith("<object object at")
 
 
+def test_json_log_formatter_serializes_exception_extra() -> None:
+    fmt = JsonLogFormatter()
+    record = logging.LogRecord(
+        name="t",
+        level=logging.INFO,
+        pathname="x.py",
+        lineno=1,
+        msg="m",
+        args=(),
+        exc_info=None,
+    )
+    record.extra_error = ValueError("extra boom")
+    data = json.loads(fmt.format(record))
+    assert data["extra_error"] == "ValueError('extra boom')"
+
+
 def test_json_formatter_stream_handler_roundtrip() -> None:
     """Same wiring as ``dictConfig`` examples: handler + :class:`JsonLogFormatter`."""
     buf = io.StringIO()

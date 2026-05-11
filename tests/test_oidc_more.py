@@ -13,6 +13,8 @@ from fluxlit.auth.oidc import (
     GenericOIDCClientConfig,
     OIDCBFFConfig,
     OIDCDiscoveryDocument,
+    _purge_expired,
+    _verify_id_token_jwks,
     _with_query,
     pkce_pair,
     register_oidc_bff_routes,
@@ -85,6 +87,13 @@ def test_generic_oidc_load_discovery_and_build_authorization_url() -> None:
     assert q["code_challenge_method"] == ["S256"]
 
 
+def test_generic_oidc_issuer_falls_back_to_config_before_discovery() -> None:
+    client = GenericOIDCClient(
+        GenericOIDCClientConfig(issuer="https://idp.example/", client_id="cid", client_secret="sec")
+    )
+    assert client.issuer == "https://idp.example"
+
+
 def test_generic_oidc_discovery_http_error() -> None:
     well_known = "https://idp.example/.well-known/openid-configuration"
     cfg = GenericOIDCClientConfig(issuer="https://idp.example", client_id="i", client_secret="s")
@@ -124,6 +133,92 @@ def test_generic_oidc_exchange_non_object_json_raises() -> None:
         mock_http.post.return_value = _resp(200, "POST", tok, json=[1, 2])
         with pytest.raises(ValueError, match="non-object"):
             c.exchange_code(code="x", code_verifier="v", redirect_uri="https://r/cb")
+
+
+def test_generic_oidc_exchange_returns_object_json() -> None:
+    inner = {
+        "issuer": "https://idp.example",
+        "authorization_endpoint": "https://idp.example/a",
+        "token_endpoint": "https://idp.example/t",
+        "jwks_uri": "https://idp.example/j",
+    }
+    c = GenericOIDCClient(
+        GenericOIDCClientConfig(issuer="https://idp.example", client_id="i", client_secret="s")
+    )
+    c._doc = OIDCDiscoveryDocument.model_validate(inner)  # noqa: SLF001
+    with patch("fluxlit.auth.oidc.httpx.Client") as mock_cls:
+        mock_http = MagicMock()
+        mock_cls.return_value.__enter__.return_value = mock_http
+        mock_http.post.return_value = _resp(
+            200, "POST", "https://idp.example/t", json={"id_token": "i"}
+        )
+        assert c.exchange_code(code="x", code_verifier="v", redirect_uri="https://r/cb") == {
+            "id_token": "i"
+        }
+
+
+def test_purge_expired_removes_only_old_entries() -> None:
+    store = {"old": ("v", 0.0), "fresh": ("v", 9.0)}
+    _purge_expired(store, ttl=5.0, now=10.0)
+    assert store == {"fresh": ("v", 9.0)}
+
+
+def test_verify_id_token_jwks_rejects_invalid_and_missing_sub(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fluxlit.auth.oidc as oidc_module
+
+    class InvalidTokenError(Exception):
+        pass
+
+    class FakeJwksClient:
+        def __init__(self, uri: str) -> None:
+            self.uri = uri
+
+        def get_signing_key_from_jwt(self, token: str) -> object:
+            return type("Key", (), {"key": "public"})()
+
+    class JwtMod:
+        PyJWKClient = FakeJwksClient
+
+        @staticmethod
+        def decode(*args: object, **kwargs: object) -> dict[str, object]:
+            if args[0] == "bad":
+                raise InvalidTokenError("bad token")
+            if args[0] == "good":
+                return {"sub": "user-1"}
+            return {"sub": ""}
+
+    JwtMod.InvalidTokenError = InvalidTokenError
+    monkeypatch.setattr(oidc_module, "_require_pyjwt", lambda: JwtMod)
+    with pytest.raises(HTTPException) as bad:
+        _verify_id_token_jwks(
+            id_token="bad",
+            jwks_uri="https://idp/jwks",
+            audience="aud",
+            issuer="iss",
+            leeway=0,
+        )
+    assert bad.value.status_code == 502
+    with pytest.raises(HTTPException) as missing_sub:
+        _verify_id_token_jwks(
+            id_token="missing-sub",
+            jwks_uri="https://idp/jwks",
+            audience="aud",
+            issuer="iss",
+            leeway=0,
+        )
+    assert missing_sub.value.detail == "id_token missing sub"
+    assert (
+        _verify_id_token_jwks(
+            id_token="good",
+            jwks_uri="https://idp/jwks",
+            audience="aud",
+            issuer="iss",
+            leeway=0,
+        )
+        == "user-1"
+    )
 
 
 def test_generic_oidc_exchange_http_error_propagates() -> None:

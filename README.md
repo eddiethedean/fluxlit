@@ -69,6 +69,7 @@ In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Sec
 - **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages.
 - **Gateway runtime:** `fluxlit dev` and `fluxlit run` start Uvicorn plus a managed Streamlit subprocess.
 - **Operational defaults:** health/readiness probes, request IDs, optional JSON logs, configurable gateway timeouts, body limits, concurrency, and graceful shutdown.
+- **Quality gate:** package tests enforce **100% coverage** for `src/fluxlit` without coverage pragmas.
 - **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests, and production TLS/proxy guidance.
 - **Optional auth:** JWT validation, OIDC/BFF helpers, Streamlit-safe API clients, and security docs via `fluxlit[auth]`.
 
@@ -122,9 +123,10 @@ my_app/
 
 ```bash
 pip install -e ".[dev]"
-ruff check src tests && ruff format src tests
-python -m pytest -n auto -m "not slow"
+python -m ruff format && python -m ruff check
 python -m mypy src/fluxlit
+ty check
+python -m pytest -n auto --cov=fluxlit --cov-report=term-missing --cov-fail-under=100
 ```
 
 [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) · [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html)
@@ -133,7 +135,7 @@ python -m mypy src/fluxlit
 
 ## Status
 
-FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, and deployment runbooks.
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, deployment runbooks, and a 100% package coverage gate for `src/fluxlit`.
 
 See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 

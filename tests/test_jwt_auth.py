@@ -10,8 +10,11 @@ from fluxlit.auth.jwt import (
     RequireRoles,
     RequireScopes,
     StandardClaims,
+    _claims_roles,
+    _claims_scopes,
     issue_hs256_access_token,
 )
+from fluxlit.config import FluxlitSettings
 
 _HS_SECRET = "unit-test-hmac-secret-32bytes-xx"
 
@@ -90,6 +93,36 @@ def test_jwt_bearer_accepts_valid_hs256(hs256_bearer: JWTBearer) -> None:
     assert r.json() == {"sub": "alice"}
 
 
+def test_jwt_bearer_from_settings_accepts_jwks_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    import fluxlit.auth.jwt as jwt_module
+
+    class FakeJwksClient:
+        def __init__(self, url: str) -> None:
+            self.url = url
+
+    real = jwt_module._require_pyjwt()
+    monkeypatch.setattr(
+        jwt_module,
+        "_require_pyjwt",
+        lambda: type("JwtMod", (), {**real.__dict__, "PyJWKClient": FakeJwksClient}),
+    )
+    bearer = JWTBearer.from_fluxlit_settings(
+        FluxlitSettings(
+            jwt_issuer="https://iss",
+            jwt_audience="aud",
+            jwt_jwks_url="https://issuer.example/jwks",
+        )
+    )
+    assert isinstance(bearer, JWTBearer)
+
+
+def test_jwt_bearer_from_settings_requires_secret_or_jwks() -> None:
+    with pytest.raises(ValueError, match="HS256_SECRET or FLUXLIT_JWT_JWKS_URL"):
+        JWTBearer.from_fluxlit_settings(
+            FluxlitSettings(jwt_issuer="https://iss", jwt_audience="aud")
+        )
+
+
 def test_jwt_bearer_rejects_missing_header(hs256_bearer: JWTBearer) -> None:
     app = FastAPI()
     bearer = hs256_bearer
@@ -154,6 +187,31 @@ def test_require_roles_enforces_roles_claim(hs256_bearer: JWTBearer) -> None:
     )
     client = TestClient(app)
     assert client.get("/admin", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+
+
+def test_claim_scope_and_role_helpers_handle_missing_strings_lists_and_other_values() -> None:
+    assert _claims_scopes(StandardClaims(sub="s", iss="i", aud="a"), "scope") == set()
+    assert _claims_scopes(
+        StandardClaims.model_construct(sub="s", iss="i", aud="a", scope=["read", 2]), "scope"
+    ) == {"read", "2"}
+    assert (
+        _claims_scopes(
+            StandardClaims.model_construct(sub="s", iss="i", aud="a", scope={"bad": "shape"}),
+            "scope",
+        )
+        == set()
+    )
+    assert _claims_roles(StandardClaims(sub="s", iss="i", aud="a"), "roles") == set()
+    assert _claims_roles(
+        StandardClaims.model_construct(sub="s", iss="i", aud="a", roles="admin"), "roles"
+    ) == {"admin"}
+    assert (
+        _claims_roles(
+            StandardClaims.model_construct(sub="s", iss="i", aud="a", roles={"bad": "shape"}),
+            "roles",
+        )
+        == set()
+    )
 
 
 def test_issue_hs256_requires_auth_extra(monkeypatch: pytest.MonkeyPatch) -> None:

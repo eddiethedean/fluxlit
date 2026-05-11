@@ -160,6 +160,22 @@ def test_post_model_parses_response(monkeypatch: pytest.MonkeyPatch) -> None:
     assert user.name == "Bob"
 
 
+def test_post_model_serializes_pydantic_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = request.read()
+        return httpx.Response(200, json={"name": "Bob"})
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        user = client.post_model("/users", _User, body=_User(name="sent"))
+    assert user.name == "Bob"
+    assert captured["json"] == b'{"name":"sent"}'
+
+
 def test_get_model_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
 

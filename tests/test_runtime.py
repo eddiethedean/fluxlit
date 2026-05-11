@@ -17,6 +17,7 @@ from fluxlit.runtime import (
     internal_api_base_url,
     load_fluxlit,
 )
+from fluxlit.runtime.import_target import _import_target_module
 
 
 def test_load_fluxlit_rejects_bad_target() -> None:
@@ -40,6 +41,135 @@ def test_load_fluxlit_missing_attribute(tmp_path, monkeypatch: pytest.MonkeyPatc
     monkeypatch.syspath_prepend(str(tmp_path))
     with pytest.raises(AttributeError):
         load_fluxlit("mod_attr:there_is_no_such_attr")
+
+
+def test_load_fluxlit_from_explicit_file_target_reuses_loaded_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app_file = tmp_path / "file_app.py"
+    app_file.write_text(
+        "from fluxlit import FluxLit\napp = FluxLit(title='file-target')\n", encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    first = load_fluxlit("./file_app.py:app")
+    second = load_fluxlit("./file_app.py:app")
+    assert first is second
+    assert first.settings.title == "file-target"
+
+
+def test_import_target_module_reuse_ignores_modules_without_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "nofile_mod.py"
+    local.write_text("VALUE = 1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    import sys
+    import types
+
+    sys.modules["nofile_mod"] = types.ModuleType("nofile_mod")
+    try:
+        mod = _import_target_module("nofile_mod")
+    finally:
+        sys.modules.pop("nofile_mod", None)
+    assert mod.VALUE == 1
+
+
+def test_import_target_module_reuse_ignores_unresolvable_existing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "badfile_mod.py"
+    local.write_text("VALUE = 2\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    import sys
+    import types
+
+    class BadPath:
+        def __fspath__(self) -> str:
+            raise OSError("bad path")
+
+    existing = types.ModuleType("badfile_mod")
+    existing.__file__ = BadPath()  # type: ignore[assignment]
+    sys.modules["badfile_mod"] = existing
+    try:
+        mod = _import_target_module("badfile_mod")
+    finally:
+        sys.modules.pop("badfile_mod", None)
+    assert mod.VALUE == 2
+
+
+def test_import_target_module_reuse_handles_resolve_oserror(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "resolve_error_mod.py"
+    local.write_text("VALUE = 3\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    import sys
+    import types
+
+    from fluxlit.runtime import import_target as import_target_module
+
+    existing = types.ModuleType("resolve_error_mod")
+    existing.__file__ = str(local)
+    sys.modules["resolve_error_mod"] = existing
+    original_resolve = import_target_module.Path.resolve
+    calls = {"n": 0}
+
+    def resolve_once(path: Path) -> Path:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("cannot resolve")
+        return original_resolve(path)
+
+    monkeypatch.setattr(import_target_module.Path, "resolve", resolve_once)
+    try:
+        mod = _import_target_module("resolve_error_mod")
+    finally:
+        sys.modules.pop("resolve_error_mod", None)
+    assert mod.VALUE == 3
+
+
+def test_import_target_module_reuse_ignores_different_existing_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "different_file_mod.py"
+    other = tmp_path / "other.py"
+    local.write_text("VALUE = 4\n", encoding="utf-8")
+    other.write_text("VALUE = 0\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    import sys
+    import types
+
+    existing = types.ModuleType("different_file_mod")
+    existing.__file__ = str(other)
+    sys.modules["different_file_mod"] = existing
+    try:
+        mod = _import_target_module("different_file_mod")
+    finally:
+        sys.modules.pop("different_file_mod", None)
+    assert mod.VALUE == 4
+
+
+def test_import_target_module_explicit_missing_file_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ModuleNotFoundError):
+        _import_target_module("./missing.py")
+
+
+def test_import_target_module_spec_failure_raises(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    local = tmp_path / "bad_spec.py"
+    local.write_text("VALUE = 1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "fluxlit.runtime.import_target.importlib.util.spec_from_file_location", lambda *a, **k: None
+    )
+    with pytest.raises(ModuleNotFoundError):
+        _import_target_module("bad_spec")
+    with pytest.raises(ModuleNotFoundError):
+        _import_target_module("./bad_spec.py")
 
 
 def test_load_fluxlit_prefers_local_app_py_over_polluted_syspath(

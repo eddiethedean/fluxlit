@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from fluxlit.logging.redact import (
     redact_authorization,
     redact_query_string,
@@ -9,6 +11,10 @@ from fluxlit.logging.redact import (
 
 def test_redact_bearer() -> None:
     assert redact_authorization("Bearer secret-token") == "Bearer <redacted>"
+
+
+def test_redact_empty_authorization() -> None:
+    assert redact_authorization("   ") == ""
 
 
 def test_sanitize_headers_never_echoes_bearer_secret() -> None:
@@ -54,6 +60,20 @@ def test_redact_query_string_custom_key() -> None:
     out = redact_query_string("my_sid=abc&x=1", sensitive_keys=frozenset({"my_sid"}))
     assert "abc" not in out
     assert "redacted" in out.lower()
+
+
+def test_redact_query_string_returns_original_when_parser_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def boom(*args, **kwargs):
+        raise ValueError("bad query")
+
+    monkeypatch.setattr("fluxlit.logging.redact.parse_qsl", boom)
+    assert redact_query_string("fluxlit_sid=secret") == "fluxlit_sid=secret"
+
+
+def test_redact_query_string_preserves_blank_sensitive_values() -> None:
+    assert redact_query_string("fluxlit_sid=&x=1") == "fluxlit_sid=&x=1"
 
 
 def test_sanitize_headers_preserves_unlisted_headers() -> None:

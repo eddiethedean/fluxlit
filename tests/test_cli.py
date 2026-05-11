@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import contextlib
 import json
+import socket
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
+import fluxlit.cli as cli_module
 from fluxlit.cli import app
 
 
@@ -594,3 +597,192 @@ def test_shutdown_sends_sigterm_to_recorded_pid(tmp_path: Path) -> None:
         with contextlib.suppress(Exception):
             proc.kill()
             proc.wait(timeout=3)
+
+
+def test_tcp_url_reachable_validation_success_and_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert cli_module._tcp_url_reachable("not-a-url")[0] is False  # noqa: SLF001
+
+    class Conn:
+        def __enter__(self) -> Conn:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    seen: list[tuple[str, int]] = []
+
+    def connect(addr: tuple[str, int], timeout: float) -> Conn:
+        seen.append(addr)
+        return Conn()
+
+    monkeypatch.setattr(cli_module.socket, "create_connection", connect)
+    ok, msg = cli_module._tcp_url_reachable("https://example.com/path")  # noqa: SLF001
+    assert ok is True
+    assert seen == [("example.com", 443)]
+    assert "reachable" in msg
+
+    def fail(addr: tuple[str, int], timeout: float) -> Conn:
+        raise OSError("closed")
+
+    monkeypatch.setattr(cli_module.socket, "create_connection", fail)
+    ok, msg = cli_module._tcp_url_reachable("http://example.com:8080")  # noqa: SLF001
+    assert ok is False
+    assert "unreachable" in msg
+
+
+def test_doctor_checks_dependency_import_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    real_import = __import__
+
+    def fake_import(name: str, *args: object, **kwargs: object):
+        if name == "httpx":
+            raise ImportError("blocked httpx")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+    rows = cli_module._doctor_checks("definitely_missing_cli_cov:app")  # noqa: SLF001
+    assert ("dependencies", "FAIL", "blocked httpx") in rows
+
+
+def test_doctor_checks_streamlit_version_warn_and_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_version_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\napp = FluxLit()\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setitem(sys.modules, "streamlit", types.SimpleNamespace(__version__="1.20.0"))
+    rows = cli_module._doctor_checks("doctor_version_app:app")  # noqa: SLF001
+    assert any(name == "streamlit_version" and status == "WARN" for name, status, _ in rows)
+
+    class BadStreamlit:
+        @property
+        def __version__(self) -> str:
+            raise RuntimeError("no version")
+
+    monkeypatch.setitem(sys.modules, "streamlit", BadStreamlit())
+    rows = cli_module._doctor_checks("doctor_version_app:app")  # noqa: SLF001
+    assert any(
+        name == "streamlit_version" and status == "WARN" and "no version" in detail
+        for name, status, detail in rows
+    )
+
+
+def test_doctor_checks_gateway_bind_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_bind_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_port=59401))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    blocker.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    blocker.bind(("127.0.0.1", 59401))
+    try:
+        rows = cli_module._doctor_checks("doctor_bind_app:app")  # noqa: SLF001
+    finally:
+        blocker.close()
+    assert any(name == "gateway_bind" and status == "FAIL" for name, status, _ in rows)
+
+
+def test_doctor_checks_internal_api_invalid_and_import_failed_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "not-absolute")
+    rows = cli_module._doctor_checks("definitely_missing_cli_cov:app")  # noqa: SLF001
+    assert (
+        "FLUXLIT_INTERNAL_API_BASE",
+        "FAIL",
+        "not a valid absolute URL",
+    ) in rows
+
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:8000/api")
+    rows = cli_module._doctor_checks("definitely_missing_cli_cov:app")  # noqa: SLF001
+    assert any(
+        name == "FLUXLIT_INTERNAL_API_BASE" and status == "PASS" and "import failed" in detail
+        for name, status, detail in rows
+    )
+
+
+def test_doctor_checks_public_url_forwarded_and_security_warnings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_misc_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(\n"
+        "    public_base_url='not-a-url',\n"
+        "    trust_proxy=True,\n"
+        "    forwarded_allow_ips='127.0.0.1',\n"
+        "    cors_allow_origins=['https://app.example'],\n"
+        "    enable_security_headers=False,\n"
+        "    gateway_port=59402,\n"
+        "))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doctor_misc_app:app")  # noqa: SLF001
+    assert ("forwarded_allow_ips", "PASS", "127.0.0.1") in rows
+    assert ("public_base_url", "FAIL", "not a valid absolute URL") in rows
+    assert any(name == "security_headers" and status == "WARN" for name, status, _ in rows)
+
+
+def test_doctor_checks_oauth_public_base_url_warning(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_oauth_base_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(root_path='/content/2', gateway_port=59412))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doctor_oauth_base_app:app")  # noqa: SLF001
+    assert any(name == "oauth_public_base_url" and status == "WARN" for name, status, _ in rows)
+
+
+def test_doctor_checks_upstream_state_file_and_env(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_upstream_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_port=59403))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    state_file = tmp_path / "upstream.txt"
+    state_file.write_text("", encoding="utf-8")
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", str(state_file))
+    rows = cli_module._doctor_checks("doctor_upstream_app:app")  # noqa: SLF001
+    assert any(
+        name == "streamlit_upstream_state" and status == "WARN" and "empty" in detail
+        for name, status, detail in rows
+    )
+
+    state_file.write_text("http://127.0.0.1:9\n", encoding="utf-8")
+    monkeypatch.setattr(cli_module, "_tcp_url_reachable", lambda url: (True, f"{url} ok"))
+    rows = cli_module._doctor_checks("doctor_upstream_app:app")  # noqa: SLF001
+    assert ("streamlit_upstream_state", "PASS", "http://127.0.0.1:9 ok") in rows
+
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", "http://127.0.0.1:9")
+    rows = cli_module._doctor_checks("doctor_upstream_app:app")  # noqa: SLF001
+    assert ("streamlit_upstream", "PASS", "http://127.0.0.1:9 ok") in rows
+
+
+def test_main_invokes_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    called: list[bool] = []
+    monkeypatch.setattr(cli_module, "app", lambda: called.append(True))
+    cli_module.main()
+    assert called == [True]

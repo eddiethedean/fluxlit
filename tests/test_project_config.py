@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import importlib
+import sys
+import types
 from pathlib import Path
 
+import tomllib
+
+import fluxlit.config.project as project_module
 from fluxlit.config import (
     ProjectConfig,
     load_project_config,
@@ -78,6 +84,28 @@ def test_gateway_port_bool_is_ignored(tmp_path: Path) -> None:
     assert pc is not None
     assert pc.target == "a:b"
     assert pc.gateway_port is None
+
+
+def test_fluxlit_toml_non_table_returns_none(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / "fluxlit.toml").write_text("target = 'x:y'\n", encoding="utf-8")
+    monkeypatch.setattr(project_module.tomllib, "loads", lambda text: ["not", "a", "table"])
+    assert load_project_config(tmp_path) is None
+
+
+def test_pyproject_tool_non_table_returns_none(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("tool = 1\n", encoding="utf-8")
+    assert load_project_config(tmp_path) is None
+
+
+def test_project_config_imports_tomli_on_old_python(monkeypatch) -> None:
+    original_version = sys.version_info
+    fake_tomli = types.SimpleNamespace(loads=tomllib.loads, TOMLDecodeError=tomllib.TOMLDecodeError)
+    monkeypatch.setitem(sys.modules, "tomli", fake_tomli)
+    monkeypatch.setattr(sys, "version_info", (3, 10, 0))
+    importlib.reload(project_module)
+    assert project_module.tomllib is fake_tomli
+    monkeypatch.setattr(sys, "version_info", original_version)
+    importlib.reload(project_module)
 
 
 def test_resolve_binding_precedence() -> None:

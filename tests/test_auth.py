@@ -84,3 +84,16 @@ def test_trusted_proxy_user_rejects_untrusted_client_host() -> None:
 
     client = TestClient(app)
     assert client.get("/me", headers={"X-Remote-User": "eve"}).status_code == 403
+
+
+def test_trusted_proxy_user_requires_non_empty_header_by_default() -> None:
+    app = FastAPI()
+    dep = TrustedProxyUser(TrustedProxyUserConfig())
+
+    @app.get("/me")
+    def me(user: str = Depends(dep)) -> dict[str, str]:  # noqa: B008
+        return {"user": user}
+
+    client = TestClient(app)
+    assert client.get("/me").status_code == 401
+    assert client.get("/me", headers={"X-Remote-User": "   "}).status_code == 401
