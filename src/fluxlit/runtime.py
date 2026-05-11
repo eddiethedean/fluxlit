@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import importlib
+import importlib.util
 import ipaddress
 import os
 import signal
@@ -14,7 +16,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable
+from collections.abc import Callable, MutableMapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,7 +26,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from fluxlit.gateway import build_gateway, normalize_root_mount
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit
+    from fluxlit.app import FluxLit as FluxLitType
 
 DEFAULT_PIDFILE_NAME = ".fluxlit-dev.pid"
 STREAMLIT_UPSTREAM_FILE_ENV = "FLUXLIT_STREAMLIT_UPSTREAM_FILE"
@@ -141,12 +143,70 @@ def _fluxlit_import_hint(target: str, mod_name: str) -> str:
     return (
         f"Cannot import module {mod_name!r} for FluxLit target {target!r}. "
         "Put the package on PYTHONPATH (for example `export PYTHONPATH=$(pwd)` before "
-        "`fluxlit dev`). Avoid naming your entry file `app.py` if it would shadow "
-        "FluxLit's internal `fluxlit.app` package."
+        "`fluxlit dev`). Tip: if you have a local `app.py`, FluxLit prefers it for "
+        "`app:app`; you can also use an explicit file target like `./app.py:app`."
     )
 
 
-def load_fluxlit(target: str) -> FluxLit:
+def _import_target_module(mod_name: str) -> object:
+    """Import a target module, preferring local ``<cwd>/<mod_name>.py`` when present.
+
+    This avoids a common footgun where users accidentally add ``.../fluxlit/src/fluxlit`` to
+    ``PYTHONPATH`` (or similar), making FluxLit's own ``app.py`` importable as top-level
+    ``import app`` and breaking ``app:app`` targets.
+    """
+    def _reuse_loaded(sys_mod_name: str, file_path: Path) -> object | None:
+        existing = sys.modules.get(sys_mod_name)
+        if existing is None:
+            return None
+        ef = getattr(existing, "__file__", None)
+        if ef is None:
+            return None
+        try:
+            if Path(ef).resolve() == file_path.resolve():
+                return existing
+        except OSError:
+            return None
+        return None
+
+    # Accept explicit file targets like "./app.py" or "/abs/path/app.py".
+    p = Path(mod_name)
+    if p.suffix == ".py" or any(sep in mod_name for sep in (os.sep, os.altsep) if sep):
+        path = p if p.is_absolute() else (Path.cwd() / p)
+        if not path.is_file():
+            raise ModuleNotFoundError(mod_name)
+        stem = p.stem
+        reused = _reuse_loaded(stem, path)
+        if reused is not None:
+            return reused
+        spec = importlib.util.spec_from_file_location(stem, path)
+        if spec is None or spec.loader is None:
+            raise ModuleNotFoundError(mod_name)
+        module = importlib.util.module_from_spec(spec)
+        # Ensure future imports of the stem see this module.
+        sys.modules[stem] = module
+        spec.loader.exec_module(module)
+        return module
+
+    # Prefer a local "<cwd>/<name>.py" file over sys.path resolution.
+    # This makes "fluxlit dev app:app" robust even if PYTHONPATH is polluted.
+    local = Path.cwd() / f"{mod_name}.py"
+    if mod_name and "." not in mod_name and local.is_file():
+        reused = _reuse_loaded(mod_name, local)
+        if reused is not None:
+            return reused
+        spec = importlib.util.spec_from_file_location(mod_name, local)
+        if spec is None or spec.loader is None:
+            raise ModuleNotFoundError(mod_name)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[mod_name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    return importlib.import_module(mod_name)
+
+
+def load_fluxlit(target: str) -> FluxLitType:
     """Import ``module:attribute`` and ensure the object is a :class:`~fluxlit.app.FluxLit`.
 
     Raises:
@@ -162,7 +222,7 @@ def load_fluxlit(target: str) -> FluxLit:
         msg = "App target must look like 'my_module:app'"
         raise ValueError(msg)
     try:
-        module = importlib.import_module(mod_name)
+        module = _import_target_module(mod_name)
     except ModuleNotFoundError as e:
         raise ModuleNotFoundError(_fluxlit_import_hint(target, mod_name)) from e
     try:
@@ -516,6 +576,231 @@ def create_gateway_app() -> ASGIApp:
         ),
         mount,
     )
+
+
+def resolve_import_target_for_unified(fl: FluxLitType) -> str:
+    """Resolve ``module:attr`` for the Streamlit child and import stability.
+
+    Order: :attr:`~fluxlit.app.FluxLit.import_target`, ``FLUXLIT_APP``, then project file
+    (``fluxlit.toml`` / ``pyproject.toml``), then ``app:app``.
+    """
+    from fluxlit.project_config import load_project_config, resolve_target
+
+    if fl.import_target:
+        return fl.import_target.strip()
+    env_t = (os.environ.get("FLUXLIT_APP") or "").strip()
+    if env_t:
+        return env_t
+    return resolve_target(None, load_project_config())
+
+
+def _gateway_bind_for_streamlit_child(fl: FluxLitType) -> tuple[str, int]:
+    """Host/port the Streamlit sidecar uses to reach the API (loopback-safe URL)."""
+    from fluxlit.project_config import load_project_config
+
+    pc = load_project_config()
+    bind_host = (os.environ.get("FLUXLIT_GATEWAY_HOST") or "").strip()
+    if not bind_host and pc and pc.gateway_host:
+        bind_host = pc.gateway_host.strip()
+    if not bind_host:
+        bind_host = fl.settings.gateway_host.strip()
+
+    bind_port_s = (os.environ.get("FLUXLIT_GATEWAY_PORT") or "").strip()
+    if bind_port_s:
+        try:
+            bind_port = int(bind_port_s)
+        except ValueError:
+            bind_port = fl.settings.gateway_port
+    elif pc and pc.gateway_port is not None:
+        bind_port = pc.gateway_port
+    else:
+        bind_port = fl.settings.gateway_port
+    return bind_host, bind_port
+
+
+def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
+    """Build unified ASGI (gateway + Streamlit) for an existing :class:`~fluxlit.app.FluxLit`.
+
+    Use when you already hold the instance (e.g. ``uvicorn main:app``). *import_target*
+    must be the ``module:attr`` the Streamlit subprocess imports; use
+    :func:`resolve_import_target_for_unified` or set
+    :attr:`~fluxlit.app.FluxLit.import_target` / ``fluxlit.toml`` / ``FLUXLIT_APP``.
+
+    Behavior matches :func:`create_unified_app` (lifespan, sidecar, inner FastAPI hooks).
+    """
+    target = import_target.strip()
+    if not target:
+        msg = "import_target for unified ASGI must be a non-empty module:attr string"
+        raise ValueError(msg)
+
+    api_prefix = fl.settings.api_mount_path
+    mount = normalize_root_mount(fl.settings.public_mount_path())
+
+    internal = (os.environ.get("FLUXLIT_INTERNAL_API_BASE") or "").strip()
+    if not internal:
+        bind_host, bind_port = _gateway_bind_for_streamlit_child(fl)
+        internal = internal_api_base_url(
+            bind_host=bind_host,
+            port=bind_port,
+            api_mount_path=api_prefix,
+        )
+
+    runner = Path(__file__).resolve().parent / "streamlit_main.py"
+    streamlit_port = find_free_port()
+    pub = fl.settings.public_mount_path()
+    cmd = _build_streamlit_cmd(runner=runner, port=streamlit_port, base_url_path=pub)
+    env = _build_streamlit_env(target=target, api_prefix=api_prefix, internal_api_base=internal)
+
+    streamlit_proc: subprocess.Popen[Any] | None = None
+    upstream_url: str = ""
+
+    gateway_app: ASGIApp = build_gateway(
+        fl.api,
+        "",
+        upstream_resolver=lambda: upstream_url,
+        access_log=fl.settings.enable_gateway_access_log,
+        api_prefix=api_prefix,
+        root_mount=mount,
+    )
+    gateway_app = _inject_public_root_path(gateway_app, mount)
+
+    async def app(scope: Scope, receive: Receive, send: Send) -> None:
+        nonlocal streamlit_proc, upstream_url
+
+        stype = scope.get("type")
+        if stype == "lifespan":
+            # Ensure keys required / conventional for ASGI Lifespan and framework routers.
+            lifespan_scope: dict[str, Any] = dict(scope)
+            lifespan_scope.setdefault("state", {})
+            asgi_info: dict[str, Any] = dict(lifespan_scope.get("asgi") or {})
+            asgi_info.setdefault("version", "3.0")
+            asgi_info.setdefault("spec_version", "2.0")
+            lifespan_scope["asgi"] = asgi_info
+
+            lifespan_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+            inner_task: asyncio.Task[None] | None = None
+
+            async def bridge_receive() -> dict[str, Any]:
+                return await lifespan_queue.get()
+
+            async def bridge_send(message: MutableMapping[str, Any]) -> None:
+                await send(message)
+
+            while True:
+                message = dict(await receive())
+                msg_type = message.get("type")
+
+                if msg_type == "lifespan.startup":
+                    if inner_task is not None:
+                        await send({"type": "lifespan.startup.complete"})
+                        continue
+                    try:
+                        popen_kwargs: dict[str, Any] = {"env": env}
+                        if sys.platform.startswith("win"):
+                            popen_kwargs["creationflags"] = getattr(  # noqa: B009
+                                subprocess, "CREATE_NEW_PROCESS_GROUP"
+                            )
+                        else:
+                            popen_kwargs["start_new_session"] = True
+
+                        streamlit_proc = subprocess.Popen(cmd, **popen_kwargs)
+                        _wait_for_tcp("127.0.0.1", streamlit_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+                        upstream_url = f"http://127.0.0.1:{streamlit_port}"
+                    except Exception as e:
+                        if streamlit_proc is not None:
+                            _terminate_process(streamlit_proc, timeout_s=2.0)
+                            streamlit_proc = None
+                        upstream_url = ""
+                        await send({"type": "lifespan.startup.failed", "message": str(e)})
+                        return
+
+                    inner_task = asyncio.create_task(
+                        fl.api(lifespan_scope, bridge_receive, bridge_send)
+                    )
+                    await lifespan_queue.put(message)
+                    await asyncio.sleep(0)
+                    if inner_task.done():
+                        upstream_url = ""
+                        if streamlit_proc is not None:
+                            _terminate_process(streamlit_proc, timeout_s=2.0)
+                            streamlit_proc = None
+                        exc = inner_task.exception()
+                        if exc is not None:
+                            await send({"type": "lifespan.startup.failed", "message": str(exc)})
+                        return
+                    continue
+
+                if msg_type == "lifespan.shutdown":
+                    try:
+                        if inner_task is not None:
+                            await lifespan_queue.put(message)
+                            await inner_task
+                        else:
+                            await send({"type": "lifespan.shutdown.complete"})
+                    finally:
+                        upstream_url = ""
+                        if streamlit_proc is not None:
+                            _terminate_process(streamlit_proc, timeout_s=5.0)
+                            streamlit_proc = None
+                    return
+
+                # Lifespan spec: only startup and shutdown are defined for receive.
+                continue
+
+        if stype not in {"http", "websocket"}:
+            msg = f"Unsupported ASGI scope type: {stype!r}"
+            raise RuntimeError(msg)
+
+        # If the sidecar is down (or lifespan wasn't run), fail fast with a clean response.
+        if not upstream_url or (streamlit_proc is not None and streamlit_proc.poll() is not None):
+            upstream_url = ""
+            streamlit_proc = None
+            if stype == "http":
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 503,
+                        "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+                    }
+                )
+                await send(
+                    {
+                        "type": "http.response.body",
+                        "body": b"FluxLit Streamlit sidecar is not running.",
+                        "more_body": False,
+                    }
+                )
+                return
+            if stype == "websocket":
+                await send(
+                    {
+                        "type": "websocket.close",
+                        "code": 1013,
+                        "reason": "FluxLit Streamlit sidecar is not running.",
+                    }
+                )
+                return
+
+        await gateway_app(scope, receive, send)
+
+    return app
+
+
+def create_unified_app() -> ASGIApp:
+    """ASGI factory for Uvicorn ``--factory`` (same stack as :meth:`fluxlit.app.FluxLit.__call__`).
+
+    Requires ``FLUXLIT_APP=module:attr``. Prefer ``uvicorn main:app`` when ``app`` is a
+    :class:`~fluxlit.app.FluxLit` instance so you do not need this factory or env indirection.
+    """
+    if not (os.environ.get("FLUXLIT_APP") or "").strip():
+        msg = (
+            "Missing required environment variable FLUXLIT_APP. "
+            "Set it before using `create_unified_app` with Uvicorn --factory."
+        )
+        raise RuntimeError(msg)
+    target = os.environ["FLUXLIT_APP"].strip()
+    fl = load_fluxlit(target)
+    return asgi_from_fluxlit(fl, target)
 
 
 def run_unified(

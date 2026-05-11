@@ -62,6 +62,18 @@ fluxlit dev
 fluxlit dev app:app
 ```
 
+**Or** run it like a normal FastAPI project (same `app` object):
+
+```bash
+uvicorn app:app --host 127.0.0.1 --port 8000
+```
+
+A :class:`~fluxlit.app.FluxLit` instance **is** an ASGI application: Uvicorn calls it directly—no `--factory` and no `FLUXLIT_APP` env var required when your file is `app.py` and the variable is `app` (the default `target` is `app:app`). If your module is named differently (e.g. `main.py`), set **`target = "main:app"`** in `fluxlit.toml`, or pass ``import_target="main:app"`` to :class:`~fluxlit.app.FluxLit`, or set ``FLUXLIT_APP``.
+
+Put **`gateway_port`** in `fluxlit.toml` (or **`FLUXLIT_GATEWAY_PORT`**) to match Uvicorn’s **`--port`** when it is not **8000**, so the Streamlit sidecar can reach the API.
+
+Advanced / legacy: ``uvicorn fluxlit.runtime:create_unified_app --factory`` with ``FLUXLIT_APP`` still works; prefer ``uvicorn app:app`` for clarity.
+
 FluxLit looks for **`app:app`** by default. You can set **`target`** in `fluxlit.toml` or `pyproject.toml` under **`[tool.fluxlit]`** instead of typing it every time—see {doc}`configuration`.
 
 - Open the URL Uvicorn prints (default `http://127.0.0.1:8000`).

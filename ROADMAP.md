@@ -18,16 +18,85 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Dev reload:** `--reload-scope=gateway` (default) vs `--reload-scope=full` (Uvicorn reload plus Streamlit restart via `watchfiles`); invalid scope fails before spawning Streamlit.
 - **Observability (baseline):** optional structured gateway access logs (`enable_gateway_access_log`); log redaction helpers for sensitive headers; temp-file upstream state so reload workers and Streamlit restarts stay aligned.
 - **Tests (deeper):** async readiness probe against threaded upstreams; gateway access-log behavior; upstream file/env precedence; reload-watcher callback; extended redaction and doctor/auth import edge cases.
+- **Unified ASGI:** `FluxLit` as a normal ASGI entrypoint (`uvicorn app:app`); lifespan bridged to the inner FastAPI app; regression suite in `tests/test_asgi_unified.py` (lifespan + concurrent HTTP, streaming body, sidecar failure) — foundation for **Version 0.5** soak/chaos work.
 
 **Gaps vs “production”**
 
 - CI adds **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, and Playwright **e2e** (including subpath); continue with soak/load and broader scenarios over time.
 - **Metrics** (Prometheus / OTel), hardened Docker/K8s beyond `fluxlit build` + `examples/docker_compose`, and broader proxy edge cases remain open; optional **`fluxlit[auth]`** covers JWT/OIDC/BFF patterns from **Version 0.3** onward.
 - **Browser refresh continuity** for Streamlit (cookie-free, URL + server store) is specified under **Phase 2 follow-on** in this file but not implemented yet.
+- Deeper **operational maturity** (SLOs, runbooks, chaos/load, supply-chain, multi-replica guidance) is tracked under **Version 0.5** below.
 
 **Next: 0.5.x**
 
-- Hardening and product depth: observability, Streamlit lifecycle on reload, session continuity, and deployment templates — see phased sections below (including **Version 0.3** outcomes already on PyPI).
+- **Version 0.5** (below) is the planned **production-hardening** release: reliability, security supply chain, deployment/runbooks, observability, testing depth, and versioning/support policy — alongside ongoing **Phase 2 follow-on** (Streamlit refresh continuity) and **Phase 4** items folded into that slice where they overlap.
+
+---
+
+## Version 0.5 — Production hardening & operations (planned)
+
+**Theme:** Close the gap between “runs well in dev/CI” and **operated production**: measurable reliability, defensible security posture, observable failure modes, and documented scale paths — without requiring a 1.0 semver freeze.
+
+### Reliability & operations
+
+| Feature | Description |
+|---------|-------------|
+| **Structured logging + correlation** | JSON logs in container images; one **request / trace** correlation id from gateway → FastAPI → Streamlit logs; document required fields for common log stacks. |
+| **SLOs & alerting** | Documented SLO examples (e.g. p99 on `GET /api/healthz`, error budget on `GET /api/readyz`); map to alert rules, not only process liveness. |
+| **Graceful shutdown** | Document and test **SIGTERM** under real orchestrators (e.g. Kubernetes `preStop`, `terminationGracePeriodSeconds`): in-flight HTTP/WebSocket drain, Streamlit teardown order, and upper-bound timeouts. |
+| **Backpressure & timeouts** | Explicit timeouts on httpx / WebSocket paths to the Streamlit upstream; optional max request body size; limits on concurrent upstream connections so a wedged sidecar cannot exhaust the gateway. |
+
+### Security & supply chain
+
+| Feature | Description |
+|---------|-------------|
+| **Dependency & image hygiene** | **SBOM** generation; **`pip-audit`** (or equivalent) in CI; pinned base images; reproducible lockfiles in templates where applicable. |
+| **Container hardening** | **Non-root** user in generated and reference Dockerfiles; **read-only root filesystem** where compatible; least-privilege defaults in `fluxlit build` output. |
+| **Secrets lifecycle** | Guidance and checks: no secrets in logs; integration patterns for secret stores; **JWT / OIDC secret rotation** runbook. |
+| **TLS & edge headers** | Production checklist: **HSTS**, **CSP** notes for Streamlit-typical layouts, strict **`forwarded_allow_ips`** when trusting proxies; validate against real TLS termination (same as production). |
+
+### Deployment & scale
+
+| Feature | Description |
+|---------|-------------|
+| **Horizontal scale** | First-class docs: **sticky sessions** vs replica count vs Streamlit session model; when to add an external session store (ties to **Phase 2 follow-on**). |
+| **Multi-worker stance** | Keep “**not supported** for unified in-process Uvicorn workers” explicit; document **supported alternatives** (e.g. one process per replica, or split gateway / Streamlit topology if a platform demands it). |
+
+### Testing & quality
+
+| Feature | Description |
+|---------|-------------|
+| **Contract tests** | OpenAPI snapshot or consumer-driven tests to catch API vs UI drift in CI. |
+| **Soak & load** | Long-running `fluxlit run` / `uvicorn` with sustained traffic; baseline WebSocket concurrency under load. |
+| **Chaos & failure injection** | Scripted scenarios: Streamlit killed, slow upstream, partial network partition — aligned with `tests/test_asgi_unified.py` failure modes. |
+| **Upgrade matrix** | CI matrix: **minimum and latest** supported Python, Streamlit, FastAPI/Starlette (or documented subset) to catch breakage early. |
+
+### Observability
+
+| Feature | Description |
+|---------|-------------|
+| **RED / USE metrics** | Prometheus-friendly metrics from the gateway (requests, latency, errors, upstream status class); optional **USE** for resource saturation. |
+| **Distributed tracing** | OpenTelemetry hooks with context propagation across the gateway → internal API hop (aligns with **Version 0.3** “correlation” row). |
+| **Runbooks** | One short runbook per common incident: **503 on `readyz`**, blank Streamlit, WebSocket failures behind nginx/Traefik, auth misconfig — linked from **troubleshooting** docs. |
+
+### Product, versioning & support
+
+| Feature | Description |
+|---------|-------------|
+| **Semver & changelog discipline** | Clear **0.x** cadence; **CHANGELOG** entries per release; short **upgrade X → Y** checklist for breaking CLI/config/runtime changes. |
+| **Support matrix** | Published “supported combinations” (Python × Streamlit × FluxLit); optional **LTS** or extended-support branch policy if demand warrants. |
+
+### Success criteria (0.5)
+
+- Operators can answer **“is it healthy?”**, **“why did it fail?”**, and **“how do I roll safely?”** from docs + defaults without reading source.
+- CI blocks regressions on **authored** security/supply-chain gates agreed for the repo (audit/SBOM as adopted).
+- At least one **reference deployment** path (e.g. Kubernetes example) matches hardened Dockerfile and env contract.
+
+### Relation to other roadmap items
+
+- **Phase 4 (Production runtime):** 0.5 **implements the prioritized subset** (metrics, tracing correlation, K8s example, soak notes); remaining Phase 4 bullets stay until done or folded into later 0.x.
+- **Phase 2 follow-on (URL-bound session):** complementary for **multi-replica** continuity; 0.5 documents scale limits until an external store exists.
+- **Version 0.3:** security headers, correlation, and doctor extensions **feed** 0.5 TLS/proxy/runbook work.
 
 ---
 
@@ -260,19 +329,21 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 - Operate like a service: observable, portable, and proxy-aware.
 
+**Tracking:** concrete delivery and acceptance criteria for the next wave of Phase 4 work are folded into **Version 0.5** above (metrics, tracing, hardened containers, K8s example, soak/load, runbooks).
+
 ### Features
 
-- **Health and readiness** for Kubernetes — **partial:** liveness (`/api/healthz`) and readiness (`/api/readyz` vs Streamlit) shipped; multi-probe charts and operator runbooks still TBD.
-- **Metrics:** Prometheus-friendly endpoints or OpenTelemetry hooks.
-- **Structured logging + tracing** correlation across gateway and API — **partial:** optional per-request gateway INFO logs with structured `extra`; full trace propagation still TBD.
-- **Docker:** official image or `Dockerfile` template; non-root user; multi-stage build.
-- **Kubernetes:** example Deployment + Service + Ingress annotations.
-- **`root_path` / `X-Forwarded-*`:** first-class docs and tests for subpath deployment.
+- **Health and readiness** for Kubernetes — **partial:** liveness (`/api/healthz`) and readiness (`/api/readyz` vs Streamlit) shipped; multi-probe charts and operator runbooks still TBD (**0.5**).
+- **Metrics:** Prometheus-friendly endpoints or OpenTelemetry hooks (**0.5**).
+- **Structured logging + tracing** correlation across gateway and API — **partial:** optional per-request gateway INFO logs with structured `extra`; full trace propagation still TBD (**0.5**).
+- **Docker:** official image or `Dockerfile` template; non-root user; multi-stage build (**0.5** hardening on template output).
+- **Kubernetes:** example Deployment + Service + Ingress annotations (**0.5**).
+- **`root_path` / `X-Forwarded-*`:** first-class docs and tests for subpath deployment (ongoing; **0.5** runbooks for common proxy failures).
 
 ### Success criteria
 
 - One-command container run with documented env vars.
-- Load test or soak notes for websocket proxy under concurrent users (baseline).
+- Load test or soak notes for websocket proxy under concurrent users (baseline) — **0.5** soak/chaos items.
 
 ---
 
@@ -316,6 +387,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 | Area | Today | Target |
 |------|--------|--------|
+| Unified ASGI (v0.5 prep) | `tests/test_asgi_unified.py`: lifespan + concurrent HTTP, httpx + `TestClient`, streaming body, sidecar failure | Soak/chaos suites as **0.5** lands |
 | Gateway HTTP | TestClient + threaded upstream (gzip, redirects); forwarded-header assertions; access-log on/off; `readyz` with fake upstream | More edge cases (timeouts, trailers) |
 | Gateway WebSocket | Echo/proxy happy path against `/_stcore/stream` | Automated stability / reconnect cases |
 | Runtime orchestration | Subprocess `run_unified` + `/api/healthz` (`slow`); upstream state read/write; invalid `reload_scope` before Streamlit spawn; reload-watcher unit test | Optional deeper lifecycle tests |
@@ -342,6 +414,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 - Documented deployment paths (Docker, K8s, reverse proxy).
 - Observable failures (health, logs, metrics).
+- **Version 0.5:** SLO-oriented readiness, runbooks, metrics/tracing, supply-chain and container hardening, soak/chaos and upgrade-matrix CI — see **Version 0.5** section.
 
 ### Community
 

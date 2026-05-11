@@ -15,6 +15,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
@@ -52,6 +53,11 @@ class FluxLit:
         title: If set, overrides ``FluxlitSettings.title`` for this instance.
         settings: Explicit settings; default is :class:`~fluxlit.config.FluxlitSettings`
             loaded from env / ``.env``.
+        import_target: Optional ``module:attr`` string for this instance (same as
+            ``FLUXLIT_APP`` / ``fluxlit.toml`` ``target``). Use when the module name is not
+            ``app`` (e.g. ``main:app``) so ``uvicorn`` and the Streamlit child import the
+            right object. If unset, resolution follows env and project file; see
+            :func:`fluxlit.runtime.resolve_import_target_for_unified`.
         fastapi_kwargs: Extra keyword arguments forwarded to :class:`fastapi.FastAPI`.
     """
 
@@ -60,8 +66,11 @@ class FluxLit:
         *,
         title: str | None = None,
         settings: FluxlitSettings | None = None,
+        import_target: str | None = None,
         fastapi_kwargs: dict[str, Any] | None = None,
     ) -> None:
+        self.import_target = import_target.strip() if import_target else None
+        self._unified_asgi_cache: ASGIApp | None = None
         self.settings = settings or FluxlitSettings()
         if title is not None:
             self.settings.title = title
@@ -121,6 +130,21 @@ class FluxLit:
                 status_code=503,
                 content={"status": "not_ready", "detail": detail},
             )
+
+    def _unified_asgi(self) -> ASGIApp:
+        """Lazily build gateway + Streamlit ASGI (see :meth:`__call__`)."""
+        if self._unified_asgi_cache is None:
+            from fluxlit.runtime import asgi_from_fluxlit, resolve_import_target_for_unified
+
+            self._unified_asgi_cache = asgi_from_fluxlit(
+                self,
+                resolve_import_target_for_unified(self),
+            )
+        return self._unified_asgi_cache
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """ASGI entrypoint: run ``uvicorn main:app`` like a normal FastAPI app."""
+        await self._unified_asgi()(scope, receive, send)
 
     def discover_pages(self, directory: str, *, package: str) -> FluxLit:
         """Load Streamlit page modules and call ``register(self)`` on each.

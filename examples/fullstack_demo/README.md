@@ -28,7 +28,9 @@ export PYTHONPATH="$(pwd)"
 fluxlit dev
 ```
 
-**Why `main.py` and `fluxlit.toml`?** The FluxLit instance lives in **`main.py`** as **`app`**, and the default target is **`main:app`**. Do not name the module `app.py`: if `PYTHONPATH` accidentally includes `…/fluxlit/src/fluxlit`, then `import app` loads **FluxLit’s library** `fluxlit/app.py` (the `FluxLit` class), which has **no** `app` attribute — Streamlit then fails with `module 'app' has no attribute 'app'`.
+**Why `main.py` and `fluxlit.toml`?** The FluxLit instance lives in **`main.py`** as **`app`**, and the default target is **`main:app`**.
+
+Historically this example avoided `app.py` because a polluted `PYTHONPATH` could cause `import app` to resolve to FluxLit’s internal `app.py` instead of your project’s file. FluxLit now prefers `./app.py` when you run `fluxlit dev app:app` from the project directory, so the naming collision is no longer a problem.
 
 Set **`PYTHONPATH`** to this directory so `main` resolves. **`fluxlit.toml`** sets `target = "main:app"` so you can run plain **`fluxlit dev`** from this folder. Open the **gateway** URL FluxLit prints (e.g. `http://127.0.0.1:8501`); Streamlit may use another ephemeral port internally.
 

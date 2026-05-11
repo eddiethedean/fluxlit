@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- **ASGI / Uvicorn:** `FluxLit` is a first-class ASGI app (`uvicorn app:app`); unified stack via `asgi_from_fluxlit` / `create_unified_app` with lifespan bridged to the inner FastAPI app, Streamlit sidecar lifecycle, and spec-shaped HTTP/WebSocket error responses.
+- **Imports:** `load_fluxlit` prefers a local `./<module>.py` when resolving targets (avoids `app.py` / `PYTHONPATH` shadowing); optional `FluxLit(import_target=...)` for explicit `module:attr`.
+- **CLI:** `fluxlit new` writes `fluxlit.toml` with `target` and `gateway_port`; mentions `uvicorn app:app`.
+- **Tests:** `tests/test_asgi_unified.py` for lifespan, concurrent HTTP, streaming request bodies, sidecar failure, and related edge cases.
+- **Docs / roadmap:** Quickstart and deployment document the simple Uvicorn entrypoint; **ROADMAP** adds planned **Version 0.5** production-hardening themes and ties **Phase 4** delivery to that track.
+
 ## 0.4.1
 
 - **Docs:** Fix PyPI version badge image URL in `README.md` (use Shields `pypi/v` badge).

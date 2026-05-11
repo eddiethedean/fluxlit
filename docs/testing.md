@@ -79,6 +79,7 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 
 | Area | Examples |
 |------|----------|
+| Unified ASGI | `tests/test_asgi_unified.py` — lifespan + concurrent HTTP, httpx + `TestClient`, streaming bodies, sidecar failure |
 | Readiness | `tests/test_health_probe.py`, `tests/test_gateway_readyz.py`, `tests/test_app.py` (`readyz`) |
 | Gateway logging | `tests/test_gateway_access_log.py` |
 | Upstream state | `tests/test_runtime_upstream.py` |

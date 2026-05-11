@@ -16,6 +16,31 @@ The **`target`** (`module:attr`) resolves the same way as `fluxlit dev`: CLI arg
 
 Behind a reverse proxy, pass **`--proxy-headers`** (or set `FLUXLIT_TRUST_PROXY=1`) and configure `FLUXLIT_ROOT_PATH` when the app is mounted under a subpath — see the reverse-proxy section in {doc}`configuration`.
 
+## Running under Uvicorn directly
+
+The usual pattern matches FastAPI: your `FluxLit` instance is the ASGI app.
+
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+Set **`target`** in `fluxlit.toml` (or `FluxLit(import_target=...)`, or `FLUXLIT_APP`) when
+the import path is not `app:app`. Set **`gateway_port`** in `fluxlit.toml` (or
+`FLUXLIT_GATEWAY_PORT`) to match **`--port`** when it is not **8000**.
+
+Legacy / factory entrypoint (same stack, requires env):
+
+```bash
+export FLUXLIT_APP="app:app"
+uvicorn fluxlit.runtime:create_unified_app --factory --host 0.0.0.0 --port 8000
+```
+
+Notes:
+
+- Uvicorn `--workers` > 1 is **not supported** for the unified stack.
+- Lifespan follows the ASGI spec; the inner FastAPI app’s lifespan runs after the
+  Streamlit sidecar starts.
+
 ## Health checks
 
 | Probe | Path | Meaning |

@@ -305,9 +305,13 @@ def test_new_scaffold_writes_app_py(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     runner = CliRunner()
     res = runner.invoke(app, ["new", "scaffold_demo"], catch_exceptions=False)
     assert res.exit_code == 0
-    app_py = tmp_path / "scaffold_demo" / "app.py"
+    root = tmp_path / "scaffold_demo"
+    app_py = root / "app.py"
     assert app_py.is_file()
     assert "FluxLit" in app_py.read_text(encoding="utf-8")
+    toml = root / "fluxlit.toml"
+    assert toml.is_file()
+    assert 'target = "app:app"' in toml.read_text(encoding="utf-8")
 
 
 def test_new_exits_when_destination_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

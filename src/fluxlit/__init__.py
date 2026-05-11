@@ -62,4 +62,4 @@ __all__ = [
     "register_oidc_bff_routes",
     "__version__",
 ]
-__version__ = "0.4.1"
+__version__ = "0.5.0"
