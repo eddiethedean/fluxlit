@@ -10,7 +10,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -400,7 +400,7 @@ async def test_http_503_body_shape_matches_asgi_http_spec(
     await asgi(scope, receive, send)  # type: ignore[arg-type]
     start = next(m for m in sent if m.get("type") == "http.response.start")
     assert start["status"] == 503
-    hdrs = list(start.get("headers") or [])
+    hdrs = cast(list[tuple[bytes, bytes]], list(start.get("headers") or []))
     assert all(isinstance(a, (bytes, bytearray)) for a, _ in hdrs)
     body = next(m for m in sent if m.get("type") == "http.response.body")
     assert body.get("more_body") is False
