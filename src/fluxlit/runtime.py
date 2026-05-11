@@ -271,15 +271,23 @@ def _pid_is_zombie_unix(pid: int) -> bool:
 
 def _pid_running(pid: int) -> bool:
     if sys.platform.startswith("win"):
-        # Avoid parsing ``tasklist`` output (locale-dependent). OpenProcess is authoritative.
+        # Avoid parsing ``tasklist`` output (locale-dependent). OpenProcess alone is not
+        # enough: a terminated child can still be opened until the parent reaps it, so we
+        # must consult ``GetExitCodeProcess`` (``STILL_ACTIVE`` means still running).
         import ctypes
+        from ctypes import wintypes
 
         kernel32 = ctypes.windll.kernel32
         PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
         ERROR_ACCESS_DENIED = 5
+        STILL_ACTIVE = 259
         handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
         if handle:
+            exit_code = wintypes.DWORD()
+            ok = int(kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)))
             kernel32.CloseHandle(handle)
+            if ok:
+                return int(exit_code.value) == STILL_ACTIVE
             return True
         # ``GetLastError`` is often typed as ``Any`` in stubs; coerce for ``no-any-return``.
         return int(kernel32.GetLastError()) == ERROR_ACCESS_DENIED
