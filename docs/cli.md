@@ -2,6 +2,22 @@
 
 The `fluxlit` console script (or `python -m fluxlit`) is built with Typer.
 
+## Setup
+
+```{include} _generated/setup.txt
+:literal:
+```
+
+## CLI help (real output)
+
+```bash
+fluxlit --help
+```
+
+```{include} _generated/fluxlit_help_entrypoint.txt
+:literal:
+```
+
 ```{tip}
 **`fluxlit dev`** — local development; optional `--reload` and `--reload-scope`. **`fluxlit run`** — production-style process (no reloader). Both start the same **gateway + Streamlit** stack.
 ```

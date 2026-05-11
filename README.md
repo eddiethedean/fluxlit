@@ -44,6 +44,16 @@ Optional JWT / OIDC / BFF helpers: `pip install "fluxlit[auth]"` — see [Auth r
 fluxlit new my-app && cd my-app   # optional
 ```
 
+### Setup (for the commands below)
+
+```bash
+python -c "import fluxlit; print('fluxlit version:', fluxlit.__version__)"
+```
+
+```text
+fluxlit version: 0.5.0
+```
+
 `app.py`:
 
 ```python
@@ -63,6 +73,34 @@ def home(st, client):
 
 ```bash
 fluxlit dev    # default target app:app; or fluxlit dev your.module:app
+```
+
+- **CLI help (real output)**:
+
+```bash
+fluxlit --help
+```
+
+```text
+                                                                                
+ Usage: fluxlit [OPTIONS] COMMAND [ARGS]...                                     
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ dev       Run the unified stack for local development (Streamlit subprocess  │
+│           + Uvicorn gateway).                                                │
+│ shutdown  Stop ``fluxlit dev`` or ``fluxlit run`` using the PID file they    │
+│           write.                                                             │
+│ run       Run the unified stack for production-style use (no Uvicorn         │
+│           reload).                                                           │
+│ doctor    Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).       │
+│ build     Emit a minimal ``Dockerfile`` and ``.dockerignore`` for container  │
+│           deployment.                                                        │
+│ new       Create ``<name>/app.py`` with a sample API route and Streamlit     │
+│           home page.                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
 ```
 
 - **UI:** app root on the URL Uvicorn prints (default port **8000**).

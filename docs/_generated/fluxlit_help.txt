@@ -1,0 +1,20 @@
+                                                                                
+ Usage: python -m fluxlit [OPTIONS] COMMAND [ARGS]...                           
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --help          Show this message and exit.                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ dev       Run the unified stack for local development (Streamlit subprocess  │
+│           + Uvicorn gateway).                                                │
+│ shutdown  Stop ``fluxlit dev`` or ``fluxlit run`` using the PID file they    │
+│           write.                                                             │
+│ run       Run the unified stack for production-style use (no Uvicorn         │
+│           reload).                                                           │
+│ doctor    Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).       │
+│ build     Emit a minimal ``Dockerfile`` and ``.dockerignore`` for container  │
+│           deployment.                                                        │
+│ new       Create ``<name>/app.py`` with a sample API route and Streamlit     │
+│           home page.                                                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
