@@ -271,18 +271,17 @@ def _pid_is_zombie_unix(pid: int) -> bool:
 
 def _pid_running(pid: int) -> bool:
     if sys.platform.startswith("win"):
-        try:
-            out = subprocess.run(
-                ["tasklist", "/FI", f"PID eq {pid}", "/NH"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired):
+        # Avoid parsing ``tasklist`` output (locale-dependent). OpenProcess is authoritative.
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        ERROR_ACCESS_DENIED = 5
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if handle:
+            kernel32.CloseHandle(handle)
             return True
-        line = (out.stdout or "").strip()
-        return bool(line) and "INFO:" not in line
+        return kernel32.GetLastError() == ERROR_ACCESS_DENIED
 
     try:
         os.kill(pid, 0)
@@ -295,6 +294,19 @@ def _pid_running(pid: int) -> bool:
     return True
 
 
+def _windows_taskkill_tree(pid: int, *, force: bool) -> subprocess.CompletedProcess[str]:
+    cmd = ["taskkill", "/PID", str(pid), "/T"]
+    if force:
+        cmd.append("/F")
+    return subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+
+
 def shutdown_unified_process(
     pidfile: Path | None = None,
     *,
@@ -304,6 +316,9 @@ def shutdown_unified_process(
     """Stop a stack started by :func:`run_unified` using its PID file.
 
     Sends ``SIGTERM`` to the recorded PID (the process running Uvicorn + supervision).
+    On Windows, uses ``taskkill /T`` (and ``/F`` when *force* is True) instead of
+    ``os.kill``, which does not reliably terminate arbitrary processes.
+
     If ``force`` is True on POSIX, sends ``SIGKILL`` after *wait_s* if still running.
 
     Returns:
@@ -325,13 +340,22 @@ def shutdown_unified_process(
         path.unlink(missing_ok=True)
         return 0, f"Removed stale pid file (pid {pid} not running)"
 
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        path.unlink(missing_ok=True)
-        return 0, f"Process {pid} exited before signal was delivered"
-    except PermissionError as e:
-        return 1, f"Cannot signal pid {pid}: {e}"
+    if sys.platform.startswith("win"):
+        tk = _windows_taskkill_tree(pid, force=False)
+        combined = f"{tk.stdout or ''}{tk.stderr or ''}"
+        if tk.returncode != 0:
+            lowered = combined.lower()
+            if "could not find" in lowered or "not found" in lowered or "not running" in lowered:
+                path.unlink(missing_ok=True)
+                return 0, f"Process {pid} exited before signal was delivered"
+    else:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            path.unlink(missing_ok=True)
+            return 0, f"Process {pid} exited before signal was delivered"
+        except PermissionError as e:
+            return 1, f"Cannot signal pid {pid}: {e}"
 
     deadline = time.monotonic() + wait_s
     while time.monotonic() < deadline:
@@ -340,9 +364,12 @@ def shutdown_unified_process(
             return 0, f"Stopped process {pid}"
         time.sleep(0.05)
 
-    if force and not sys.platform.startswith("win"):
-        with contextlib.suppress(ProcessLookupError):
-            os.kill(pid, signal.SIGKILL)
+    if force:
+        if sys.platform.startswith("win"):
+            _windows_taskkill_tree(pid, force=True)
+        else:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGKILL)
         t2 = time.monotonic() + 2.0
         while time.monotonic() < t2:
             if not _pid_running(pid):

@@ -73,7 +73,7 @@ See {doc}`configuration` (reverse proxies).
 
 If **`fluxlit shutdown`** cannot find the process, use the same **`--pidfile`** (or `FLUXLIT_PIDFILE`) and working directory as `dev` / `run`. See {doc}`cli`.
 
-On **Windows**, **`--force`** does not escalate to SIGKILL; if SIGTERM is not enough, end the process manually (`taskkill`, Task Manager).
+On **Windows**, the first stop attempt uses ``taskkill /T``; with **`--force`**, FluxLit runs ``taskkill /T /F``. If the PID file targets a process your shell cannot stop, use Task Manager or an elevated prompt.
 
 ## Getting help
 
