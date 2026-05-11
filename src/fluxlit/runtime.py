@@ -342,6 +342,8 @@ def shutdown_unified_process(
         return 0, f"Removed stale pid file (pid {pid} not running)"
 
     if sys.platform.startswith("win"):
+        # Try graceful termination first, but many headless console processes (like tests)
+        # don't respond unless we force-kill; we'll escalate if still running after waiting.
         tk = _windows_taskkill_tree(pid, force=False)
         combined = f"{tk.stdout or ''}{tk.stderr or ''}"
         if tk.returncode != 0:
@@ -364,6 +366,17 @@ def shutdown_unified_process(
             path.unlink(missing_ok=True)
             return 0, f"Stopped process {pid}"
         time.sleep(0.05)
+
+    if sys.platform.startswith("win") and not force:
+        # Escalate on Windows even without --force; otherwise headless processes often
+        # survive the graceful taskkill signal indefinitely.
+        _windows_taskkill_tree(pid, force=True)
+        t_escalate = time.monotonic() + 2.0
+        while time.monotonic() < t_escalate:
+            if not _pid_running(pid):
+                path.unlink(missing_ok=True)
+                return 0, f"Stopped process {pid}"
+            time.sleep(0.05)
 
     if force:
         if sys.platform.startswith("win"):

@@ -25,7 +25,9 @@ async def probe_streamlit_ready(*, timeout_s: float = 0.5) -> tuple[bool, str]:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             response = await client.get(url)
     except (httpx.HTTPError, OSError) as e:
-        return False, str(e)
+        # Some Win32 socket errors stringify to "", but tests/ops want a non-empty reason.
+        detail = str(e) or f"{type(e).__name__}: {e!r}"
+        return False, detail
     if 200 <= response.status_code < 300:
         return True, "ok"
     return False, f"upstream_http_{response.status_code}"
