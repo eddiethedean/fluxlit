@@ -342,15 +342,26 @@ def shutdown_unified_process(
         return 0, f"Removed stale pid file (pid {pid} not running)"
 
     if sys.platform.startswith("win"):
-        # Try graceful termination first, but many headless console processes (like tests)
-        # don't respond unless we force-kill; we'll escalate if still running after waiting.
-        tk = _windows_taskkill_tree(pid, force=False)
-        combined = f"{tk.stdout or ''}{tk.stderr or ''}"
-        if tk.returncode != 0:
-            lowered = combined.lower()
-            if "could not find" in lowered or "not found" in lowered or "not running" in lowered:
-                path.unlink(missing_ok=True)
-                return 0, f"Process {pid} exited before signal was delivered"
+        # Prefer `os.kill(..., SIGTERM)` first: it reliably terminates Python processes
+        # (including the ones spawned in our tests). Fall back to taskkill for non-Python
+        # or permission edge cases.
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            path.unlink(missing_ok=True)
+            return 0, f"Process {pid} exited before signal was delivered"
+        except Exception:
+            tk = _windows_taskkill_tree(pid, force=False)
+            combined = f"{tk.stdout or ''}{tk.stderr or ''}"
+            if tk.returncode != 0:
+                lowered = combined.lower()
+                if (
+                    "could not find" in lowered
+                    or "not found" in lowered
+                    or "not running" in lowered
+                ):
+                    path.unlink(missing_ok=True)
+                    return 0, f"Process {pid} exited before signal was delivered"
     else:
         try:
             os.kill(pid, signal.SIGTERM)
@@ -368,8 +379,8 @@ def shutdown_unified_process(
         time.sleep(0.05)
 
     if sys.platform.startswith("win") and not force:
-        # Escalate on Windows even without --force; otherwise headless processes often
-        # survive the graceful taskkill signal indefinitely.
+        # If SIGTERM didn't work, escalate with taskkill /F (same behavior as --force on
+        # POSIX where we follow SIGTERM with SIGKILL).
         _windows_taskkill_tree(pid, force=True)
         t_escalate = time.monotonic() + 2.0
         while time.monotonic() < t_escalate:
