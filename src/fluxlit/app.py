@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import logging
 import pkgutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from types import FunctionType
 from typing import Any
 
@@ -31,6 +31,17 @@ from fluxlit.oidc import GenericOIDCClient, OIDCBFFConfig, register_oidc_bff_rou
 from fluxlit.security_middleware import SecurityHeadersMiddleware
 
 _api_log = logging.getLogger("fluxlit.api")
+
+# Passed explicitly to CORSMiddleware; duplicates in **kwargs raise TypeError at runtime.
+_CORS_MIDDLEWARE_EXCLUSIVE_KWARGS = frozenset(
+    {"allow_origins", "allow_credentials", "allow_methods", "allow_headers"}
+)
+
+
+def _cors_middleware_extras(cors_middleware_kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Drop keys FluxLit always sets on ``CORSMiddleware`` so ``**extras`` never duplicates."""
+    skip = _CORS_MIDDLEWARE_EXCLUSIVE_KWARGS
+    return {k: v for k, v in cors_middleware_kwargs.items() if k not in skip}
 
 
 class FluxLit:
@@ -58,7 +69,15 @@ class FluxLit:
             ``app`` (e.g. ``main:app``) so ``uvicorn`` and the Streamlit child import the
             right object. If unset, resolution follows env and project file; see
             :func:`fluxlit.runtime.resolve_import_target_for_unified`.
-        fastapi_kwargs: Extra keyword arguments forwarded to :class:`fastapi.FastAPI`.
+        fastapi_kwargs: Extra keyword arguments forwarded to :class:`fastapi.FastAPI`
+            (``lifespan``, ``dependencies``, ``openapi_url``, ``docs_url``, etc.). ``title`` and
+            ``root_path`` always come from :class:`~fluxlit.config.FluxlitSettings` so the API
+            stays aligned with the gateway and Streamlit public path.
+        streamlit_run_args: Optional extra ``streamlit run`` CLI tokens; appended to
+            :attr:`~fluxlit.config.FluxlitSettings.streamlit_run_cli_args` on :attr:`settings`.
+        streamlit_page_config: Optional keys merged into
+            :attr:`~fluxlit.config.FluxlitSettings.streamlit_page_config` for
+            :func:`streamlit.set_page_config` in the Streamlit process.
     """
 
     def __init__(
@@ -68,6 +87,8 @@ class FluxLit:
         settings: FluxlitSettings | None = None,
         import_target: str | None = None,
         fastapi_kwargs: dict[str, Any] | None = None,
+        streamlit_run_args: Sequence[str] | None = None,
+        streamlit_page_config: dict[str, Any] | None = None,
     ) -> None:
         self.import_target = import_target.strip() if import_target else None
         self._unified_asgi_cache: ASGIApp | None = None
@@ -75,12 +96,23 @@ class FluxLit:
         if title is not None:
             self.settings.title = title
 
-        fa_kwargs: dict[str, Any] = {
-            "title": self.settings.title,
-            "root_path": self.settings.public_mount_path(),
-        }
-        if fastapi_kwargs:
-            fa_kwargs.update(fastapi_kwargs)
+        settings_updates: dict[str, Any] = {}
+        if streamlit_run_args is not None:
+            settings_updates["streamlit_run_cli_args"] = [
+                *self.settings.streamlit_run_cli_args,
+                *streamlit_run_args,
+            ]
+        if streamlit_page_config is not None:
+            merged_pages = dict(self.settings.streamlit_page_config)
+            merged_pages.update(streamlit_page_config)
+            settings_updates["streamlit_page_config"] = merged_pages
+        if settings_updates:
+            self.settings = self.settings.model_copy(update=settings_updates)
+
+        fa_kwargs: dict[str, Any] = dict(fastapi_kwargs or {})
+        # Always align with FluxlitSettings so the gateway and Streamlit baseUrlPath match.
+        fa_kwargs["title"] = self.settings.title
+        fa_kwargs["root_path"] = self.settings.public_mount_path()
 
         self.api = FastAPI(**fa_kwargs)
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
@@ -95,6 +127,7 @@ class FluxLit:
                 allow_credentials=self.settings.cors_allow_credentials,
                 allow_methods=["*"],
                 allow_headers=["*"],
+                **_cors_middleware_extras(self.settings.cors_middleware_kwargs),
             )
 
         if self.settings.enable_request_logging:

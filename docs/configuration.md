@@ -61,12 +61,17 @@ log_level = "info"
 | `FLUXLIT_ENABLE_SECURITY_HEADERS` | If true, add baseline security headers on the FastAPI app (HSTS when HTTPS, `X-Content-Type-Options`, etc.). |
 | `FLUXLIT_CORS_ALLOW_ORIGINS` | JSON list of allowed origins (e.g. `["http://localhost:3000"]`). Empty list disables CORS middleware. |
 | `FLUXLIT_CORS_ALLOW_CREDENTIALS` | Whether to set `Access-Control-Allow-Credentials` when CORS is enabled. |
+| `FLUXLIT_CORS_MIDDLEWARE_KWARGS` | JSON object of extra keyword arguments for Starlette `CORSMiddleware` when CORS is enabled (e.g. `{"expose_headers": ["X-My-Header"], "max_age": 600}`). |
+| `FLUXLIT_STREAMLIT_RUN_CLI_ARGS` | JSON list of extra `streamlit run` CLI tokens appended after FluxLit’s built-in flags (e.g. `["--theme.base","light"]`). |
+| `FLUXLIT_STREAMLIT_PAGE_CONFIG` | JSON object merged into `streamlit.set_page_config` (keys such as `layout`, `page_icon`, `initial_sidebar_state`, `menu_items`; `page_title` defaults from `FLUXLIT_TITLE`). |
 | `FLUXLIT_PUBLIC_BASE_URL` | Public origin for OAuth redirects (e.g. `https://app.example.com`), used with BFF/OIDC helpers. |
 | `FLUXLIT_JWT_ISSUER` / `FLUXLIT_JWT_AUDIENCE` | Expected JWT `iss` / `aud` when using :meth:`fluxlit.jwt_auth.JWTBearer.from_fluxlit_settings` or :meth:`fluxlit.app.FluxLit.make_jwt_bearer`. |
 | `FLUXLIT_JWT_HS256_SECRET` | HS256 secret (dev/small deploys); omit if using JWKS. |
 | `FLUXLIT_JWT_JWKS_URL` | JWKS URL for RS256; omit if using HS256 secret. |
 | `FLUXLIT_JWT_LEEWAY_SECONDS` | Clock skew leeway for JWT validation (default `0`). |
 | `FLUXLIT_OIDC_BFF_SECRET` | Secret for first-party JWTs after OIDC callback; used by :meth:`fluxlit.app.FluxLit.attach_oidc_login` when `first_party_secret` is omitted. |
+
+**Passthrough caveats:** Do not use `FLUXLIT_STREAMLIT_RUN_CLI_ARGS` to set sidecar `--server.port`, `--server.address`, or `--server.baseUrlPath` (FluxLit assigns these; overrides break the parent process and gateway). In `FLUXLIT_CORS_MIDDLEWARE_KWARGS`, do not repeat `allow_origins`, `allow_credentials`, `allow_methods`, or `allow_headers` (FluxLit sets those from the dedicated fields; duplicates are ignored). Constructor `fastapi_kwargs` cannot change FastAPI `title` or `root_path`; they always follow `FluxlitSettings` so the API matches the public mount and Streamlit.
 
 See the {mod}`fluxlit.config` API reference for the full settings model.
 

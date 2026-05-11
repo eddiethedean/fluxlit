@@ -13,6 +13,104 @@ from fluxlit.config import FluxlitSettings
 from fluxlit.gateway import build_gateway
 
 
+def test_fluxlit_constructor_merges_streamlit_settings() -> None:
+    base = FluxlitSettings(
+        streamlit_page_config={"layout": "wide"},
+        streamlit_run_cli_args=["--logger.level", "error"],
+    )
+    fl = FluxLit(
+        settings=base,
+        streamlit_page_config={"page_icon": "🚀"},
+        streamlit_run_args=["--theme.base", "dark"],
+    )
+    assert fl.settings.streamlit_page_config == {"layout": "wide", "page_icon": "🚀"}
+    assert fl.settings.streamlit_run_cli_args == [
+        "--logger.level",
+        "error",
+        "--theme.base",
+        "dark",
+    ]
+
+
+def test_fastapi_kwargs_cannot_override_root_path() -> None:
+    settings = FluxlitSettings(root_path="/app")
+    fl = FluxLit(
+        settings=settings,
+        fastapi_kwargs={"root_path": "/wrong", "openapi_url": "/o.json"},
+    )
+    assert fl.api.root_path == "/app"
+    assert fl.api.openapi_url == "/o.json"
+
+
+def test_cors_middleware_kwargs_duplicate_allow_origins_is_ignored() -> None:
+    """allow_origins in cors_middleware_kwargs would duplicate the middleware kw and crash."""
+    settings = FluxlitSettings(
+        cors_allow_origins=["http://localhost:3000"],
+        cors_middleware_kwargs={
+            "allow_origins": ["http://evil.example"],
+            "max_age": 10,
+        },
+    )
+    fl = FluxLit(settings=settings)
+    client = TestClient(fl.api)
+    r = client.get("/healthz", headers={"Origin": "http://localhost:3000"})
+    assert r.status_code == 200
+    assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_fastapi_kwargs_passthrough_openapi_url() -> None:
+    fl = FluxLit(title="T", fastapi_kwargs={"openapi_url": "/custom-openapi.json"})
+    client = TestClient(fl.api)
+    r = client.get("/custom-openapi.json")
+    assert r.status_code == 200
+    assert "openapi" in r.json()
+    assert client.get("/openapi.json").status_code == 404
+
+
+def test_cors_middleware_expose_headers_visible_to_browser() -> None:
+    settings = FluxlitSettings(
+        cors_allow_origins=["https://app.example"],
+        cors_middleware_kwargs={"expose_headers": ["X-App-Version"]},
+    )
+    fl = FluxLit(settings=settings)
+
+    @fl.api.get("/versioned", include_in_schema=False)
+    def versioned() -> dict[str, str]:
+        from starlette.responses import JSONResponse
+
+        return JSONResponse(
+            content={"v": "1"},
+            headers={"X-App-Version": "1.0.0"},
+        )
+
+    client = TestClient(fl.api)
+    r = client.get(
+        "/versioned",
+        headers={"Origin": "https://app.example"},
+    )
+    assert r.status_code == 200
+    exposed = (r.headers.get("access-control-expose-headers") or "").lower()
+    assert "x-app-version" in exposed
+
+
+def test_cors_middleware_merges_extra_kwargs() -> None:
+    settings = FluxlitSettings(
+        cors_allow_origins=["http://localhost:3000"],
+        cors_middleware_kwargs={"max_age": 1234},
+    )
+    fl = FluxLit(settings=settings)
+    client = TestClient(fl.api)
+    r = client.options(
+        "/healthz",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert r.status_code == 200
+    assert r.headers.get("access-control-max-age") == "1234"
+
+
 def test_replacing_api_clears_unified_asgi_cache() -> None:
     fl = FluxLit(title="T")
     fl._unified_asgi_cache = object()  # type: ignore[assignment]

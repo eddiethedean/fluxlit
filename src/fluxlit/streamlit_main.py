@@ -21,6 +21,7 @@ from typing import Any
 import streamlit as st
 
 from fluxlit.runtime import load_fluxlit
+from fluxlit.streamlit_page_config import build_set_page_config_kwargs
 
 spec = os.environ.get("FLUXLIT_APP")
 if not spec:
@@ -28,7 +29,12 @@ if not spec:
     st.stop()
 
 _fluxlit = load_fluxlit(spec)
-st.set_page_config(page_title=_fluxlit.settings.title)
+st.set_page_config(
+    **build_set_page_config_kwargs(
+        settings_title=_fluxlit.settings.title,
+        streamlit_page_config=_fluxlit.settings.streamlit_page_config,
+    )
+)
 _client = _fluxlit.get_client()
 
 

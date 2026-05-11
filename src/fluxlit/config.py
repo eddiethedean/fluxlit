@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -25,6 +27,9 @@ class FluxlitSettings(BaseSettings):
     - ``enable_gateway_access_log`` — per-request INFO logs on the gateway (structured extras).
     - ``trust_proxy`` / ``forwarded_allow_ips`` — Uvicorn proxy trust (e.g. Posit Connect).
     - ``streamlit_public_path`` — optional subpath when ``root_path`` is unset.
+    - ``streamlit_run_cli_args`` — extra ``streamlit run`` CLI tokens (JSON list in env).
+    - ``streamlit_page_config`` — keys forwarded to ``st.set_page_config`` (JSON object in env).
+    - ``cors_middleware_kwargs`` — extra kwargs for ``CORSMiddleware`` when CORS is enabled.
     """
 
     model_config = SettingsConfigDict(
@@ -103,6 +108,33 @@ class FluxlitSettings(BaseSettings):
     cors_allow_credentials: bool = Field(
         default=False,
         description="Set Access-Control-Allow-Credentials when CORS is enabled.",
+    )
+    cors_middleware_kwargs: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Additional keyword arguments for Starlette ``CORSMiddleware`` when "
+            "``cors_allow_origins`` is non-empty (e.g. ``expose_headers``, ``max_age``). "
+            "Do not pass ``allow_origins``, ``allow_credentials``, ``allow_methods``, or "
+            "``allow_headers`` here (FluxLit sets those); such keys are ignored."
+        ),
+    )
+    streamlit_run_cli_args: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Extra CLI arguments appended after FluxLit’s built-in ``streamlit run`` flags "
+            "(later arguments override earlier ones per Streamlit CLI rules). Must not set "
+            "``--server.port``, ``--server.address``, or ``--server.baseUrlPath`` (FluxLit "
+            "controls the sidecar bind and public mount)."
+        ),
+    )
+    streamlit_page_config: dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Keyword arguments merged into ``streamlit.set_page_config`` after "
+            "``page_title`` (defaulting to :attr:`title`). Supported keys include "
+            "``page_icon``, ``layout``, ``initial_sidebar_state``, ``menu_items``; "
+            "unknown keys are ignored."
+        ),
     )
     public_base_url: str = Field(
         default="",

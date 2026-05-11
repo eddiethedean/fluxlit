@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -9,6 +10,7 @@ from fluxlit.runtime import (
     _build_streamlit_cmd,
     _build_streamlit_env,
     _inject_public_root_path,
+    _validate_streamlit_extra_cli_args,
     asgi_from_fluxlit,
     create_unified_app,
     find_free_port,
@@ -134,6 +136,37 @@ def test_build_streamlit_cmd_adds_base_url_path(tmp_path) -> None:
     assert cmd[cmd.index("--server.baseUrlPath") + 1] == "/connect/app123"
 
 
+@pytest.mark.parametrize(
+    "bad_extra",
+    [
+        ["--server.port", "9999"],
+        ["--server.address", "0.0.0.0"],
+        ["--server.baseUrlPath", "/nope"],
+        ["--server.port=9999"],
+    ],
+)
+def test_build_streamlit_cmd_rejects_conflicting_extra_cli_args(
+    tmp_path: Path, bad_extra: list[str]
+) -> None:
+    runner = tmp_path / "streamlit_main.py"
+    with pytest.raises(ValueError, match="streamlit_run_cli_args"):
+        _build_streamlit_cmd(runner=runner, port=1234, extra_cli_args=bad_extra)
+
+
+def test_validate_streamlit_extra_cli_args_accepts_theme_only() -> None:
+    _validate_streamlit_extra_cli_args(["--theme.base", "light"])
+
+
+def test_build_streamlit_cmd_appends_extra_cli_args(tmp_path) -> None:
+    runner = tmp_path / "streamlit_main.py"
+    cmd = _build_streamlit_cmd(
+        runner=runner,
+        port=1234,
+        extra_cli_args=["--theme.base", "light", "--logger.level", "debug"],
+    )
+    assert cmd[-4:] == ["--theme.base", "light", "--logger.level", "debug"]
+
+
 def test_public_mount_path_prefers_root_path() -> None:
     from fluxlit.config import FluxlitSettings
 
@@ -234,6 +267,68 @@ async def test_create_unified_app_starts_and_stops_streamlit(
     assert started["env"].get("FLUXLIT_APP") == "tests.e2e.minimal_app:app"
     assert {"type": "lifespan.shutdown.complete"} in sent
     assert stopped["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_create_unified_app_streamlit_cmd_includes_settings_cli_args(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``FluxlitSettings.streamlit_run_cli_args`` must reach the ``streamlit run`` argv."""
+    (tmp_path / "cli_args_app.py").write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(\n"
+        "    settings=FluxlitSettings(\n"
+        "        streamlit_run_cli_args=['--logger.level', 'debug'],\n"
+        "    ),\n"
+        ")\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+
+    captured: dict[str, Any] = {}
+
+    class DummyProc:
+        def send_signal(self, _sig: object) -> None:  # noqa: ARG002
+            return
+
+        def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002
+            return 0
+
+        def poll(self) -> int | None:
+            return None
+
+        def terminate(self) -> None:
+            return
+
+        def kill(self) -> None:
+            return
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> DummyProc:
+        captured["cmd"] = cmd
+        return DummyProc()
+
+    monkeypatch.setattr("fluxlit.runtime._wait_for_tcp", lambda *a, **k: None)
+    monkeypatch.setattr("fluxlit.runtime.subprocess.Popen", fake_popen)
+    monkeypatch.setenv("FLUXLIT_APP", "cli_args_app:app")
+    monkeypatch.setenv("FLUXLIT_GATEWAY_PORT", "8000")
+
+    asgi = create_unified_app()
+    q: list[dict[str, object]] = [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}]
+    sent: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        return q.pop(0)
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    await asgi({"type": "lifespan"}, receive, send)
+    cmd = captured.get("cmd")
+    assert isinstance(cmd, list)
+    assert "--logger.level" in cmd
+    assert cmd[cmd.index("--logger.level") + 1] == "debug"
 
 
 @pytest.mark.asyncio

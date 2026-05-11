@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **Configuration:** `FluxlitSettings` / `FluxLit` passthroughs for Streamlit (`streamlit_run_cli_args`, `streamlit_page_config` → `st.set_page_config`) and Starlette `CORSMiddleware` (`cors_middleware_kwargs`); `fastapi_kwargs` documented as the full `FastAPI(...)` hook.
+- **Tests:** `test_streamlit_page_config`, `test_config_settings` (env JSON, `SettingsError`, type errors, default isolation), FastAPI `openapi_url` / CORS `expose_headers` coverage, unified lifespan asserting Streamlit argv includes `streamlit_run_cli_args`.
+- **Safety:** Reject `streamlit_run_cli_args` that override sidecar port/address/baseUrlPath; strip CORS middleware kwargs that duplicate FluxLit-controlled keys; always set FastAPI `title` / `root_path` from settings after `fastapi_kwargs` merge.
+
 ## 0.5.0
 
 - **ASGI / Uvicorn:** `FluxLit` is a first-class ASGI app (`uvicorn app:app`); unified stack via `asgi_from_fluxlit` / `create_unified_app` with lifespan bridged to the inner FastAPI app, Streamlit sidecar lifecycle, and spec-shaped HTTP/WebSocket error responses.

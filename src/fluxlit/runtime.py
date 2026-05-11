@@ -16,7 +16,7 @@ import tempfile
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -259,14 +259,50 @@ def _build_streamlit_env(*, target: str, api_prefix: str, internal_api_base: str
     return env
 
 
-def _build_streamlit_cmd(*, runner: Path, port: int, base_url_path: str = "") -> list[str]:
+def _validate_streamlit_extra_cli_args(args: Sequence[str] | None) -> None:
+    """Reject CLI flags that would break FluxLit's sidecar contract (bind, port, base path).
+
+    Extra args are appended *after* FluxLit flags, so Streamlit would honor overrides for
+    port/address/baseUrlPath and the parent would still wait on the wrong port or URL.
+    """
+    if not args:
+        return
+    forbid = frozenset({"--server.port", "--server.address", "--server.baseUrlPath"})
+    eq_prefixes = ("--server.port=", "--server.address=", "--server.baseUrlPath=")
+    for a in args:
+        if a.startswith(eq_prefixes):
+            msg = (
+                "streamlit_run_cli_args must not set server.port, server.address, or "
+                f"server.baseUrlPath (FluxLit owns the sidecar bind and public path); got {a!r}"
+            )
+            raise ValueError(msg)
+        if a in forbid:
+            msg = (
+                "streamlit_run_cli_args must not include "
+                f"{a!r} (use FLUXLIT_ROOT_PATH / settings for the public mount; "
+                "FluxLit assigns the sidecar port)."
+            )
+            raise ValueError(msg)
+
+
+def _build_streamlit_cmd(
+    *,
+    runner: Path,
+    port: int,
+    base_url_path: str = "",
+    extra_cli_args: Sequence[str] | None = None,
+) -> list[str]:
     """Command line: ``python -m streamlit run <runner>`` with headless bind on ``port``.
 
     Streamlit binds only to loopback on an ephemeral port; the browser talks to the
     FluxLit gateway. Disabling XSRF on this hop avoids Streamlit forcing CORS on when
     XSRF is enabled (noisy warnings and brittle proxy handshakes). CORS stays off
     because cross-origin browser traffic should not hit the sidecar directly.
+
+    ``extra_cli_args`` (from :attr:`~fluxlit.config.FluxlitSettings.streamlit_run_cli_args`)
+    are appended last so callers can override theme, logging level, etc., per Streamlit CLI.
     """
+    _validate_streamlit_extra_cli_args(extra_cli_args)
     cmd: list[str] = [
         sys.executable,
         "-m",
@@ -289,6 +325,8 @@ def _build_streamlit_cmd(*, runner: Path, port: int, base_url_path: str = "") ->
     m = normalize_root_mount(base_url_path)
     if m:
         cmd.extend(["--server.baseUrlPath", m])
+    if extra_cli_args:
+        cmd.extend(list(extra_cli_args))
     return cmd
 
 
@@ -649,7 +687,12 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
     runner = Path(__file__).resolve().parent / "streamlit_main.py"
     streamlit_port = find_free_port()
     pub = fl.settings.public_mount_path()
-    cmd = _build_streamlit_cmd(runner=runner, port=streamlit_port, base_url_path=pub)
+    cmd = _build_streamlit_cmd(
+        runner=runner,
+        port=streamlit_port,
+        base_url_path=pub,
+        extra_cli_args=fl.settings.streamlit_run_cli_args,
+    )
     env = _build_streamlit_env(target=target, api_prefix=api_prefix, internal_api_base=internal)
 
     streamlit_proc: subprocess.Popen[Any] | None = None
@@ -863,7 +906,10 @@ def run_unified(
         internal_api_base=internal_api_base,
     )
     cmd = _build_streamlit_cmd(
-        runner=runner, port=streamlit_port, base_url_path=fl.settings.public_mount_path()
+        runner=runner,
+        port=streamlit_port,
+        base_url_path=fl.settings.public_mount_path(),
+        extra_cli_args=fl.settings.streamlit_run_cli_args,
     )
 
     popen_kwargs: dict[str, Any] = {"env": env}
@@ -975,6 +1021,7 @@ def run_unified(
                         runner=runner,
                         port=new_port,
                         base_url_path=fl.settings.public_mount_path(),
+                        extra_cli_args=fl.settings.streamlit_run_cli_args,
                     )
                     new_proc = subprocess.Popen(cmd_local, **popen_kwargs)
                     proc_box[0] = new_proc
