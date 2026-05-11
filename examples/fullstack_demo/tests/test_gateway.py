@@ -14,6 +14,7 @@ def test_healthz_on_gateway(fluxlit_client: FluxLitTestClient) -> None:
 def test_openapi_excludes_healthz(fluxlit_client: FluxLitTestClient) -> None:
     paths = fluxlit_client.openapi().get("paths", {})
     assert "/healthz" not in paths
+    assert "/readyz" not in paths
 
 
 def test_openapi_includes_demo_routes(fluxlit_client: FluxLitTestClient) -> None:

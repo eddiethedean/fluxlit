@@ -10,6 +10,7 @@ from types import FunctionType
 from typing import Any
 
 from fastapi import APIRouter, FastAPI
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -17,6 +18,7 @@ from starlette.responses import Response
 
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
+from fluxlit.health import probe_streamlit_ready
 from fluxlit.jwt_auth import JWTBearer
 from fluxlit.logging_context import (
     REQUEST_ID_HEADER,
@@ -43,7 +45,8 @@ class FluxLit:
     per instance) using ``FLUXLIT_PUBLIC_BASE_URL`` and ``FLUXLIT_OIDC_BFF_SECRET`` when you do
     not pass secrets explicitly.
 
-    A minimal ``GET /healthz`` route is registered on :attr:`api` (hidden from OpenAPI).
+    ``GET /healthz`` (liveness) and ``GET /readyz`` (readiness vs Streamlit) are
+    registered on :attr:`api` (hidden from OpenAPI).
 
     Args:
         title: If set, overrides ``FluxlitSettings.title`` for this instance.
@@ -108,6 +111,16 @@ class FluxLit:
         @self.api.get("/healthz", include_in_schema=False)
         def _healthz() -> dict[str, str]:
             return {"status": "ok"}
+
+        @self.api.get("/readyz", include_in_schema=False, response_model=None)
+        async def _readyz() -> JSONResponse:
+            ok, detail = await probe_streamlit_ready()
+            if ok:
+                return JSONResponse(content={"status": "ready", "streamlit": detail})
+            return JSONResponse(
+                status_code=503,
+                content={"status": "not_ready", "detail": detail},
+            )
 
     def discover_pages(self, directory: str, *, package: str) -> FluxLit:
         """Load Streamlit page modules and call ``register(self)`` on each.

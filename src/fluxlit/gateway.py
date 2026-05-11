@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 
 import anyio
@@ -88,6 +88,8 @@ def build_gateway(
     api_app: ASGIApp,
     upstream_base: str,
     *,
+    upstream_resolver: Callable[[], str] | None = None,
+    access_log: bool = False,
     api_prefix: str = "/api",
     root_mount: str = "",
 ) -> ASGIApp:
@@ -96,13 +98,18 @@ def build_gateway(
     Routes whose path equals ``api_prefix`` or starts with ``api_prefix/`` are
     forwarded to ``api_app`` with that prefix stripped from ``path`` and ``raw_path``.
     All other HTTP traffic and WebSockets are reverse-proxied to ``upstream_base``
-    (typically the internal Streamlit origin).
+    (typically the internal Streamlit origin), or to the URL returned by
+    ``upstream_resolver`` when that is provided (evaluated per request).
 
     Lifespan events are delegated only to ``api_app``.
 
     Args:
         api_app: Inner FastAPI / Starlette app (mount path not included in its routes).
-        upstream_base: Base URL for Streamlit, e.g. ``http://127.0.0.1:8501``.
+        upstream_base: Base URL for Streamlit when ``upstream_resolver`` is unset.
+        upstream_resolver: If set, called for each proxied request to get the current
+            upstream base (e.g. after Streamlit restarts on a new port). ``upstream_base``
+            is ignored for proxying when this is set.
+        access_log: If True, emit one INFO log per request with structured ``extra`` fields.
         api_prefix: Public URL prefix for the API (default ``/api``).
         root_mount: Optional browser-visible path prefix when the app is published
             under a subpath (e.g. Posit Connect / Workbench). Must match
@@ -114,7 +121,13 @@ def build_gateway(
     Returns:
         A callable ASGI3 application.
     """
-    upstream = upstream_base.rstrip("/")
+    fixed_upstream = upstream_base.rstrip("/")
+
+    def resolve_upstream() -> str:
+        if upstream_resolver is not None:
+            return upstream_resolver().strip().rstrip("/")
+        return fixed_upstream
+
     prefix = api_prefix.rstrip("/") or "/api"
     mount = normalize_root_mount(root_mount)
 
@@ -128,19 +141,27 @@ def build_gateway(
             method_or_type = scope.get("method") or scope["type"]
             path_in = scope.get("path") or ""
             path, streamlit_path = split_gateway_paths(path_in, mount)
-            _gateway_log.debug(
-                "gateway %s %s request_id=%s",
-                method_or_type,
-                path_in,
-                rid,
-            )
-            if path == prefix or path.startswith(f"{prefix}/"):
+            is_api = path == prefix or path.startswith(f"{prefix}/")
+            dispatch = "api" if is_api else "streamlit"
+            log_extra = {
+                "fluxlit_dispatch": dispatch,
+                "http_method_or_type": method_or_type,
+                "path": path_in,
+            }
+            log_msg = "gateway %s %s request_id=%s"
+            log_args = (method_or_type, path_in, rid)
+            if access_log:
+                _gateway_log.info(log_msg, *log_args, extra=log_extra)
+            else:
+                _gateway_log.debug(log_msg, *log_args, extra=log_extra)
+            if is_api:
                 inner = dict(scope)
                 inner["path"] = path
                 inner["raw_path"] = path.encode("latin-1")
                 api_scope = _strip_prefix_scope(inner, prefix)
                 await api_app(api_scope, receive, send)
                 return
+            upstream = resolve_upstream()
             if scope["type"] == "websocket":
                 await _proxy_websocket(
                     scope, receive, send, upstream, streamlit_path, forwarded_prefix=mount or None

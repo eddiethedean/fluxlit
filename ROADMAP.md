@@ -4,7 +4,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.2.x)
+## Current status (0.4.x)
 
 **Done**
 
@@ -14,21 +14,24 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **App model:** `FluxLit` holds `FastAPI` on `.api`, `@app.page` registers Streamlit pages; `ApiClient` for server-side calls with `FLUXLIT_INTERNAL_API_BASE`.
 - **Scaffold:** `fluxlit new <name>` minimal app.
 - **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client.
+- **Readiness:** `GET /api/readyz` probes the Streamlit upstream when `FLUXLIT_STREAMLIT_UPSTREAM` is set (Kubernetes-style readiness; hidden from OpenAPI).
+- **Dev reload:** `--reload-scope=gateway` (default) vs `--reload-scope=full` (Uvicorn reload plus Streamlit restart via `watchfiles`); invalid scope fails before spawning Streamlit.
+- **Observability (baseline):** optional structured gateway access logs (`enable_gateway_access_log`); log redaction helpers for sensitive headers; temp-file upstream state so reload workers and Streamlit restarts stay aligned.
+- **Tests (deeper):** async readiness probe against threaded upstreams; gateway access-log behavior; upstream file/env precedence; reload-watcher callback; extended redaction and doctor/auth import edge cases.
 
 **Gaps vs “production”**
 
 - CI adds **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, and Playwright **e2e** (including subpath); continue with soak/load and broader scenarios over time.
-- Reload is gateway-only (`fluxlit dev --reload`); Streamlit lifecycle on reload is not orchestrated.
-- Auth, metrics, and hardened Docker/K8s beyond `fluxlit build` templates are not implemented.
+- **Metrics** (Prometheus / OTel), hardened Docker/K8s beyond `fluxlit build` + `examples/docker_compose`, and broader proxy edge cases remain open; optional **`fluxlit[auth]`** covers JWT/OIDC/BFF patterns from **Version 0.3** onward.
 - **Browser refresh continuity** for Streamlit (cookie-free, URL + server store) is specified under **Phase 2 follow-on** in this file but not implemented yet.
 
-**Next: 0.3.x**
+**Next: 0.5.x**
 
-- Primary focus: **security and identity** — JWT/OAuth/OIDC, safe patterns for Streamlit calling FastAPI, and operational guardrails (see **Version 0.3** below).
+- Hardening and product depth: observability, Streamlit lifecycle on reload, session continuity, and deployment templates — see phased sections below (including **Version 0.3** outcomes already on PyPI).
 
 ---
 
-## Version 0.3 — Security, identity, and cross-layer trust (planned)
+## Version 0.3 — Security, identity, and cross-layer trust (released on PyPI)
 
 **Theme:** Make **industry-standard auth** easy to wire correctly, with **one mental model** for both FastAPI routes and Streamlit pages — and **no accidental token leaks** through the browser, logs, or the Streamlit subprocess.
 
@@ -162,7 +165,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 | **Config file** | `fluxlit.toml` (top-level keys) / `[tool.fluxlit]` in `pyproject.toml`; `fluxlit.toml` wins if both exist. | **Done** |
 | **Page discovery** | Opt-in `FluxLit.discover_pages("pages", package="pkg")` + `register(app)` per module. | **Done** |
 | **Typed client** | `ApiClient.get_model` / `post_model` (Pydantic). OpenAPI codegen deferred. | **Done** (sync helpers) |
-| **Hot reload** | Documented gateway-only reload; stderr warning; `--reload-scope=gateway`. | **Done** |
+| **Hot reload** | `--reload-scope=gateway` (default) vs `full` (restart Streamlit on changes via `watchfiles`); stderr documents behavior; invalid scope rejected at CLI and runtime. | **Done** |
 | **Logging** | Request id `ContextVar`, gateway DEBUG line, optional `enable_request_logging` on FastAPI. | **Done** |
 | **`fluxlit doctor`** | Import, bind, deps, `FLUXLIT_INTERNAL_API_BASE`, Streamlit version WARN; `--warnings-only`. | **Done** |
 | **`fluxlit build`** | Starter `Dockerfile` + `.dockerignore` (wheel/lockfile export still future). | **Done** (Docker template) |
@@ -259,9 +262,9 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 ### Features
 
-- **Health and readiness** for Kubernetes.
+- **Health and readiness** for Kubernetes — **partial:** liveness (`/api/healthz`) and readiness (`/api/readyz` vs Streamlit) shipped; multi-probe charts and operator runbooks still TBD.
 - **Metrics:** Prometheus-friendly endpoints or OpenTelemetry hooks.
-- **Structured logging + tracing** correlation across gateway and API.
+- **Structured logging + tracing** correlation across gateway and API — **partial:** optional per-request gateway INFO logs with structured `extra`; full trace propagation still TBD.
 - **Docker:** official image or `Dockerfile` template; non-root user; multi-stage build.
 - **Kubernetes:** example Deployment + Service + Ingress annotations.
 - **`root_path` / `X-Forwarded-*`:** first-class docs and tests for subpath deployment.
@@ -313,9 +316,10 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 | Area | Today | Target |
 |------|--------|--------|
-| Gateway HTTP | TestClient + threaded upstream (gzip, redirects); forwarded-header assertions | More edge cases (timeouts, trailers) |
+| Gateway HTTP | TestClient + threaded upstream (gzip, redirects); forwarded-header assertions; access-log on/off; `readyz` with fake upstream | More edge cases (timeouts, trailers) |
 | Gateway WebSocket | Echo/proxy happy path against `/_stcore/stream` | Automated stability / reconnect cases |
-| Runtime orchestration | Subprocess `run_unified` + `/api/healthz` (`slow`) | Optional deeper lifecycle tests |
+| Runtime orchestration | Subprocess `run_unified` + `/api/healthz` (`slow`); upstream state read/write; invalid `reload_scope` before Streamlit spawn; reload-watcher unit test | Optional deeper lifecycle tests |
+| Health / readiness | Async probe tests (200/500/refused); `readyz` via gateway + FluxLit | Broader failure modes and timeouts |
 | Auth (Phase 3 / v0.3) | Fake JWKS server, JWT/OIDC edge cases; `ApiClient` must not log bearer secrets | Broader IdP matrices |
 | `root_path` / forwards | Forwarded headers + Playwright subpath E2E | Regression matrix for more proxy shapes |
 | Streamlit URL-bound session (Phase 2 follow-on) | — | AppTest: re-run with same query params + store contract |

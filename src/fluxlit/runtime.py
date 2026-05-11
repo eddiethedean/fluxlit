@@ -10,9 +10,11 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -25,8 +27,74 @@ if TYPE_CHECKING:
     from fluxlit.app import FluxLit
 
 DEFAULT_PIDFILE_NAME = ".fluxlit-dev.pid"
+STREAMLIT_UPSTREAM_FILE_ENV = "FLUXLIT_STREAMLIT_UPSTREAM_FILE"
 # Streamlit cold start can exceed the default 30s on slow disks / CI.
 _STREAMLIT_TCP_WAIT_S = 60.0
+
+
+def read_streamlit_upstream_url() -> str:
+    """Current Streamlit base URL from :func:`write_streamlit_upstream_state` or plain env."""
+    fp = (os.environ.get(STREAMLIT_UPSTREAM_FILE_ENV) or "").strip()
+    if fp:
+        try:
+            raw = Path(fp).read_text(encoding="utf-8").strip()
+        except OSError:
+            raw = ""
+        if raw:
+            return raw.rstrip("/")
+    return (os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM") or "").strip().rstrip("/")
+
+
+def write_streamlit_upstream_state(url: str) -> Path:
+    """Write *url* to a temp file and set env for the gateway resolver and subprocesses."""
+    fd, name = tempfile.mkstemp(prefix="fluxlit-upstream-", suffix=".txt", text=True)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(url.strip())
+    path = Path(name)
+    os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = url.strip()
+    os.environ[STREAMLIT_UPSTREAM_FILE_ENV] = str(path)
+    return path
+
+
+def update_streamlit_upstream_file(path: Path, url: str) -> None:
+    """Replace the on-disk upstream URL (e.g. after restarting Streamlit on a new port)."""
+    path.write_text(url.strip(), encoding="utf-8")
+    os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = url.strip()
+
+
+def _start_streamlit_reload_watcher(
+    on_change: Callable[[], None],
+    *,
+    debounce_s: float,
+    stop_flag: Callable[[], bool],
+) -> None:
+    """Background thread: debounced filesystem watch → ``on_change`` (Streamlit restart)."""
+
+    def run() -> None:
+        try:
+            from watchfiles import watch
+        except ImportError:
+            sys.stderr.write(
+                "[fluxlit] --reload-scope=full requires the `watchfiles` package "
+                "(install the same `fluxlit` environment).\n"
+            )
+            sys.stderr.flush()
+            return
+        debounce_ms = int(max(50, debounce_s * 1000))
+        try:
+            for _changes in watch(Path.cwd(), debounce=debounce_ms):
+                if stop_flag():
+                    return
+                try:
+                    on_change()
+                except Exception as e:
+                    sys.stderr.write(f"[fluxlit] Streamlit sidecar reload failed: {e}\n")
+                    sys.stderr.flush()
+        except Exception as e:
+            sys.stderr.write(f"[fluxlit] Streamlit file watch exited: {e}\n")
+            sys.stderr.flush()
+
+    threading.Thread(target=run, daemon=True).start()
 
 
 def find_free_port() -> int:
@@ -349,38 +417,40 @@ def _inject_public_root_path(app: ASGIApp, public_mount: str) -> ASGIApp:
 def create_gateway_app() -> ASGIApp:
     """ASGI factory for Uvicorn ``--factory`` reload mode.
 
-    Reads ``FLUXLIT_APP`` (import target), ``FLUXLIT_STREAMLIT_UPSTREAM`` (Streamlit base URL),
-    and ``FLUXLIT_API_PREFIX`` from the environment, then returns
+    Reads ``FLUXLIT_APP`` (import target), Streamlit upstream from
+    ``FLUXLIT_STREAMLIT_UPSTREAM_FILE`` or ``FLUXLIT_STREAMLIT_UPSTREAM``, and
+    ``FLUXLIT_API_PREFIX`` from the environment, then returns
     :func:`fluxlit.gateway.build_gateway` over the loaded FastAPI app.
 
     Returns:
         An ASGI3 callable (same contract as :func:`~fluxlit.gateway.build_gateway`).
 
     Raises:
-        RuntimeError: If ``FLUXLIT_APP`` or ``FLUXLIT_STREAMLIT_UPSTREAM`` is unset.
+        RuntimeError: If ``FLUXLIT_APP`` is unset or the upstream URL cannot be resolved.
     """
-    missing = [
-        name
-        for name in ("FLUXLIT_APP", "FLUXLIT_STREAMLIT_UPSTREAM")
-        if not (os.environ.get(name) or "").strip()
-    ]
-    if missing:
-        need = ", ".join(missing)
+    if not (os.environ.get("FLUXLIT_APP") or "").strip():
         msg = (
-            f"Missing required environment variable(s): {need}. "
-            "These are set automatically by `fluxlit dev` / `fluxlit run`; "
-            "set them before using `create_gateway_app` with Uvicorn --factory."
+            "Missing required environment variable FLUXLIT_APP. "
+            "Set it before using `create_gateway_app` with Uvicorn --factory "
+            "(normally set by `fluxlit dev` / `fluxlit run`)."
+        )
+        raise RuntimeError(msg)
+    if not read_streamlit_upstream_url():
+        msg = (
+            "Missing Streamlit upstream URL. Set FLUXLIT_STREAMLIT_UPSTREAM and/or "
+            "FLUXLIT_STREAMLIT_UPSTREAM_FILE (normally set by `fluxlit dev` / `fluxlit run`)."
         )
         raise RuntimeError(msg)
     target = os.environ["FLUXLIT_APP"].strip()
-    upstream = os.environ["FLUXLIT_STREAMLIT_UPSTREAM"].strip()
     api_prefix = os.environ.get("FLUXLIT_API_PREFIX", "/api")
     fl = load_fluxlit(target)
     mount = normalize_root_mount(fl.settings.public_mount_path())
     return _inject_public_root_path(
         build_gateway(
             fl.api,
-            upstream,
+            "",
+            upstream_resolver=read_streamlit_upstream_url,
+            access_log=fl.settings.enable_gateway_access_log,
             api_prefix=api_prefix,
             root_mount=mount,
         ),
@@ -394,6 +464,7 @@ def run_unified(
     host: str = "127.0.0.1",
     port: int = 8000,
     reload: bool = False,
+    reload_scope: str = "gateway",
     log_level: str = "info",
     proxy_headers: bool = False,
     forwarded_allow_ips: str | None = None,
@@ -412,7 +483,9 @@ def run_unified(
         target: ``module:fluxlit_instance`` import path.
         host: Uvicorn bind host.
         port: Uvicorn bind port (public).
-        reload: If True, use Uvicorn reload with :func:`create_gateway_app` (gateway only).
+        reload: If True, use Uvicorn reload with :func:`create_gateway_app`.
+        reload_scope: ``gateway`` (default) or ``full``. ``full`` also restarts Streamlit
+            when watched files change (requires ``watchfiles``); see CLI ``--reload-scope``.
         log_level: Uvicorn log level.
         proxy_headers: Forwarded to :class:`uvicorn.Config`.
         forwarded_allow_ips: Forwarded to :class:`uvicorn.Config`.
@@ -424,6 +497,11 @@ def run_unified(
     runner = Path(__file__).resolve().parent / "streamlit_main.py"
 
     fl = load_fluxlit(target)
+
+    scope = (reload_scope or "gateway").strip().lower()
+    if reload and scope not in {"gateway", "full"}:
+        msg = "reload_scope must be 'gateway' or 'full'"
+        raise ValueError(msg)
 
     api_prefix = fl.settings.api_mount_path
     internal_api_base = internal_api_base_url(bind_host=host, port=port, api_mount_path=api_prefix)
@@ -449,16 +527,20 @@ def run_unified(
     else:
         popen_kwargs["start_new_session"] = True
 
-    proc: subprocess.Popen[Any] = subprocess.Popen(cmd, **popen_kwargs)
+    proc_box: list[subprocess.Popen[Any]] = [subprocess.Popen(cmd, **popen_kwargs)]
+    streamlit_restart_lock = threading.Lock()
+    streamlit_reload_state: dict[str, bool] = {"intentional": False}
+    streamlit_reload_done = threading.Event()
     pidfile_path: Path | None = None
     pidfile_written = False
+    upstream_state_path: Path | None = None
     no_pf = os.environ.get("FLUXLIT_NO_PIDFILE", "").strip().lower() in {"1", "true", "yes"}
     try:
         _wait_for_tcp("127.0.0.1", streamlit_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
         upstream = f"http://127.0.0.1:{streamlit_port}"
         os.environ["FLUXLIT_APP"] = target
-        os.environ["FLUXLIT_STREAMLIT_UPSTREAM"] = upstream
         os.environ["FLUXLIT_API_PREFIX"] = api_prefix
+        upstream_state_path = write_streamlit_upstream_state(upstream)
 
         if write_pidfile and not no_pf:
             pidfile_path = default_pidfile_path(pidfile)
@@ -466,10 +548,16 @@ def run_unified(
             pidfile_written = True
 
         if reload:
-            sys.stderr.write(
-                "[fluxlit] --reload restarts the API gateway only; the Streamlit process "
-                "does not reload. Restart fluxlit to apply Streamlit page changes.\n"
-            )
+            if scope == "full":
+                sys.stderr.write(
+                    "[fluxlit] --reload --reload-scope=full: Uvicorn reload plus Streamlit "
+                    "restart on file changes (best-effort; WebSockets reconnect).\n"
+                )
+            else:
+                sys.stderr.write(
+                    "[fluxlit] --reload --reload-scope=gateway: only the API gateway reloads; "
+                    "Streamlit does not. Use --reload-scope=full to restart Streamlit too.\n"
+                )
             sys.stderr.flush()
             config = uvicorn.Config(
                 "fluxlit.runtime:create_gateway_app",
@@ -487,7 +575,9 @@ def run_unified(
                 _inject_public_root_path(
                     build_gateway(
                         fl.api,
-                        upstream,
+                        "",
+                        upstream_resolver=read_streamlit_upstream_url,
+                        access_log=fl.settings.enable_gateway_access_log,
                         api_prefix=fl.settings.api_mount_path,
                         root_mount=mount,
                     ),
@@ -504,15 +594,63 @@ def run_unified(
         server = uvicorn.Server(config)
 
         def monitor_streamlit() -> None:
-            code = proc.wait()
-            if not server.should_exit:
-                sys.stderr.write(f"[fluxlit] Streamlit exited (code={code}); stopping gateway.\n")
-                sys.stderr.flush()
-                server.should_exit = True
+            while not server.should_exit:
+                p = proc_box[0]
+                code = p.wait()
+                with streamlit_restart_lock:
+                    reloading = streamlit_reload_state["intentional"]
+                if reloading:
+                    if streamlit_reload_done.wait(timeout=_STREAMLIT_TCP_WAIT_S):
+                        streamlit_reload_done.clear()
+                    with streamlit_restart_lock:
+                        streamlit_reload_state["intentional"] = False
+                    continue
+                if not server.should_exit:
+                    sys.stderr.write(
+                        f"[fluxlit] Streamlit exited (code={code}); stopping gateway.\n"
+                    )
+                    sys.stderr.flush()
+                    server.should_exit = True
+                return
 
         threading.Thread(target=monitor_streamlit, daemon=True).start()
+
+        if reload and scope == "full" and upstream_state_path is not None:
+            path_for_updates = upstream_state_path
+
+            def restart_streamlit_sidecar() -> None:
+                try:
+                    with streamlit_restart_lock:
+                        streamlit_reload_state["intentional"] = True
+                        streamlit_reload_done.clear()
+                    _terminate_process(proc_box[0])
+                    new_port = find_free_port()
+                    cmd_local = _build_streamlit_cmd(
+                        runner=runner,
+                        port=new_port,
+                        base_url_path=fl.settings.public_mount_path(),
+                    )
+                    proc_box[0] = subprocess.Popen(cmd_local, **popen_kwargs)
+                    _wait_for_tcp("127.0.0.1", new_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+                    new_upstream = f"http://127.0.0.1:{new_port}"
+                    update_streamlit_upstream_file(path_for_updates, new_upstream)
+                finally:
+                    with streamlit_restart_lock:
+                        streamlit_reload_done.set()
+
+            _start_streamlit_reload_watcher(
+                restart_streamlit_sidecar,
+                debounce_s=0.25,
+                stop_flag=lambda: server.should_exit,
+            )
+
         server.run()
     finally:
+        if upstream_state_path is not None:
+            with contextlib.suppress(OSError):
+                upstream_state_path.unlink(missing_ok=True)
+        if STREAMLIT_UPSTREAM_FILE_ENV in os.environ:
+            del os.environ[STREAMLIT_UPSTREAM_FILE_ENV]
         if pidfile_written and pidfile_path is not None:
             _remove_pidfile(pidfile_path)
-        _terminate_process(proc)
+        _terminate_process(proc_box[0])

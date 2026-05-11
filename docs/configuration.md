@@ -1,5 +1,21 @@
 # Configuration
 
+(runtime-env)=
+
+## Runtime-managed environment variables
+
+When you use **`fluxlit dev`** or **`fluxlit run`**, the parent process sets additional **`FLUXLIT_*`** variables for the Streamlit subprocess and for code that resolves the proxy target. You typically **should not** override these unless you are doing advanced testing.
+
+| Variable | Purpose |
+|----------|---------|
+| `FLUXLIT_APP` | Import target for the `FluxLit` instance (e.g. `app:app`). |
+| `FLUXLIT_API_PREFIX` | Public API mount path (default `/api`); used when building internal URLs. |
+| `FLUXLIT_INTERNAL_API_BASE` | Absolute base URL for {class}`~fluxlit.client.ApiClient` inside Streamlit (includes `/api`). |
+| `FLUXLIT_STREAMLIT_UPSTREAM` | Base URL of the Streamlit HTTP server (loopback); used by the gateway proxy and {func}`~fluxlit.health.probe_streamlit_ready`. |
+| `FLUXLIT_STREAMLIT_UPSTREAM_FILE` | Path to a file mirroring the upstream URL so Uvicorn reload workers and restarts stay consistent. |
+
+`create_gateway_app` / bare tests may run without the upstream variables; then `GET /readyz` reports `streamlit: not_configured`. See {mod}`fluxlit.runtime` and {doc}`deployment`.
+
 ## Precedence
 
 1. **CLI flags** (highest)
@@ -39,6 +55,7 @@ log_level = "info"
 | `FLUXLIT_STREAMLIT_PUBLIC_PATH` | Optional subpath used only if `FLUXLIT_ROOT_PATH` is empty; prefer `FLUXLIT_ROOT_PATH`. |
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side {class}`~fluxlit.client.ApiClient` (should include `/api`). |
 | `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log API requests (method, path, status) at INFO with request id context. |
+| `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG` | If true, log each **gateway** request at INFO with structured `extra` (`fluxlit_dispatch`, path, method/type); default is DEBUG-only. See {doc}`observability`. |
 | `FLUXLIT_ENABLE_SECURITY_HEADERS` | If true, add baseline security headers on the FastAPI app (HSTS when HTTPS, `X-Content-Type-Options`, etc.). |
 | `FLUXLIT_CORS_ALLOW_ORIGINS` | JSON list of allowed origins (e.g. `["http://localhost:3000"]`). Empty list disables CORS middleware. |
 | `FLUXLIT_CORS_ALLOW_CREDENTIALS` | Whether to set `Access-Control-Allow-Credentials` when CORS is enabled. |

@@ -52,6 +52,72 @@ def test_doctor_warns_when_internal_api_path_mismatches_mount(
     assert "api_mount_path" in res.stdout
 
 
+def test_doctor_passes_proxy_headers_when_subpath_and_trust_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_subpath_trust_ok.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='ST', settings=FluxlitSettings("
+        "root_path='/content/1', trust_proxy=True, public_base_url='https://example.com', "
+        "gateway_port=59278))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_subpath_trust_ok:app"])
+    assert res.exit_code == 0
+    assert "proxy_headers" in res.stdout
+    assert "PASS" in res.stdout
+    assert "trust_proxy enabled" in res.stdout
+
+
+def test_doctor_fails_fluxlit_auth_extra_when_pyjwt_unimportable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module_path = tmp_path / "doc_jwt_blocked.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='B', settings=FluxlitSettings(gateway_port=59301))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_JWT_ISSUER", "https://issuer.blocked")
+    prior = sys.modules.pop("jwt", None)
+    sys.modules["jwt"] = None
+    try:
+        runner = CliRunner()
+        res = runner.invoke(app, ["doctor", "doc_jwt_blocked:app"])
+        assert res.exit_code == 1
+        assert "fluxlit_auth_extra" in res.stdout
+        assert "FAIL" in res.stdout
+    finally:
+        sys.modules.pop("jwt", None)
+        if prior is not None:
+            sys.modules["jwt"] = prior
+
+
+def test_doctor_reports_auth_extra_when_jwt_env_set(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_jwt_env.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='J', settings=FluxlitSettings(gateway_port=59299))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_JWT_ISSUER", "https://issuer.example")
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_jwt_env:app"])
+    assert res.exit_code == 0
+    assert "fluxlit_auth_extra" in res.stdout
+    assert "PyJWT" in res.stdout
+
+
 def test_doctor_warns_when_subpath_without_trust_proxy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -131,11 +197,36 @@ def test_dev_invalid_reload_scope_exits_two(
     runner = CliRunner()
     res = runner.invoke(
         app,
-        ["dev", "reload_app:app", "--reload", "--reload-scope", "all"],
+        ["dev", "reload_app:app", "--reload", "--reload-scope", "bogus"],
         catch_exceptions=False,
     )
     assert res.exit_code == 2
-    assert "reload-scope" in res.stderr.lower() or "gateway" in res.stderr.lower()
+    assert "reload-scope" in res.stderr.lower()
+
+
+def test_dev_passes_reload_scope_full_to_run_unified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "reload_full_app.py").write_text(
+        "from fluxlit import FluxLit\napp = FluxLit(title='RF')\n", encoding="utf-8"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    called: dict[str, object] = {}
+
+    def stub(target: str, **kwargs: object) -> None:
+        called["target"] = target
+        called.update(kwargs)
+
+    monkeypatch.setattr("fluxlit.cli.run_unified", stub)
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["dev", "reload_full_app:app", "--reload", "--reload-scope", "full"],
+        catch_exceptions=False,
+    )
+    assert res.exit_code == 0
+    assert called.get("reload_scope") == "full"
 
 
 def test_dev_resolves_target_fluxlit_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

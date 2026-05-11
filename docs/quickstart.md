@@ -57,7 +57,12 @@ fluxlit dev app:app
 - Open the URL Uvicorn prints (default `http://127.0.0.1:8000`).
 - **API:** `GET /api/users` (prefix configurable via {attr}`~fluxlit.config.FluxlitSettings.api_mount_path`).
 - **OpenAPI:** `/api/docs`, `/api/openapi.json`.
-- **Health:** `/api/healthz` (hidden from OpenAPI).
+- **Health:** `/api/healthz` (liveness; hidden from OpenAPI).
+- **Readiness:** `/api/readyz` checks the Streamlit sidecar when running under `fluxlit dev` / `fluxlit run` (hidden from OpenAPI).
+
+For structured per-request logs at the gateway (optional), set `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1` and read {doc}`observability`.
+
+For local development, `fluxlit dev --reload --reload-scope=full` reloads the gateway and restarts Streamlit on changes; the default `--reload-scope=gateway` reloads FastAPI only. See {doc}`cli`.
 
 ## Calling the API from Streamlit
 
@@ -99,3 +104,14 @@ my_app/
 ```
 
 See {doc}`configuration` and {doc}`cli` for flags, env vars, and commands.
+
+## Next steps
+
+| Topic | Doc |
+|-------|-----|
+| Reverse proxies, subpaths, OAuth base URL | {doc}`configuration` |
+| Containers, probes, scaling | {doc}`deployment` |
+| Structured logs, readiness details | {doc}`observability` |
+| JWT / OIDC / Streamlit callers | {doc}`auth-recipes`, {doc}`security` |
+| Markers, E2E, proxy smoke | {doc}`testing` |
+| Import errors, 503 readyz, API paths from Streamlit | {doc}`troubleshooting` |

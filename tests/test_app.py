@@ -64,6 +64,27 @@ def test_enable_request_logging_emits_api_log(
     assert any(r.name == "fluxlit.api" and "GET" in r.getMessage() for r in caplog.records)
 
 
+def test_readyz_streamlit_not_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM", raising=False)
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    fl = FluxLit(title="T")
+    client = TestClient(fl.api)
+    r = client.get("/readyz")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ready", "streamlit": "not_configured"}
+
+
+def test_readyz_fails_when_upstream_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", "http://127.0.0.1:59123")
+    fl = FluxLit(title="T")
+    client = TestClient(fl.api)
+    r = client.get("/readyz")
+    assert r.status_code == 503
+    body = r.json()
+    assert body["status"] == "not_ready"
+    assert "detail" in body
+
+
 def test_enable_security_headers_adds_x_content_type_options() -> None:
     settings = FluxlitSettings(enable_security_headers=True)
     fl = FluxLit(title="T", settings=settings)

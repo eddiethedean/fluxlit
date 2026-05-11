@@ -23,7 +23,7 @@ Coverage (optional): `pytest -n auto --ignore=tests/e2e --cov=fluxlit --cov-repo
 
 ## Documentation (Sphinx)
 
-Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository.
+Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository. User-facing guides include **[docs/deployment.md](docs/deployment.md)** (containers, probes, scaling) and **[docs/troubleshooting.md](docs/troubleshooting.md)**.
 
 Build locally:
 
@@ -36,7 +36,7 @@ Open `docs/_build/html/index.html` in a browser. Configuration lives in [`docs/c
 
 ## Testing notes
 
-Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` markers, Playwright, proxy smoke).
+Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` markers, Playwright, proxy smoke, [fast suite highlights](docs/testing.md#fast-suite-highlights)). Dev reload: `fluxlit dev --reload --reload-scope=full` restarts Streamlit on changes; default `gateway` reloads FastAPI only — see **docs/cli.md**.
 
 - Prefer FluxLit’s wrapper **`FluxLitTestClient`** for gateway-level API tests (so prefix stripping and `/healthz` behavior are exercised through the gateway).
 - Use Streamlit’s built-in **`streamlit.testing.v1.AppTest`** for UI tests where possible (version-dependent).

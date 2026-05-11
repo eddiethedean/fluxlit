@@ -22,6 +22,7 @@ class FluxlitSettings(BaseSettings):
     - ``api_mount_path`` — public URL prefix for the API (default ``/api``).
     - ``root_path`` — ASGI root when behind a reverse proxy.
     - ``enable_request_logging`` — per-request INFO logs on the FastAPI app.
+    - ``enable_gateway_access_log`` — per-request INFO logs on the gateway (structured extras).
     - ``trust_proxy`` / ``forwarded_allow_ips`` — Uvicorn proxy trust (e.g. Posit Connect).
     - ``streamlit_public_path`` — optional subpath when ``root_path`` is unset.
     """
@@ -81,6 +82,13 @@ class FluxlitSettings(BaseSettings):
     enable_request_logging: bool = Field(
         default=False,
         description="Log API requests with X-Request-ID (or generated id) at INFO.",
+    )
+    enable_gateway_access_log: bool = Field(
+        default=False,
+        description=(
+            "Log each gateway request at INFO with structured fields "
+            "(fluxlit_dispatch, path); default is DEBUG only."
+        ),
     )
     enable_security_headers: bool = Field(
         default=False,

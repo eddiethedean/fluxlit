@@ -21,6 +21,21 @@ Streamlit’s own paths (`/_stcore/...`, etc.) appear on the **public** origin b
 
 This matches Streamlit’s supported deployment model, avoids unsupported deep embedding until a stable ASGI embedding story exists, and keeps a clear boundary for testing and operations.
 
+### Processes and environment
+
+| Role | Process | Listens on |
+|------|---------|------------|
+| Gateway | Uvicorn worker(s) | Public `host:port` (e.g. `0.0.0.0:8000`) |
+| Streamlit | Child of the runtime | Ephemeral **localhost** port (not exposed directly) |
+
+The runtime sets **`FLUXLIT_*`** variables so Streamlit’s entry script knows the import target, API prefix, internal API base URL, and (from the parent) where to reach the Streamlit HTTP server for readiness checks. See {ref}`runtime-env`.
+
+### Operational endpoints
+
+Under the configured API mount (default **`/api`**), the inner app exposes **`/healthz`** (liveness) and **`/readyz`** (readiness vs Streamlit). Public URLs are typically **`/api/healthz`** and **`/api/readyz`**.
+
+These routes are registered with **`include_in_schema=False`** so they do not appear in Swagger/OpenAPI; your own API surface stays clean.
+
 ## Streamlit UI routing
 
 - You register pages with {meth}`~fluxlit.app.FluxLit.page` or {meth}`~fluxlit.app.FluxLit.discover_pages`.
@@ -30,11 +45,11 @@ This matches Streamlit’s supported deployment model, avoids unsupported deep e
 ## Principles
 
 - **Pythonic:** explicit, typed surface; ordinary FastAPI and Streamlit in user code.
-- **Production-minded:** proxy-friendly (`root_path`, forwarded headers where configured), observable hooks (request ids, optional API access logging).
+- **Production-minded:** proxy-friendly (`root_path`, forwarded headers where configured), observable hooks (request ids, optional API and **gateway** access logging, readiness via `/api/readyz`).
 - **Honest about Streamlit:** subprocess + WebSocket proxy until a native single-process model is proven.
 
 Further product context: see the [architecture and product plan](https://github.com/eddiethedean/fluxlit/blob/main/PLAN.md) in the repository.
 
 ## Automated tests
 
-Gateway routing, HTTP/WebSocket proxying, `root_path`, and auth helpers are covered by Pytest (fast matrix, optional `slow` subprocess checks, Playwright E2E, and Docker-based proxy smoke). See {doc}`testing`.
+Gateway routing, HTTP/WebSocket proxying, `root_path`, readiness (`/api/readyz`), and auth helpers are covered by Pytest (fast matrix, optional `slow` subprocess checks, Playwright E2E, and Docker-based proxy smoke). See {doc}`testing` and {doc}`observability`.

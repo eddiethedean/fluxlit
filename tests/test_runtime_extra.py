@@ -13,6 +13,7 @@ from fluxlit.runtime import (
     _wait_for_tcp,
     create_gateway_app,
     default_pidfile_path,
+    run_unified,
     shutdown_unified_process,
 )
 
@@ -39,7 +40,29 @@ def test_wait_for_tcp_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_create_gateway_app_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("FLUXLIT_APP", raising=False)
     monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM", raising=False)
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
     with pytest.raises(RuntimeError, match="FLUXLIT_APP"):
+        create_gateway_app()
+
+
+def test_run_unified_rejects_invalid_reload_scope_before_spawning_streamlit() -> None:
+    """Invalid ``reload_scope`` must fail before starting the Streamlit subprocess."""
+    with pytest.raises(ValueError, match="reload_scope"):
+        run_unified("tests.e2e.minimal_app:app", reload=True, reload_scope="not-a-scope")
+
+
+def test_create_gateway_app_rejects_empty_upstream(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "empty_up_app.py").write_text(
+        "from fluxlit import FluxLit\napp = FluxLit(title='E')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_APP", "empty_up_app:app")
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", "")
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    with pytest.raises(RuntimeError, match="upstream"):
         create_gateway_app()
 
 

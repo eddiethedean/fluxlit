@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- **Runtime:** Map IPv6 unspecified bind ``::`` to loopback for ``FLUXLIT_INTERNAL_API_BASE`` (same as ``0.0.0.0``).
+- **OIDC BFF:** Validate ``id_token`` with IdP JWKS when using ``GenericOIDCClient``; optional ``OIDCBFFConfig.id_token_audience`` / ``id_token_leeway_seconds``; parse-only fallback for other ``OIDCProvider`` stubs.
+- **JWT:** Run PyJWT/JWKS decode in a worker thread via ``anyio.to_thread`` to avoid blocking the event loop.
+- **Gateway:** Use Latin-1 for stripped ``raw_path``; log exceptions while streaming proxied response bodies.
+- **API:** ``FluxLit.attach_oidc_login`` raises if called twice on the same instance.
+- **CI:** Release workflow runs ``pip-audit`` (same as main CI); ``slow`` pytest marker; ``slow-tests`` and ``coverage`` jobs (upload ``coverage.xml`` artifact); expanded gateway and auth tests; Playwright E2E including ``FLUXLIT_ROOT_PATH``.
+- **Docs:** OIDC in-memory store and JWKS ``id_token`` behavior in security, auth-recipes, and ``SECURITY.md``; fix OIDC docstring cross-reference (Streamlit exchange helpers); README, ``docs/testing.md``, index, roadmap testing table, and cross-links for the test/CI layout.
+
 ## 0.3.0
 
 - **Auth (optional `fluxlit[auth]`):** JWT bearer validation with HS256 (dev) or JWKS (RS256/ES256), `RequireScopes` / `RequireRoles`, first-party HS256 minting for BFF flows.
@@ -40,13 +50,11 @@
 
 ## Unreleased
 
-- **Runtime:** Map IPv6 unspecified bind ``::`` to loopback for ``FLUXLIT_INTERNAL_API_BASE`` (same as ``0.0.0.0``).
-- **OIDC BFF:** Validate ``id_token`` with IdP JWKS when using ``GenericOIDCClient``; optional ``OIDCBFFConfig.id_token_audience`` / ``id_token_leeway_seconds``; parse-only fallback for other ``OIDCProvider`` stubs.
-- **JWT:** Run PyJWT/JWKS decode in a worker thread via ``anyio.to_thread`` to avoid blocking the event loop.
-- **Gateway:** Use Latin-1 for stripped ``raw_path``; log exceptions while streaming proxied response bodies.
-- **API:** ``FluxLit.attach_oidc_login`` raises if called twice on the same instance.
-- **CI:** Release workflow runs ``pip-audit`` (same as main CI).
-- **Docs:** OIDC in-memory store and JWKS ``id_token`` behavior in security, auth-recipes, and ``SECURITY.md``.
-- **Docs:** Fix OIDC docstring cross-reference (Streamlit exchange helpers).
-- **Tests / CI:** `slow` pytest marker; **`slow-tests`** and **`coverage`** workflow jobs (upload **`coverage.xml`** artifact); broader gateway tests (HTTP upstream, WebSocket echo, forwarded headers), JWKS/JWT/OIDC edge cases, `ApiClient` log redaction, subprocess runtime health check, Playwright E2E including **`FLUXLIT_ROOT_PATH`**.
-- **Docs:** README, `docs/testing.md` / Read the Docs Testing page, docs index, roadmap testing table, and cross-links aligned with the above.
+- **Dev:** `fluxlit dev --reload --reload-scope=full` restarts the Streamlit sidecar on file changes (`watchfiles`); `gateway` remains the default (Uvicorn reload only).
+- **Gateway:** Optional per-request `upstream_resolver` and temp-file upstream state so reload workers and Streamlit restarts stay consistent; optional `enable_gateway_access_log` (structured INFO logs).
+- **API:** `GET /api/readyz` readiness probe for the Streamlit upstream (see `fluxlit.health`).
+- **CLI:** `fluxlit doctor` JWT clock skew only when JWT/OIDC env is present; `fluxlit_auth_extra` check; proxy_headers PASS when `trust_proxy` matches subpath deployment; clearer OAuth base URL warning.
+- **Utilities:** `fluxlit.logging_redact` for safe header logging.
+- **Docs:** `docs/observability.md`, `docs/rate-limiting.md`; auth-recipes BFF refresh subsection; CLI/reload and README updates.
+- **Examples:** `examples/docker_compose/` minimal Compose stack.
+- **Dependencies:** direct `watchfiles` dependency.

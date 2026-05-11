@@ -1,0 +1,9 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Behind a path-stripping reverse proxy, set e.g. FLUXLIT_ROOT_PATH=/myapp
+      FLUXLIT_GATEWAY_HOST: "0.0.0.0"
+      FLUXLIT_GATEWAY_PORT: "8000"

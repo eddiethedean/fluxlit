@@ -34,7 +34,12 @@ class FluxLitTestClient:
     @property
     def api(self) -> TestClient:
         """HTTP test client; non-API routes hit a dummy upstream (unused for ``/api`` tests)."""
-        gateway = build_gateway(self.app.api, "http://127.0.0.1:9", api_prefix=self.api_prefix)
+        gateway = build_gateway(
+            self.app.api,
+            "http://127.0.0.1:9",
+            api_prefix=self.api_prefix,
+            access_log=self.app.settings.enable_gateway_access_log,
+        )
         return TestClient(gateway)
 
     def api_get(self, path: str, **kwargs: Any) -> httpx.Response:

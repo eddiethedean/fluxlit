@@ -651,7 +651,7 @@ wheels = [
 
 [[package]]
 name = "fluxlit"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -663,6 +663,7 @@ dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "typer" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "watchfiles" },
     { name = "websockets" },
 ]
 
@@ -726,6 +727,7 @@ requires-dist = [
     { name = "tomli", marker = "extra == 'dev'", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.12" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
+    { name = "watchfiles", specifier = ">=0.21" },
     { name = "websockets", specifier = ">=12" },
 ]
 provides-extras = ["auth", "dev", "e2e", "docs"]

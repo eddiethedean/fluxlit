@@ -50,6 +50,7 @@ def test_fluxlit_testclient_openapi_excludes_healthz() -> None:
     client = FluxLitTestClient(fl)
     paths = client.openapi().get("paths", {})
     assert "/healthz" not in paths
+    assert "/readyz" not in paths
 
 
 def test_fluxlit_testclient_openapi_type_error_when_not_object() -> None:

@@ -1,5 +1,7 @@
 # Testing
 
+FluxLit’s tests fall into three bands: **fast** Pytest (default CI and local), **`slow`** subprocess checks, and **E2E** Playwright under `tests/e2e`. Docker-based **proxy smoke** exercises nginx-style routing. This page lists commands; {doc}`contributing` summarizes contributor workflow.
+
 ## Quick start
 
 ```bash
@@ -61,8 +63,29 @@ python -m pytest tests/e2e -m e2e
 
 The suite starts a real unified gateway (including Streamlit WebSocket traffic) and includes a **`FLUXLIT_ROOT_PATH`** / subpath regression (browser shell + `GET …/api/healthz` under the prefix).
 
+## Readiness
+
+With the unified runtime, `GET /api/readyz` returns **503** if the Streamlit upstream is unreachable. In bare FastAPI tests (no `FLUXLIT_STREAMLIT_UPSTREAM`), it returns **200** with `streamlit: not_configured`.
+
+The runtime may expose the upstream URL via `FLUXLIT_STREAMLIT_UPSTREAM` and a companion state file so Uvicorn reload workers and Streamlit restarts stay consistent; tests cover file vs env precedence in `tests/test_runtime_upstream.py`.
+
+## Fast suite highlights
+
+The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad slice of operations:
+
+| Area | Examples |
+|------|----------|
+| Readiness | `tests/test_health_probe.py`, `tests/test_gateway_readyz.py`, `tests/test_app.py` (`readyz`) |
+| Gateway logging | `tests/test_gateway_access_log.py` |
+| Upstream state | `tests/test_runtime_upstream.py` |
+| Reload | `tests/test_streamlit_reload_watcher.py`, `tests/test_runtime_extra.py`, CLI tests for `--reload-scope` |
+| Log redaction | `tests/test_logging_redact.py` |
+| Doctor / auth env | `tests/test_cli.py` (`doctor`, PyJWT / JWT env) |
+
 ## Conventions
 
 - Prefer **FluxLitTestClient** (see [test_fluxlit_testclient.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_fluxlit_testclient.py)) when you need the real gateway stack.
 - Use Streamlit **AppTest** for UI logic where versions allow.
 - Gateway routing and proxy behavior: [test_gateway.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway.py), [test_gateway_unit.py](https://github.com/eddiethedean/fluxlit/blob/main/tests/test_gateway_unit.py), [test_gateway_proxy_*.py](https://github.com/eddiethedean/fluxlit/tree/main/tests).
+
+For runtime or routing issues while developing, see {doc}`troubleshooting`.

@@ -90,7 +90,9 @@ def test_healthz_not_in_openapi() -> None:
     gateway = build_gateway(fl.api, "http://127.0.0.1:9", api_prefix="/api")
     client = TestClient(gateway)
     body = client.get("/api/openapi.json").json()
-    assert "/healthz" not in body.get("paths", {})
+    paths = body.get("paths", {})
+    assert "/healthz" not in paths
+    assert "/readyz" not in paths
 
 
 def test_gateway_log_includes_request_id(api: FastAPI, caplog: pytest.LogCaptureFixture) -> None:

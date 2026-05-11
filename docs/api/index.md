@@ -32,6 +32,14 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
+.. automodule:: fluxlit.health
+   :members:
+   :show-inheritance:
+
+.. automodule:: fluxlit.logging_redact
+   :members:
+   :show-inheritance:
+
 .. automodule:: fluxlit.runtime
    :members:
    :show-inheritance:
