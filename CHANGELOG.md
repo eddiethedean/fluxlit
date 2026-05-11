@@ -1,15 +1,12 @@
 # Changelog
 
-## Unreleased
-
-- **Readiness:** `GET /api/readyz` / `fluxlit.health.probe_streamlit_ready` require a **2xx** response from the Streamlit upstream root (stricter than treating any status below 500 as ready).
-- **Gateway:** Return **502** when the Streamlit upstream URL resolves empty at request time (e.g. missing state file).
-- **Dev:** On `--reload-scope=full`, if the new Streamlit process does not open its port in time, terminate it and print a clear stderr message.
-- **CI:** Docs job runs `sphinx-build -W` (warnings as errors).
-- **Docs:** Windows limitation for `fluxlit shutdown --force` (no SIGKILL fallback).
-
 ## 0.4.0
 
+- **Readiness:** ``GET /api/readyz`` / ``fluxlit.health.probe_streamlit_ready`` require a **2xx** response from the Streamlit upstream root (stricter than treating any status below 500 as ready).
+- **Gateway:** Return **502** when the Streamlit upstream URL resolves empty at request time (e.g. missing state file); WebSocket connections get a clear close when upstream is missing.
+- **Dev:** On ``--reload-scope=full``, if the new Streamlit process does not open its port in time, terminate it, print stderr guidance, and stop the gateway.
+- **CI:** Docs job runs ``sphinx-build -W`` (warnings as errors).
+- **Docs:** Windows limitation for ``fluxlit shutdown --force`` (no SIGKILL fallback); deployment, observability, and troubleshooting updates for readiness behavior.
 - **Runtime:** Map IPv6 unspecified bind ``::`` to loopback for ``FLUXLIT_INTERNAL_API_BASE`` (same as ``0.0.0.0``).
 - **OIDC BFF:** Validate ``id_token`` with IdP JWKS when using ``GenericOIDCClient``; optional ``OIDCBFFConfig.id_token_audience`` / ``id_token_leeway_seconds``; parse-only fallback for other ``OIDCProvider`` stubs.
 - **JWT:** Run PyJWT/JWKS decode in a worker thread via ``anyio.to_thread`` to avoid blocking the event loop.
