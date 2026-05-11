@@ -1,93 +1,47 @@
 # FluxLit (`fluxlit`)
 
 [![Documentation Status](https://readthedocs.org/projects/fluxlit/badge/?version=stable)](https://fluxlit.readthedocs.io/en/stable/?badge=stable)
-[![PyPI version](https://img.shields.io/pypi/v/fluxlit)](https://pypi.org/project/fluxlit/)
+[![PyPI version](https://pypi.org/project/fluxlit)](https://pypi.org/project/fluxlit/)
 [![Python versions](https://img.shields.io/pypi/pyversions/fluxlit.svg)](https://pypi.org/project/fluxlit/)
 [![CI](https://github.com/eddiethedean/fluxlit/actions/workflows/ci.yml/badge.svg)](https://github.com/eddiethedean/fluxlit/actions/workflows/ci.yml)
 [![Release](https://github.com/eddiethedean/fluxlit/actions/workflows/release.yml/badge.svg)](https://github.com/eddiethedean/fluxlit/actions/workflows/release.yml)
 [![License](https://img.shields.io/pypi/l/fluxlit)](https://github.com/eddiethedean/fluxlit/blob/main/LICENSE)
 
-Production-oriented unified runtime for **FastAPI** and **Streamlit**: one public port, one CLI, and a single `FluxLit` app object for APIs plus UI pages.
+**One port** for **FastAPI** and **Streamlit**: a `FluxLit` app object, a Starlette **gateway** (Uvicorn), and Streamlit in a managed subprocess.
 
-**Documentation (hosted):** [https://fluxlit.readthedocs.io/en/stable/](https://fluxlit.readthedocs.io/en/stable/)
+**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md)
 
-**Security:** Vulnerability reporting and dependency audit notes are in [`SECURITY.md`](SECURITY.md). CI runs `pip-audit` after installing the **`auth`** extra (core + PyJWT/cryptography).
+| | |
+|--|--|
+| [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html) | [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html) · [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html) · [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) |
+| [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html) · [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) · [Rate limiting](https://fluxlit.readthedocs.io/en/stable/rate-limiting.html) | [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html) · [Auth migration](https://fluxlit.readthedocs.io/en/stable/migration-auth.html) · [Security](https://fluxlit.readthedocs.io/en/stable/security.html) · [Troubleshooting](https://fluxlit.readthedocs.io/en/stable/troubleshooting.html) |
+| [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html) | [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html) · [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) · [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) · [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
 
-| Topic | Read the Docs |
-|--------|----------------|
-| Quick start | [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html) |
-| Architecture & routing | [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html) |
-| Config & `fluxlit.toml` | [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) |
-| Security & threat model | [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html) |
-| Auth patterns (JWT, OIDC BFF, Streamlit) | [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html) |
-| Adopting auth in an existing app | [Auth migration](https://fluxlit.readthedocs.io/en/stable/migration-auth.html) |
-| CLI (`dev`, `run`, `doctor`, `build`) | [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html) |
-| Testing | [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html) |
-| Deployment (Docker, probes, scaling) | [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html) |
-| Observability | [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) |
-| Troubleshooting | [Troubleshooting](https://fluxlit.readthedocs.io/en/stable/troubleshooting.html) |
-| Rate limiting | [Rate limiting](https://fluxlit.readthedocs.io/en/stable/rate-limiting.html) |
-| Python API | [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html) |
-| Contributing | [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) |
-| Changelog | [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) |
-| Roadmap | [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
-
-**Also in the repo:** [Product & architecture plan](https://github.com/eddiethedean/fluxlit/blob/main/PLAN.md) (source for long-form product context; overview is on Read the Docs under [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html)).
-
----
-
-## Overview
-
-FluxLit targets teams that want FastAPI for HTTP APIs and Streamlit for interactive UIs without wiring separate ports, ad hoc reverse proxies, and brittle dev scripts. The runtime uses a **sidecar model**: Streamlit runs in a subprocess; a **Starlette ASGI gateway** fronts both the API and the UI.
-
----
-
-## Requirements
-
-- Python **3.10+**
-- Dependencies are declared in [`pyproject.toml`](pyproject.toml) (FastAPI, Uvicorn, Streamlit, Typer, httpx, websockets, etc.).
+Longer product context: [PLAN.md](PLAN.md).
 
 ---
 
 ## Install
 
+Python **3.10+**.
+
 ```bash
 pip install fluxlit
 ```
 
-JWT validation, JWKS, and OIDC/BFF helpers require the optional extra:
+Optional JWT / OIDC / BFF helpers: `pip install "fluxlit[auth]"` — see [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html).
 
-```bash
-pip install "fluxlit[auth]"
-```
-
-With the extra installed you get JWT validation (HS256 and JWKS/RS256), OIDC discovery, and BFF-style login/token-exchange helpers. High-level entry points:
-
-- **FastAPI:** `app.make_jwt_bearer()` from `FLUXLIT_JWT_*` env vars, or `app.attach_oidc_login(oidc_client)` with `FLUXLIT_PUBLIC_BASE_URL` and `FLUXLIT_OIDC_BFF_SECRET`.
-- **Streamlit:** the page `client` is **unauthenticated** (for public routes and bootstrapping). For secured `/api/...` routes, use `ApiClient.for_fluxlit(bearer_token=...)` or `auth_header_factory` so every request sends `Authorization`. After an OIDC redirect, `prepare_streamlit_api_client(st)` performs the server-side code exchange and returns a client that carries the session bearer.
-
-See [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html), [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html), and [Auth migration](https://fluxlit.readthedocs.io/en/stable/migration-auth.html). A minimal runnable demo lives under [`examples/reference_auth/`](examples/reference_auth/).
-
-For local development of FluxLit itself:
-
-```bash
-git clone https://github.com/eddiethedean/fluxlit.git
-cd fluxlit
-pip install -e ".[dev]"
-```
+**Hack on FluxLit:** `git clone` this repo, then `pip install -e ".[dev]"`.
 
 ---
 
 ## Quick start
 
-Create a project (optional):
-
 ```bash
-fluxlit new my-app
-cd my-app
+fluxlit new my-app && cd my-app   # optional
 ```
 
-Define a `FluxLit` app (e.g. `app.py`):
+`app.py`:
 
 ```python
 from fluxlit import FluxLit
@@ -104,217 +58,62 @@ def home(st, client):
     st.write(client.get("/users").json())
 ```
 
-Run the unified server (default import path `app:app`, or `target` from `fluxlit.toml` / `[tool.fluxlit]`):
-
 ```bash
-fluxlit dev
-# or explicitly:
-fluxlit dev app:app
+fluxlit dev    # default target app:app; or fluxlit dev your.module:app
 ```
 
-- **Browser:** open the URL shown by Uvicorn (default `http://127.0.0.1:8000`).
-- **API:** routes are mounted under **`/api`** (e.g. `GET /api/users`).
-- **OpenAPI / docs:** `http://127.0.0.1:8000/api/docs` (Swagger) and `/api/openapi.json`.
-- **Health:** `http://127.0.0.1:8000/api/healthz` (liveness; hidden from OpenAPI).
-- **Readiness:** `http://127.0.0.1:8000/api/readyz` probes the Streamlit sidecar when the unified runtime sets `FLUXLIT_STREAMLIT_UPSTREAM` (hidden from OpenAPI).
+- **UI:** app root on the URL Uvicorn prints (default port **8000**).
+- **API:** under **`/api`** (e.g. `GET /api/users`). OpenAPI: **`/api/docs`**.
+- **Health / readiness:** **`/api/healthz`**, **`/api/readyz`** (see [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html)).
 
-From Streamlit code, `ApiClient` calls the API using a base URL that includes `/api` (set automatically as `FLUXLIT_INTERNAL_API_BASE` when using `fluxlit dev` / `fluxlit run`). Use paths like `client.get("/users")`, not `client.get("/api/users")`.
+In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Secured routes need a client with credentials — [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html).
 
-For typed JSON responses, use `ApiClient.get_model` / `post_model` with Pydantic models.
-
-If routes use `Depends(JWTBearer)` (or similar), build an authenticated client—see **Calling secured APIs from Streamlit** below.
+**Routing:** `/api/*` → FastAPI (prefix stripped inside the app); **everything else** → Streamlit (HTTP + WebSocket). Details: [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html).
 
 ---
 
-## How routing works
+## CLI (summary)
 
-```text
-Browser
-   │
-   ▼
-┌──────────────────────────────────────┐
-│  FluxLit gateway (Uvicorn, one port)  │
-├──────────────────────────────────────┤
-│  /api/*     → FastAPI (path prefix    │
-│               stripped inside the app) │
-│  /*         → Streamlit (HTTP + WS    │
-│               proxy to subprocess)     │
-└──────────────────────────────────────┘
-```
+| Command | Role |
+|---------|------|
+| `fluxlit dev` | Dev server; optional `--reload` and `--reload-scope` (`gateway` or `full`) |
+| `fluxlit run` | Same stack, no reloader (typical in containers) |
+| `fluxlit doctor` | Import, bind, env sanity checks |
+| `fluxlit build` | Emit starter `Dockerfile` + `.dockerignore` |
+| `fluxlit new` | Minimal scaffold |
 
-Anything that is **not** under `/api` is forwarded to Streamlit (including WebSockets used by Streamlit). Reserve **`/api`** for your HTTP API.
-
-Note: the API prefix is configurable via `FluxlitSettings.api_mount_path` (default `/api`).
-
----
-
-## Calling secured APIs from Streamlit
-
-The `client` passed into `@app.page` handlers is a plain `ApiClient` with **no** `Authorization` header. That is intentional: use it for public endpoints, token issuance, or OIDC exchange, then create a client that attaches credentials for protected routes.
-
-```python
-from fluxlit.client import ApiClient
-
-@app.page("/")
-def home(st, client):
-    token = st.session_state.get("access_token")  # set after your login / BFF exchange
-    if not token:
-        st.info("Sign in first.")
-        return
-    with ApiClient.for_fluxlit(bearer_token=token) as api:
-        st.write(api.get("/me").json())
-```
-
-For OIDC + BFF flows, `prepare_streamlit_api_client(st)` (from `fluxlit`) combines the one-time `auth_code` exchange with an authenticated client—details and variants (`auth_header_factory`, env-driven JWT) are in the [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html) doc.
-
-Install **`fluxlit[auth]`** for JWT/OIDC helpers used in those guides.
-
----
-
-## CLI
-
-| Command | Description |
-|--------|-------------|
-| `fluxlit dev [target]` | Development server: Streamlit subprocess + gateway. Default `target`: CLI arg → `fluxlit.toml` / `pyproject.toml` `[tool.fluxlit]` → `app:app`. |
-| `fluxlit run [target]` | Same stack without auto-reload. |
-| `fluxlit doctor [target]` | Static checks: import target, core deps, gateway bind, `FLUXLIT_INTERNAL_API_BASE` shape, Streamlit version, JWT/OIDC env + PyJWT (`fluxlit[auth]`), subpath + proxy/CORS hints. Exits non-zero on failures unless `--warnings-only`. |
-| `fluxlit build [target]` | Write a starter `Dockerfile` and `.dockerignore` (use `--output` / `-o`, `--force` to overwrite). |
-| `fluxlit new <name>` | Scaffold a minimal `app.py` in a new directory. |
-| `python -m fluxlit` | Equivalent entry to the `fluxlit` console script. |
-
-Options for `dev` / `run` include `--host`, `--port`, `--log-level`, `--proxy-headers`, `--forwarded-allow-ips`. For **Posit Connect / Workbench** (or any subpath reverse proxy), set **`FLUXLIT_ROOT_PATH`** to the browser-visible prefix (e.g. `/content/123`) and **`FLUXLIT_TRUST_PROXY=1`** (or `--proxy-headers`); see [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) (reverse proxies section).
-`fluxlit dev --reload` uses Uvicorn’s reloader. **`--reload-scope=gateway`** (default) reloads the API gateway only; **`--reload-scope=full`** also restarts the Streamlit sidecar on file changes (dev-only; uses `watchfiles`). Invalid values are rejected at the CLI and again in `run_unified` before Streamlit starts.
-
-For **Kubernetes-style readiness**, call `GET /api/readyz` on the public port when the unified runtime sets `FLUXLIT_STREAMLIT_UPSTREAM` (returns **503** if the sidecar is down). Optional **structured gateway access logs** use `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`; pair with header redaction in custom logging if needed — see [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) and the `fluxlit.logging_redact` module in the [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html).
+Proxy / subpath: **`FLUXLIT_ROOT_PATH`**, **`FLUXLIT_TRUST_PROXY`**. Full flags and PID file: [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html).
 
 ---
 
 ## Configuration
 
-**Precedence:** CLI flags override environment variables; environment overrides project file defaults; then `FluxlitSettings` field defaults.
-
-### Project file
-
-- **`fluxlit.toml`** in the current working directory (top-level keys), or
-- **`[tool.fluxlit]`** in **`pyproject.toml`** if `fluxlit.toml` is absent.
-
-If both exist, **`fluxlit.toml` wins**. Supported keys include `target`, `gateway_host`, `gateway_port`, `log_level`, `api_mount_path`, and `root_path`.
-
-Example `fluxlit.toml`:
+Precedence: **CLI → environment (`FLUXLIT_*`, `.env`) → `fluxlit.toml` / `[tool.fluxlit]` → defaults.**
 
 ```toml
+# fluxlit.toml (optional)
 target = "app:app"
 gateway_host = "127.0.0.1"
 gateway_port = 8000
-log_level = "info"
 ```
 
-### Environment (`FluxlitSettings`)
-
-See [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) and the [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html) (`fluxlit.config`). Variables use the **`FLUXLIT_`** prefix and optional **`.env`** file.
-
-| Variable | Role |
-|----------|------|
-| `FLUXLIT_TITLE` | App title (default for FastAPI / UX). |
-| `FLUXLIT_GATEWAY_HOST` / `FLUXLIT_GATEWAY_PORT` | Defaults for binding (also used in settings; CLI overrides bind for dev/run). |
-| `FLUXLIT_ROOT_PATH` | Public subpath when mounted behind a proxy (FastAPI/Uvicorn `root_path`, gateway + Streamlit `baseUrlPath`). |
-| `FLUXLIT_TRUST_PROXY` | Trust `X-Forwarded-*` / client scheme via Uvicorn (use behind Connect, nginx, etc.). |
-| `FLUXLIT_FORWARDED_ALLOW_IPS` | Optional Uvicorn allowlist; defaults to `*` when proxy trust is on. |
-| `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side `ApiClient` (includes `/api`). |
-| `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log each API request (method, path, status) at INFO with request id context. |
-| `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG` | If true, log each gateway request at INFO with structured fields (`fluxlit_dispatch`, path, method); default is DEBUG-only. |
+Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html).
 
 ---
 
-## Suggested project layout
+## Project layout (sketch)
 
 ```text
 my_app/
-├── app.py              # FluxLit instance, @app.api routes, @app.page handlers
-├── pkg/                # Optional: Python package for discover_pages
-│   ├── __init__.py
-│   └── pages/          # call discover_pages("pages", package="pkg")
-│       ├── __init__.py
-│       └── reports.py  # def register(app): @app.page(...) ...
-├── services/
-├── static/
-├── fluxlit.toml        # Optional defaults for CLI
-└── .env                # FLUXLIT_* and secrets (do not commit)
-```
-
-**Optional page packages:** each `pkg/pages/*.py` module may define `register(app: FluxLit) -> None` that attaches `@app.page` handlers; call `app.discover_pages("pages", package="pkg")` after constructing `FluxLit`.
-
----
-
-## Package layout (`src/fluxlit`)
-
-Autogenerated detail: [Python API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html). Summary:
-
-| Module | Purpose |
-|--------|---------|
-| `app` | `FluxLit` application object |
-| `cli` | Typer CLI |
-| `client` | `ApiClient` (httpx) for server-side API calls |
-| `config` | `FluxlitSettings` |
-| `gateway` | ASGI router + HTTP/WebSocket proxy (request id context + optional INFO access logs) |
-| `health` | Async readiness probe for the Streamlit upstream (`/api/readyz`) |
-| `logging_redact` | Helpers to redact sensitive headers in logs |
-| `project_config` | `fluxlit.toml` / `[tool.fluxlit]` loading |
-| `logging_context` | Request id `ContextVar` for gateway / API |
-| `runtime` | Subprocess orchestration, Uvicorn entry, upstream state for workers |
-| `streamlit_main` | Streamlit entry script (`FLUXLIT_APP`) |
-| `testing` | `FluxLitTestClient` (FluxLit-native API + Streamlit test helpers) |
-| `api` | Optional `APIRouter` helpers |
-| `auth` | Forward-auth / trusted-proxy user helpers |
-| `jwt_auth` | JWT bearer dependencies, JWKS, scopes/roles (`fluxlit[auth]`) |
-| `oidc` | OIDC client + BFF routes (`fluxlit[auth]`) |
-| `streamlit_auth` | Streamlit helpers, `prepare_streamlit_api_client` (`fluxlit[auth]`) |
-| `security_middleware` | Optional security headers on `FluxLit.api` |
-
----
-
-## Testing
-
-FluxLit uses the same “built-in” testing platforms you likely already know:
-
-- **FastAPI**: `starlette.testclient.TestClient`
-- **Streamlit**: `streamlit.testing.v1.AppTest` (version-dependent)
-
-FluxLit also ships a small wrapper: **`FluxLitTestClient`**.
-
-**Contributor default (matches CI `test` job):** run the fast unit/integration suite in parallel, skip browser tests, and skip tests marked **`slow`** (subprocess / long-running):
-
-```bash
-python -m pytest -n auto --ignore=tests/e2e -m "not slow"
-```
-
-- **`slow`:** e.g. a subprocess `fluxlit run` health check. Run with `pytest -m slow --ignore=tests/e2e` or rely on the **`slow-tests`** CI job.
-- **Coverage:** locally, `pytest ... --cov=fluxlit --cov-report=term-missing` (see [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html)). CI runs coverage on Linux (Python 3.12) and uploads **`coverage.xml`** as a workflow artifact (`coverage-xml`).
-- **Fast suite:** includes readiness probes, `readyz` through the gateway, optional gateway access logging, upstream env/file helpers, full reload-scope validation, and logging redaction — see [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html#fast-suite-highlights).
-- **E2E:** Playwright + a real unified stack under `tests/e2e` (`@pytest.mark.e2e`), including **`FLUXLIT_ROOT_PATH`** / subpath checks. Install `pip install -e ".[dev,e2e]"`, run `python -m playwright install --with-deps chromium`, then `pytest tests/e2e -m e2e`. Keep `--ignore=tests/e2e` on the default run so those tests are opt-in.
-
-Full commands, Docker proxy smoke, and conventions: **[docs/testing.md](docs/testing.md)** (also on Read the Docs as [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html)).
-
-```python
-from fluxlit import FluxLit, FluxLitTestClient
-
-app = FluxLit(title="Test")
-client = FluxLitTestClient(app)
-
-assert client.api_get("/healthz").status_code == 200
-```
-
-For Streamlit, you can run FluxLit’s Streamlit entrypoint via AppTest:
-
-```python
-at = client.streamlit(target="my_app:app", extra_sys_path=".")
+├── app.py
+├── fluxlit.toml
+├── .env              # not committed
+└── pkg/pages/        # optional: discover_pages(...)
 ```
 
 ---
 
-## Development (contributors)
-
-See [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) on Read the Docs for setup, docs builds, and PR expectations.
+## Contributors
 
 ```bash
 pip install -e ".[dev]"
@@ -323,41 +122,12 @@ python -m pytest -n auto --ignore=tests/e2e -m "not slow"
 python -m mypy src/fluxlit
 ```
 
-Optional: `pytest -m slow --ignore=tests/e2e` and coverage — see [docs/testing.md](docs/testing.md).
+[Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) · [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html)
 
 ---
 
-## Features: today vs planned
+## Status
 
-**Available in current alphas**
+Shipped: unified gateway, `@app.page` / `discover_pages`, `fluxlit.toml`, typed `ApiClient`, health/readiness probes, optional gateway access logs, dev reload scopes, `fluxlit[auth]`, CI (incl. proxy smoke + Playwright e2e). **Roadmap:** [Read the Docs](https://fluxlit.readthedocs.io/en/stable/roadmap.html).
 
-- Single public port; managed Streamlit subprocess
-- Gateway: `/api` → FastAPI; HTTP + WebSocket proxy to Streamlit
-- Liveness `/api/healthz` and readiness `/api/readyz` (Streamlit sidecar probe when upstream is configured)
-- `@app.page` + `st.navigation` integration; optional `discover_pages` for package layouts
-- `fluxlit new`, `dev`, `run`, `doctor`, `build`
-- `fluxlit.toml` / `[tool.fluxlit]` project defaults; `ApiClient.get_model` / `post_model`
-- Request id propagation (`X-Request-ID`); optional FastAPI request logging; optional structured **gateway** access logs (`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG`); `fluxlit.logging_redact` for sensitive headers
-- Dev reload: `--reload-scope=gateway` (default) or `full` (restart Streamlit via `watchfiles`)
-- Example Compose stack: [`examples/docker_compose/`](examples/docker_compose/)
-- Optional **`fluxlit[auth]`:** JWT (HS256 + JWKS/RS256), OIDC + BFF login routes, Streamlit code exchange + `ApiClient` helpers, `FluxLit.make_jwt_bearer` / `attach_oidc_login`, forward-auth helpers, opt-in security headers (see [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html))
-- Typed package; Ruff + Mypy + Pytest in-tree; CI on GitHub Actions (matrix tests, **`slow-tests`**, **`coverage`** artifact, Docker **proxy-smoke**, Playwright **e2e**)
-
-**Planned** (see [Roadmap on Read the Docs](https://fluxlit.readthedocs.io/en/stable/roadmap.html))
-
-- Deeper metrics / tracing integrations; soak testing for the WebSocket proxy
-- Deeper session/cookie presets and deployment cookbooks
-- Official Docker/Kubernetes examples beyond `fluxlit build` and [`examples/docker_compose/`](examples/docker_compose/)
-- OpenAPI-generated client (optional)
-
----
-
-## Philosophy
-
-FluxLit should stay **Pythonic** (explicit, typed, easy to reason about), **production-minded** (proxy-safe, observable, deployable), and **honest** about Streamlit’s process/WebSocket model until a native ASGI path is proven.
-
----
-
-## License
-
-MIT — see [`pyproject.toml`](pyproject.toml) metadata.
+MIT — see [LICENSE](LICENSE).
