@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, MutableMapping
+from contextlib import contextmanager
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -32,6 +33,7 @@ from fluxlit.gateway import (
     normalize_root_mount,
     split_gateway_paths,
 )
+from fluxlit.tracing import reset_trace_hook, set_trace_hook
 
 
 def _httpx_getter(client: httpx.AsyncClient) -> Callable[[], Awaitable[httpx.AsyncClient]]:
@@ -256,6 +258,28 @@ async def test_gateway_unknown_scope_type_is_404() -> None:
     }
     await gateway(scope, receive, send)
     assert sent[0]["status"] == 404
+
+
+def test_gateway_trace_hook_observes_dispatch_span() -> None:
+    seen: list[tuple[str, dict[str, object]]] = []
+
+    @contextmanager
+    def hook(name: str, attrs):
+        seen.append((name, dict(attrs)))
+        yield
+
+    token = set_trace_hook(hook)
+    try:
+        gateway = build_gateway(FastAPI(), "http://127.0.0.1:9", api_prefix="/api")
+        with TestClient(gateway) as client:
+            client.get("/api/healthz", headers={"X-Request-ID": "trace-hook-test"})
+    finally:
+        reset_trace_hook(token)
+
+    assert seen
+    assert seen[0][0] == "fluxlit.gateway.request"
+    assert seen[0][1]["fluxlit.dispatch"] == "api"
+    assert seen[0][1]["request_id"] == "trace-hook-test"
 
 
 def test_websocket_proxy_upstream_refused_closes() -> None:
@@ -740,6 +764,15 @@ def test_build_gateway_prometheus_metrics_endpoint() -> None:
     r = client.get("/__fluxlit/metrics")
     assert r.status_code == 200
     assert "fluxlit_gateway_requests_total" in r.text
+
+
+def test_gateway_prometheus_metric_contract_documents_stable_names_and_labels() -> None:
+    from fluxlit.gateway.metrics import GATEWAY_PROMETHEUS_METRICS
+
+    by_name = {str(item["name"]): item for item in GATEWAY_PROMETHEUS_METRICS}
+    assert by_name["fluxlit_gateway_requests_total"]["labels"] == ("dispatch", "method_kind")
+    assert by_name["fluxlit_gateway_request_duration_seconds"]["labels"] == ("dispatch",)
+    assert {item["stability"] for item in GATEWAY_PROMETHEUS_METRICS} == {"stable"}
 
 
 def _fluxlit_gateway_requests_total(text: str, *, dispatch: str, method_kind: str) -> float:

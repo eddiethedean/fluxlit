@@ -13,7 +13,7 @@ import pytest
 from fluxlit.runtime import find_free_port
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TARGET = "tests.e2e.minimal_app:app"
+TARGET = "examples.smoke_app.app:app"
 
 
 def _wait_for_health(

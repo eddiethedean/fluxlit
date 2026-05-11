@@ -37,6 +37,20 @@ With the default (`False`), the same line is logged at **DEBUG** only.
 
 If you enable gateway INFO logs in production, combine them with your normal log pipeline (filters, aggregators) and scrub or avoid echoing sensitive headers. For copying header dicts into logs or debug output, use {mod}`fluxlit.logging.redact`. Broader secrets and rotation guidance: {doc}`secrets`.
 
+### Gateway log schema
+
+The gateway access-log field catalog is exported as
+{data}`fluxlit.logging.GATEWAY_ACCESS_LOG_FIELDS`. Treat these fields as stable for
+dashboards and alert routing:
+
+| Field | Stability | Notes |
+|-------|-----------|-------|
+| `request_id` | Stable | Present in the formatted message and JSON logs when emitted as `extra`; joins gateway/API/upstream evidence. |
+| `fluxlit_dispatch` | Stable | `api` or `streamlit`; low cardinality and safe for dashboards. |
+| `http_method_or_type` | Stable | HTTP method or `websocket`; safe for grouping. |
+| `path` | Stable | Raw ASGI path; consider route normalization in your own log pipeline if paths include user IDs. |
+| `query` | Stable, redacted | Sensitive query values are redacted, including URL-session keys. |
+
 ### JSON log lines (Loki / Datadog-style)
 
 Use {class}`~fluxlit.logging.JsonLogFormatter` so each log record is a **single JSON object** with at least `time`, `level`, `logger`, `message`, plus any attributes from ``logger.info(..., extra={...})`` (for example `request_id`, `fluxlit_dispatch`, `path` from gateway access logs).
@@ -50,6 +64,9 @@ Suggested field conventions for log stacks:
 | `message` | Human-readable line. |
 | `request_id` | Join gateway, API, and upstream Streamlit lines when present. |
 | `fluxlit_dispatch` | `api` vs `streamlit` for quick routing dashboards. |
+
+The base JSON field contract is exported as
+{data}`fluxlit.logging.JSON_LOG_BASE_FIELDS`.
 
 Attach the formatter to **Uvicorn** and your app loggers via `logging.dictConfig` (often from a small Python file referenced by `LOGGING_CONFIG` or equivalent in your process manager):
 
@@ -117,6 +134,19 @@ The path must **not** be under your **`api_mount_path`** or it will shadow API r
 
 **USE-style saturation** (CPU, memory, file descriptors) is not emitted by FluxLit core; scrape the node or cAdvisor / kube-state-metrics alongside these application counters.
 
+### Metrics contract
+
+The current metric catalog is exported as
+{data}`fluxlit.gateway.metrics.GATEWAY_PROMETHEUS_METRICS`. The names above and
+their labels are stable for 0.x dashboards. Keep labels low-cardinality:
+
+- `dispatch`: `api` or `streamlit`.
+- `method_kind`: HTTP method or `WEBSOCKET`.
+
+FluxLit intentionally does **not** label by raw path, status code, exception type,
+user, tenant, or query string in core metrics. Add those in your own app metrics
+only after you have a cardinality budget.
+
 ## Python `logging` filters
 
 Use a {class}`logging.Filter` to drop noisy loggers or scrub fields before logs reach stdout or a log aggregator (in addition to {mod}`fluxlit.logging.redact` for header maps).
@@ -130,6 +160,14 @@ FluxLit does not bundle OpenTelemetry. A typical approach:
 3. **Streamlit subprocess:** runs in a **separate process**; treat it as its own service for tracing unless you add custom propagation via env vars.
 
 Because the browser hits a **single port**, ingress spans should label whether work happened on the API (`/api/...`) or the Streamlit proxy path.
+
+For lightweight custom integrations, FluxLit exposes
+{func}`fluxlit.set_trace_hook`, {func}`fluxlit.reset_trace_hook`, and
+{func}`fluxlit.trace_span`. A hook receives a span name such as
+`fluxlit.gateway.request` and low-cardinality attributes including
+`fluxlit.dispatch`, `http.method_or_type`, `url.path`, and `request_id`. Use the
+hook to bridge into OpenTelemetry or another tracer without adding an OTel
+dependency to FluxLit core.
 
 ### Trace context (W3C `traceparent`)
 

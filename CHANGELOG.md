@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-No unreleased changes.
+- **0.6 development:** canonical smoke app shared by E2E/proxy/load paths; expanded `fluxlit doctor` diagnostics; stable gateway log and Prometheus metric contracts; optional no-dependency tracing hooks; URL-session external-store recipe and platform docs; scaffold profiles; local smoke/load/chaos scripts.
 
 ## 0.5.0 - 2026-05-11
 

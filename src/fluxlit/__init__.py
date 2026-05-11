@@ -39,6 +39,7 @@ from fluxlit.auth.streamlit import (
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
 from fluxlit.testing import FluxLitTestClient
+from fluxlit.tracing import reset_trace_hook, set_trace_hook, trace_span
 from fluxlit.url_session import (
     InMemorySessionStore,
     SessionStore,
@@ -74,6 +75,9 @@ __all__ = [
     "ensure_url_session",
     "hydrate_url_session",
     "persist_url_session",
+    "reset_trace_hook",
+    "set_trace_hook",
+    "trace_span",
     "__version__",
 ]
-__version__ = "0.5.0"
+__version__ = "0.6.0.dev0"

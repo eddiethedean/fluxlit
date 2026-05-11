@@ -9,8 +9,8 @@ RUN pip install --no-cache-dir --upgrade pip
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 
-# Sample app (not part of the wheel)
-COPY docker/proxy-deployment/app ./sample-app
+# Canonical smoke app (not part of the wheel)
+COPY examples/smoke_app ./sample-app
 
 RUN pip install --no-cache-dir .
 
@@ -32,4 +32,4 @@ ENV FLUXLIT_GATEWAY_PORT=8000
 
 EXPOSE 8000
 
-CMD ["fluxlit", "run", "main:app", "--host", "0.0.0.0", "--port", "8000", "--no-pidfile"]
+CMD ["fluxlit", "run", "app:app", "--host", "0.0.0.0", "--port", "8000", "--no-pidfile"]

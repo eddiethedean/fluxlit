@@ -9,6 +9,21 @@ from typing import Literal
 from fluxlit.gateway._log import gateway_log
 from fluxlit.gateway.contracts import GatewayPromCounter, GatewayPromHistogram
 
+GATEWAY_PROMETHEUS_METRICS: tuple[dict[str, object], ...] = (
+    {
+        "name": "fluxlit_gateway_requests_total",
+        "type": "counter",
+        "labels": ("dispatch", "method_kind"),
+        "stability": "stable",
+    },
+    {
+        "name": "fluxlit_gateway_request_duration_seconds",
+        "type": "histogram",
+        "labels": ("dispatch",),
+        "stability": "stable",
+    },
+)
+
 _gateway_prom_cached: tuple[GatewayPromCounter, GatewayPromHistogram] | Literal[False] | None = None
 _gateway_prom_lock = threading.Lock()
 

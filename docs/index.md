@@ -15,7 +15,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Run a minimal API + Streamlit app locally | {doc}`quickstart` |
 | Understand how requests reach FastAPI vs Streamlit | {doc}`architecture` |
 | Configure ports, env vars, proxy paths, or reload behavior | {doc}`configuration` · {doc}`cli` |
-| Deploy with containers, Kubernetes, or a reverse proxy | {doc}`deployment` · {doc}`production-tls` |
+| Deploy with containers, Kubernetes, platforms, or a reverse proxy | {doc}`deployment` · {doc}`platforms` · {doc}`production-tls` |
 | Operate the app with logs, metrics, probes, and runbooks | {doc}`observability` · {doc}`runbooks` |
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` |
 | Survive full page reload without cookies (URL + server store) | {doc}`url-session` |
@@ -45,6 +45,7 @@ architecture
 configuration
 cli
 deployment
+platforms
 production-tls
 secrets
 observability

@@ -68,6 +68,104 @@ def _dockerignore_body() -> str:
     )
 
 
+def _scaffold_app_body(profile: Literal["minimal", "auth-ready", "deploy"]) -> str:
+    if profile == "auth-ready":
+        return '''"""FluxLit auth-ready demo app.
+
+Install auth helpers with: pip install "fluxlit[auth]"
+"""
+
+from fluxlit import FluxLit
+
+app = FluxLit(title="FluxLit Auth Demo")
+
+
+@app.api.get("/public")
+def public():
+    return {"message": "public"}
+
+
+@app.page("/")
+def home(st, client):
+    st.title("Auth-ready Dashboard")
+    st.write(client.get("/public").json())
+    st.info("Add app.make_jwt_bearer() or app.attach_oidc_login(...) when ready.")
+
+
+if __name__ == "__main__":
+    import subprocess
+    import sys
+
+    subprocess.run([sys.executable, "-m", "fluxlit", "dev"], check=True)
+'''
+    if profile == "deploy":
+        return '''"""FluxLit deployment-ready starter."""
+
+from fluxlit import FluxLit
+
+app = FluxLit(
+    title="FluxLit Deploy Demo",
+    streamlit_page_config={"layout": "wide"},
+)
+
+
+@app.api.get("/items")
+def items():
+    return [{"name": "Ada"}, {"name": "Grace"}]
+
+
+@app.page("/")
+def home(st, client):
+    st.title("Deployment Dashboard")
+    st.write(client.get("/items").json())
+    st.caption("Run `fluxlit doctor` before deploying behind a proxy.")
+
+
+if __name__ == "__main__":
+    import subprocess
+    import sys
+
+    subprocess.run([sys.executable, "-m", "fluxlit", "dev"], check=True)
+'''
+    return '''"""FluxLit demo app."""
+
+from fluxlit import FluxLit
+
+app = FluxLit(title="FluxLit Demo")
+
+
+@app.api.get("/users")
+def users():
+    return [{"name": "Ada"}]
+
+
+@app.page("/")
+def home(st, client):
+    st.title("Dashboard")
+    r = client.get("/users")
+    st.write(r.json())
+
+
+if __name__ == "__main__":
+    import subprocess
+    import sys
+
+    subprocess.run([sys.executable, "-m", "fluxlit", "dev"], check=True)
+'''
+
+
+def _tcp_url_reachable(url: str, *, timeout_s: float = 0.25) -> tuple[bool, str]:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False, "not a valid http(s) URL"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        with socket.create_connection((parsed.hostname, port), timeout=timeout_s):
+            return True, f"{parsed.hostname}:{port} reachable"
+    except OSError as exc:
+        return False, f"{parsed.hostname}:{port} unreachable ({exc})"
+
+
 @app.command()
 def dev(
     target: str | None = typer.Argument(
@@ -401,6 +499,54 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
                 )
             )
 
+    if fl is not None and fl.settings.trust_proxy:
+        allow = (fl.settings.forwarded_allow_ips or "").strip()
+        if not allow or allow == "*":
+            rows.append(
+                (
+                    "forwarded_allow_ips",
+                    "WARN",
+                    "trust_proxy enabled but forwarded_allow_ips is broad; set "
+                    "FLUXLIT_FORWARDED_ALLOW_IPS to your proxy IP/CIDR in production",
+                )
+            )
+        else:
+            rows.append(("forwarded_allow_ips", "PASS", allow))
+
+    if fl is not None and fl.settings.public_base_url.strip():
+        parsed_public = urlparse(fl.settings.public_base_url.strip())
+        root = fl.settings.public_mount_path().rstrip("/")
+        public_path = (parsed_public.path or "").rstrip("/")
+        if root and public_path and public_path != root:
+            rows.append(
+                (
+                    "public_base_url",
+                    "WARN",
+                    f"path {public_path!r} does not match public mount {root!r}",
+                )
+            )
+        elif not parsed_public.scheme or not parsed_public.netloc:
+            rows.append(("public_base_url", "FAIL", "not a valid absolute URL"))
+        else:
+            rows.append(("public_base_url", "PASS", fl.settings.public_base_url.strip()))
+
+    upstream_file = os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM_FILE", "").strip()
+    upstream_env = os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM", "").strip()
+    if upstream_file:
+        fp = Path(upstream_file)
+        if not fp.exists():
+            rows.append(("streamlit_upstream_state", "FAIL", f"state file missing: {fp}"))
+        else:
+            raw = fp.read_text(encoding="utf-8").strip()
+            if not raw:
+                rows.append(("streamlit_upstream_state", "WARN", f"state file is empty: {fp}"))
+            else:
+                ok, msg = _tcp_url_reachable(raw)
+                rows.append(("streamlit_upstream_state", "PASS" if ok else "WARN", msg))
+    elif upstream_env:
+        ok, msg = _tcp_url_reachable(upstream_env)
+        rows.append(("streamlit_upstream", "PASS" if ok else "WARN", msg))
+
     cors_on = fl is not None and bool(fl.settings.cors_allow_origins)
     sec_off = fl is not None and not fl.settings.enable_security_headers
     if cors_on and sec_off:
@@ -491,7 +637,14 @@ def build(
 
 
 @app.command()
-def new(name: str = typer.Argument(..., help="Project directory name.")) -> None:
+def new(
+    name: str = typer.Argument(..., help="Project directory name."),
+    profile: Literal["minimal", "auth-ready", "deploy"] = typer.Option(
+        "minimal",
+        "--profile",
+        help="Scaffold profile: minimal, auth-ready, or deploy.",
+    ),
+) -> None:
     """Create ``<name>/app.py`` with a sample API route and Streamlit home page."""
     root = Path(name)
     if root.exists():
@@ -502,36 +655,9 @@ def new(name: str = typer.Argument(..., help="Project directory name.")) -> None
         'target = "app:app"\ngateway_port = 8000\n',
         encoding="utf-8",
     )
-    (root / "app.py").write_text(
-        '''"""FluxLit demo app."""
-
-from fluxlit import FluxLit
-
-app = FluxLit(title="FluxLit Demo")
-
-
-@app.api.get("/users")
-def users():
-    return [{"name": "Ada"}]
-
-
-@app.page("/")
-def home(st, client):
-    st.title("Dashboard")
-    r = client.get("/users")
-    st.write(r.json())
-
-
-if __name__ == "__main__":
-    import subprocess
-    import sys
-
-    subprocess.run([sys.executable, "-m", "fluxlit", "dev"], check=True)
-''',
-        encoding="utf-8",
-    )
+    (root / "app.py").write_text(_scaffold_app_body(profile), encoding="utf-8")
     typer.echo(
-        f"Created {name}/ — run: cd {name} && fluxlit dev  "
+        f"Created {name}/ ({profile}) — run: cd {name} && fluxlit dev  "
         f"(or: uvicorn app:app --reload --port 8000)"
     )
 

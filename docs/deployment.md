@@ -104,6 +104,20 @@ Behind a **Layer 7 load balancer** or Kubernetes **Service** with multiple endpo
 - **Sticky sessions** (session affinity / cookie-based or IP-hash) route the same browser to the same replica for a period. That improves continuity for interactive UIs but is **not** a full multi-replica session store: long-lived affinity tables, draining nodes, and failures still drop local state.
 - **When to add an external session store:** if you need **consistent application state across replicas** without sticky sessions (or in addition to them), persist state outside the process (database, Redis, etc.). FluxLit’s URL-session helpers provide the cookie-free binding pattern; production multi-replica continuity still depends on the store you choose.
 
+### Rollout and drain playbook
+
+For multi-replica deployments:
+
+1. Run one FluxLit process per replica. Do not use Uvicorn worker fan-out inside a replica.
+2. Use readiness (`/api/readyz`) to remove a replica before it receives user traffic.
+3. Give Streamlit WebSockets time to close during rollouts by aligning `preStop`,
+   `terminationGracePeriodSeconds`, and
+   `FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`.
+4. If users must survive replica replacement or non-sticky routing, store continuity
+   state in an external `SessionStore`; in-memory stores are per replica.
+5. Keep sticky sessions as a routing optimization, not as the only persistence layer
+   for important app state.
+
 ### Supported alternatives to multi-worker
 
 - **One process per replica** (Kubernetes Pod, ECS task, VM): scale replica count; tune CPU for a single process.
@@ -128,6 +142,7 @@ A minimal **Deployment + Service** that matches the hardened image contract (pro
 ## Related
 
 - {doc}`cli` — `run`, `build`, `shutdown`, PID file options.
+- {doc}`platforms` — deployment notes for common container platforms and Posit hosts.
 - {doc}`production-tls` — HSTS, CSP notes, `forwarded_allow_ips`, TLS validation.
 - {doc}`secrets` — secret stores, logs, JWT/OIDC rotation.
 - {doc}`testing` — proxy smoke and E2E for regression coverage.

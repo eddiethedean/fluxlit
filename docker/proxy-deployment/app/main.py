@@ -1,13 +1,5 @@
-"""Minimal FluxLit app for Docker proxy smoke tests (nginx + subpath)."""
+"""Compatibility import for the canonical proxy smoke app."""
 
 from __future__ import annotations
 
-from fluxlit import FluxLit
-
-app = FluxLit(title="Proxy smoke")
-
-
-@app.page("/", title="Home")
-def home(st, client) -> None:  # noqa: ARG001
-    st.title("Proxy smoke UI")
-    st.write("docker_proxy_ok")
+from examples.smoke_app.app import app as app

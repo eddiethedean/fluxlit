@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 
 from fluxlit.config import FluxlitSettings
+from fluxlit.logging import GATEWAY_ACCESS_LOG_FIELDS
 
 
 def _mini_api() -> FastAPI:
@@ -36,6 +37,8 @@ def test_gateway_access_log_emits_info_with_extra(
     assert api_records, "expected INFO from fluxlit.gateway"
     assert any(getattr(r, "fluxlit_dispatch", None) == "api" for r in api_records)
     assert any("access-log-test" in r.getMessage() for r in api_records)
+    for field in GATEWAY_ACCESS_LOG_FIELDS:
+        assert hasattr(api_records[0], field)
 
 
 def test_gateway_debug_log_extra_includes_redacted_query(

@@ -73,6 +73,64 @@ def test_doctor_passes_proxy_headers_when_subpath_and_trust_proxy(
     assert "trust_proxy enabled" in res.stdout
 
 
+def test_doctor_warns_when_trust_proxy_has_broad_forwarded_allow_ips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_proxy_broad.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings("
+        "trust_proxy=True, forwarded_allow_ips='*', gateway_port=59279))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_proxy_broad:app"])
+    assert res.exit_code == 0
+    assert "forwarded_allow_ips" in res.stdout
+    assert "WARN" in res.stdout
+
+
+def test_doctor_warns_when_public_base_url_path_mismatches_root_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_public_base_mismatch.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings("
+        "root_path='/apps/demo', public_base_url='https://example.com/wrong', "
+        "gateway_port=59280))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_public_base_mismatch:app"])
+    assert res.exit_code == 0
+    assert "public_base_url" in res.stdout
+    assert "does not match public mount" in res.stdout
+
+
+def test_doctor_fails_missing_streamlit_upstream_state_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_missing_upstream_file.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_port=59281))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", str(tmp_path / "missing.txt"))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_missing_upstream_file:app"])
+    assert res.exit_code == 1
+    assert "streamlit_upstream_state" in res.stdout
+    assert "state file missing" in res.stdout
+
+
 def test_doctor_fails_fluxlit_auth_extra_when_pyjwt_unimportable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -315,6 +373,32 @@ def test_new_scaffold_writes_app_py(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     toml = root / "fluxlit.toml"
     assert toml.is_file()
     assert 'target = "app:app"' in toml.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("profile", "expected"),
+    [
+        ("minimal", "FluxLit Demo"),
+        ("auth-ready", "Auth-ready Dashboard"),
+        ("deploy", "Deployment Dashboard"),
+    ],
+)
+def test_new_scaffold_profiles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    profile: str,
+    expected: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    res = runner.invoke(
+        app,
+        ["new", f"scaffold_{profile}", "--profile", profile],
+        catch_exceptions=False,
+    )
+    assert res.exit_code == 0
+    assert profile in res.stdout
+    assert expected in (tmp_path / f"scaffold_{profile}" / "app.py").read_text(encoding="utf-8")
 
 
 def test_new_exits_when_destination_exists(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

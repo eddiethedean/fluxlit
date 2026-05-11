@@ -48,6 +48,10 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
+.. automodule:: fluxlit.tracing
+   :members:
+   :show-inheritance:
+
 .. automodule:: fluxlit.api
    :members:
    :show-inheritance:

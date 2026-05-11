@@ -77,16 +77,43 @@ See [docker/proxy-deployment/README.md](../docker/proxy-deployment/README.md) fo
 - **`tests/test_asgi_unified.py`** — lifespan, concurrent and **serial burst** `healthz`, streaming request bodies, **sidecar exit** → 503, chunked POST to API.
 - **`tests/test_gateway_proxy_robust.py`** — upstream **connect** / **read timeout** → **502**, body limits, WebSocket edge kwargs.
 
+## Canonical smoke app
+
+Release, proxy, E2E, and local load checks share the tiny app in
+`examples/smoke_app/`. Its public contract is intentionally small:
+
+- `GET /api/healthz` returns `{"status": "ok"}`.
+- `GET /api/smoke` includes marker `fluxlit_smoke_ok`.
+- The Streamlit home page renders `FluxLit Smoke` and `fluxlit_smoke_ok`.
+
+Run it from the repository root with:
+
+```bash
+./scripts/run_smoke_app.sh
+```
+
 ## Soak / load (local)
 
-With **`fluxlit run`** (or any HTTP server) listening on port 8000:
+With the canonical smoke app listening on port 8000:
 
 ```bash
 chmod +x scripts/soak_http.sh
-COUNT=500 BASE_URL=http://127.0.0.1:8000 ./scripts/soak_http.sh
+COUNT=500 BASE_URL=http://127.0.0.1:8000 PATH_SUFFIX=/api/smoke ./scripts/soak_http.sh
 ```
 
 Adjust `PATH_SUFFIX` (default `/api/healthz`) or `COUNT` for longer runs. Watch gateway CPU and logs; pair with {doc}`observability` if you enable access logs.
+
+## Chaos checks (local)
+
+The sidecar-failure check starts the canonical smoke app, kills the Streamlit child
+process, and verifies that the gateway exits instead of serving a broken UI:
+
+```bash
+./scripts/chaos_streamlit_kill.sh
+```
+
+Keep chaos scripts local/manual unless they are explicitly marked slow in CI; they
+intentionally manipulate subprocesses.
 
 The **[`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml)** workflow runs **weekly** (and **`workflow_dispatch`**) against `python -m http.server` to ensure `scripts/soak_http.sh` still works; it does **not** start FluxLit.
 

@@ -22,6 +22,7 @@ _curl() {
 }
 
 api_url="${BASE}${PREFIX}/api/healthz"
+smoke_url="${BASE}${PREFIX}/api/smoke"
 root_url="${BASE}${PREFIX}/"
 
 wait_curl() {
@@ -47,6 +48,12 @@ api_out="$(_curl -sfS --max-time 30 "$api_url")"
 echo "$api_out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
   || { echo "FAIL: unexpected health JSON: $api_out"; exit 1; }
 echo "API OK"
+
+echo "Checking smoke API: ${smoke_url}"
+smoke_out="$(_curl -sfS --max-time 30 "$smoke_url")"
+echo "$smoke_out" | grep -q '"marker"[[:space:]]*:[[:space:]]*"fluxlit_smoke_ok"' \
+  || { echo "FAIL: unexpected smoke JSON: $smoke_out"; exit 1; }
+echo "Smoke API OK"
 
 echo "Waiting for Streamlit shell: ${root_url}"
 wait_curl "$root_url" "gateway root"

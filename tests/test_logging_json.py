@@ -9,6 +9,7 @@ import sys
 from datetime import date, datetime, timezone
 
 from fluxlit.logging.json_formatter import JsonLogFormatter
+from fluxlit.logging.schema import JSON_LOG_BASE_FIELDS
 
 
 def test_json_log_formatter_includes_extra_fields() -> None:
@@ -31,6 +32,8 @@ def test_json_log_formatter_includes_extra_fields() -> None:
     assert data["logger"] == "test"
     assert data["request_id"] == "abc-123"
     assert data["fluxlit_dispatch"] == "streamlit"
+    for field in JSON_LOG_BASE_FIELDS:
+        assert field in data
 
 
 def test_json_log_formatter_includes_exception_block() -> None:

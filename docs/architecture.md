@@ -50,6 +50,25 @@ These routes are registered with **`include_in_schema=False`** so they do not ap
 - **Production-minded:** proxy-friendly (`root_path`, forwarded headers where configured), observable hooks (request ids forwarded to Streamlit on proxied HTTP/WebSocket, optional API and **gateway** access logging, readiness via `/api/readyz`), and tunable gateway timeouts, body limits, and upstream `httpx` pool behavior via {class}`~fluxlit.config.FluxlitSettings` / `FLUXLIT_*` (see {doc}`configuration`).
 - **Honest about Streamlit:** subprocess + WebSocket proxy until a native single-process model is proven.
 
+## Stable extension points
+
+Prefer these public hooks over importing private runtime modules:
+
+| Need | Public surface |
+|------|----------------|
+| API routes, dependencies, OpenAPI | {attr}`fluxlit.app.FluxLit.api` (FastAPI app). |
+| Streamlit pages | {meth}`fluxlit.app.FluxLit.page` and {meth}`fluxlit.app.FluxLit.discover_pages`. |
+| Streamlit → API calls | {class}`fluxlit.client.ApiClient` and `ApiClient.for_fluxlit(...)`. |
+| JWT / OIDC / BFF auth | {mod}`fluxlit.auth` and the exports from {mod}`fluxlit`. |
+| URL-bound continuity | {class}`fluxlit.url_session.SessionStore` plus `ensure_url_session`, `hydrate_url_session`, and `persist_url_session`. |
+| Logging and redaction | {mod}`fluxlit.logging`, including JSON formatting and stable gateway log fields. |
+| Tracing integrations | {func}`fluxlit.set_trace_hook` / {func}`fluxlit.trace_span` for optional no-dependency hooks. |
+
+Modules or names prefixed with `_` are internal unless documented in the API
+reference. Runtime modules under `fluxlit.runtime` may change to support sidecar
+or reload behavior; wrap them in your own deployment script only when the CLI is
+not enough.
+
 Further product context: see the [architecture and product plan](https://github.com/eddiethedean/fluxlit/blob/main/PLAN.md) in the repository.
 
 TLS termination, reverse-proxy trust, and operator security checklists: {doc}`production-tls` · {doc}`secrets` · {doc}`security`.

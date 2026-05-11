@@ -75,7 +75,10 @@ async def respond_413_payload_too_large(send: Send) -> None:
     await send(
         {
             "type": "http.response.body",
-            "body": b"Payload Too Large",
+            "body": (
+                b"Payload Too Large: proxied request body exceeds "
+                b"FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES"
+            ),
             "more_body": False,
         }
     )

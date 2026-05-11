@@ -28,6 +28,7 @@ from fluxlit.gateway.responses import (
 )
 from fluxlit.gateway.websocket_proxy import proxy_websocket
 from fluxlit.logging import redact_query_string, reset_request_id, set_request_id
+from fluxlit.tracing import trace_span
 
 
 def make_gateway_app(
@@ -93,6 +94,7 @@ def make_gateway_app(
             except Exception:
                 qs_dec = ""
             log_extra = {
+                "request_id": rid,
                 "fluxlit_dispatch": dispatch,
                 "http_method_or_type": method_or_type,
                 "path": path_in,
@@ -104,67 +106,74 @@ def make_gateway_app(
                 gateway_log.info(log_msg, *log_args, extra=log_extra)
             else:
                 gateway_log.debug(log_msg, *log_args, extra=log_extra)
-            if prom_metrics:
-                mk = (
-                    "WEBSOCKET"
-                    if scope["type"] == "websocket"
-                    else str(scope.get("method", "GET")).upper()
-                )
-                prom_metrics[0].labels(dispatch=dispatch, method_kind=mk).inc()
-            if is_api:
-                inner = dict(scope)
-                inner["path"] = path
-                inner["raw_path"] = path.encode("latin-1")
-                api_scope = strip_prefix_scope(inner, prefix)
-                await api_app(api_scope, receive, send)
-                return
-            upstream = resolve_upstream()
-            if not upstream:
-                if scope["type"] == "http":
-                    await bad_streamlit_upstream_http(send)
+            attrs = {
+                "fluxlit.dispatch": dispatch,
+                "http.method_or_type": str(method_or_type),
+                "url.path": path_in,
+                "request_id": rid,
+            }
+            with trace_span("fluxlit.gateway.request", attrs):
+                if prom_metrics:
+                    mk = (
+                        "WEBSOCKET"
+                        if scope["type"] == "websocket"
+                        else str(scope.get("method", "GET")).upper()
+                    )
+                    prom_metrics[0].labels(dispatch=dispatch, method_kind=mk).inc()
+                if is_api:
+                    inner = dict(scope)
+                    inner["path"] = path
+                    inner["raw_path"] = path.encode("latin-1")
+                    api_scope = strip_prefix_scope(inner, prefix)
+                    await api_app(api_scope, receive, send)
                     return
+                upstream = resolve_upstream()
+                if not upstream:
+                    if scope["type"] == "http":
+                        await bad_streamlit_upstream_http(send)
+                        return
+                    if scope["type"] == "websocket":
+                        await bad_streamlit_upstream_ws(receive, send)
+                        return
                 if scope["type"] == "websocket":
-                    await bad_streamlit_upstream_ws(receive, send)
+                    await proxy_websocket(
+                        scope,
+                        receive,
+                        send,
+                        upstream,
+                        streamlit_path,
+                        forwarded_prefix=mount or None,
+                        request_id=rid,
+                        proxy_options=opts,
+                    )
                     return
-            if scope["type"] == "websocket":
-                await proxy_websocket(
-                    scope,
-                    receive,
-                    send,
-                    upstream,
-                    streamlit_path,
-                    forwarded_prefix=mount or None,
-                    request_id=rid,
-                    proxy_options=opts,
-                )
-                return
-            if scope["type"] == "http":
-                method = scope.get("method", "GET").upper()
-                if method in {"GET", "HEAD"}:
-                    if path in {"/docs", "/docs/"}:
-                        await redirect(send, location_under_mount(mount, f"{prefix}/docs"))
-                        return
-                    if path in {"/redoc", "/redoc/"}:
-                        await redirect(send, location_under_mount(mount, f"{prefix}/redoc"))
-                        return
-                    if path in {"/openapi.json"}:
-                        loc = location_under_mount(mount, f"{prefix}/openapi.json")
-                        await redirect(send, loc)
-                        return
-                await proxy_http(
-                    scope,
-                    receive,
-                    send,
-                    upstream,
-                    streamlit_path,
-                    forwarded_prefix=mount or None,
-                    request_id=rid,
-                    proxy_options=opts,
-                    httpx_client_getter=shared_httpx_client,
-                    upstream_sem=upstream_sem,
-                )
-                return
-            await not_found(send)
+                if scope["type"] == "http":
+                    method = scope.get("method", "GET").upper()
+                    if method in {"GET", "HEAD"}:
+                        if path in {"/docs", "/docs/"}:
+                            await redirect(send, location_under_mount(mount, f"{prefix}/docs"))
+                            return
+                        if path in {"/redoc", "/redoc/"}:
+                            await redirect(send, location_under_mount(mount, f"{prefix}/redoc"))
+                            return
+                        if path in {"/openapi.json"}:
+                            loc = location_under_mount(mount, f"{prefix}/openapi.json")
+                            await redirect(send, loc)
+                            return
+                    await proxy_http(
+                        scope,
+                        receive,
+                        send,
+                        upstream,
+                        streamlit_path,
+                        forwarded_prefix=mount or None,
+                        request_id=rid,
+                        proxy_options=opts,
+                        httpx_client_getter=shared_httpx_client,
+                        upstream_sem=upstream_sem,
+                    )
+                    return
+                await not_found(send)
         finally:
             if (
                 prom_metrics

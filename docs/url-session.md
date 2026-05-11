@@ -44,6 +44,58 @@ Treat the query string as part of your **public URL contract**. Any link or `st.
 - **TTL:** {class}`~fluxlit.url_session.InMemorySessionStore` supports TTL; cap size with `max_entries`.
 - **Logging:** do not log raw tokens at INFO. The gateway structured log field `query` redacts `fluxlit_sid` and your configured `url_session_query_param`.
 
+## External store recipe
+
+For multiple replicas, implement {class}`~fluxlit.url_session.SessionStore` with a
+shared backend. Keep the implementation in your app or infrastructure package so
+FluxLit core does not need to depend on Redis, SQL drivers, or cloud SDKs.
+
+```python
+import json
+from typing import Any
+
+from fluxlit.config import JsonValue
+from fluxlit.url_session import SessionStore
+
+
+class RedisSessionStore(SessionStore):
+    def __init__(self, redis_client: Any, *, prefix: str = "fluxlit:sid:") -> None:
+        self.redis = redis_client
+        self.prefix = prefix
+
+    def _key(self, session_id: str) -> str:
+        return f"{self.prefix}{session_id}"
+
+    def get(self, session_id: str) -> dict[str, JsonValue] | None:
+        raw = self.redis.get(self._key(session_id))
+        if raw is None:
+            return None
+        return json.loads(raw)
+
+    def set(
+        self,
+        session_id: str,
+        data: dict[str, JsonValue],
+        *,
+        ttl_seconds: float | None = None,
+    ) -> None:
+        payload = json.dumps(data)
+        if ttl_seconds is None:
+            self.redis.set(self._key(session_id), payload)
+        else:
+            self.redis.setex(self._key(session_id), int(ttl_seconds), payload)
+
+    def delete(self, session_id: str) -> None:
+        self.redis.delete(self._key(session_id))
+```
+
+Production notes:
+
+- Use a TTL and rotate session IDs after privilege changes.
+- Keep the URL token opaque; never encode user identity or permissions in it.
+- Add monitoring for store latency and errors because page hydration now depends on it.
+- Pair the shared store with rollout/drain guidance in {doc}`deployment`; sticky sessions alone do not protect users when a replica restarts.
+
 ## Related
 
 - Roadmap **Phase 2 follow-on** in {doc}`roadmap`.

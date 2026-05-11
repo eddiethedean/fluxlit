@@ -86,6 +86,14 @@ For a **PyPI / tag** release of FluxLit itself:
 4. **Tag** — `git tag vX.Y.Z` after merge to the release branch / `main` per your workflow.
 5. **Read the Docs** — confirm the **stable** build points at the new tag when applicable.
 
+Before tagging, run the canonical smoke app once locally when runtime or deployment behavior
+changed:
+
+```bash
+./scripts/run_smoke_app.sh
+BASE_URL=http://127.0.0.1:8000 PATH_SUFFIX=/api/smoke COUNT=50 ./scripts/soak_http.sh
+```
+
 Support expectations for Python and dependencies are summarized in **`docs/support-matrix.md`**.
 
 ## Public-facing polish checklist

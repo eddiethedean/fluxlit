@@ -16,10 +16,13 @@ from fluxlit.logging.redact import (
     redact_query_string,
     sanitize_headers,
 )
+from fluxlit.logging.schema import GATEWAY_ACCESS_LOG_FIELDS, JSON_LOG_BASE_FIELDS
 
 __all__ = [
     "DEFAULT_SENSITIVE_QUERY_KEYS",
+    "GATEWAY_ACCESS_LOG_FIELDS",
     "JsonLogFormatter",
+    "JSON_LOG_BASE_FIELDS",
     "REQUEST_ID_HEADER",
     "get_request_id",
     "log",
