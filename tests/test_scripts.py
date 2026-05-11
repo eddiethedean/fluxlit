@@ -32,7 +32,7 @@ def test_shell_scripts_parse() -> None:
 
 
 @pytest.mark.skipif(
-    sys.platform.startswith("win") or (sys.platform == "darwin" and os.environ.get("CI")),
+    sys.platform.startswith("win") or (sys.platform == "darwin" and bool(os.environ.get("CI"))),
     reason="requires stable POSIX shell networking",
 )
 def test_soak_http_json_output_against_local_server(tmp_path: Path) -> None:

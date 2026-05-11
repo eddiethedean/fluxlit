@@ -4,7 +4,18 @@ from __future__ import annotations
 
 import httpx
 
+from fluxlit.config import FluxlitSettings
 from fluxlit.runtime import read_streamlit_upstream_url
+
+
+def _streamlit_readiness_urls(upstream: str) -> list[str]:
+    """Candidate Streamlit URLs that indicate the sidecar is serving traffic."""
+    base = upstream.rstrip("/")
+    urls = [f"{base}/"]
+    mount = FluxlitSettings().public_mount_path().strip().strip("/")
+    if mount:
+        urls.append(f"{base}/{mount}/")
+    return urls
 
 
 async def probe_streamlit_ready(*, timeout_s: float = 0.5) -> tuple[bool, str]:
@@ -20,14 +31,16 @@ async def probe_streamlit_ready(*, timeout_s: float = 0.5) -> tuple[bool, str]:
     upstream = read_streamlit_upstream_url()
     if not upstream:
         return True, "not_configured"
-    url = f"{upstream.rstrip('/')}/"
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
-            response = await client.get(url)
+            detail = ""
+            for url in _streamlit_readiness_urls(upstream):
+                response = await client.get(url)
+                if 200 <= response.status_code < 300:
+                    return True, "ok"
+                detail = f"upstream_http_{response.status_code}"
     except (httpx.HTTPError, OSError) as e:
         # Some Win32 socket errors stringify to "", but tests/ops want a non-empty reason.
         detail = str(e) or f"{type(e).__name__}: {e!r}"
         return False, detail
-    if 200 <= response.status_code < 300:
-        return True, "ok"
-    return False, f"upstream_http_{response.status_code}"
+    return False, detail

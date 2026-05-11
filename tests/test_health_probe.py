@@ -58,6 +58,20 @@ class _Root302Handler(BaseHTTPRequestHandler):
         return
 
 
+class _MountedOkHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        if self.path == "/myapp/":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"ok")
+        else:
+            self.send_error(404)
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
+
+
 @pytest.fixture
 def http_root_ok() -> Generator[str, None, None]:
     port = find_free_port()
@@ -110,6 +124,19 @@ def http_root_302() -> Generator[str, None, None]:
         thread.join(timeout=10)
 
 
+@pytest.fixture
+def http_mounted_ok() -> Generator[str, None, None]:
+    port = find_free_port()
+    server = HTTPServer(("127.0.0.1", port), _MountedOkHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=10)
+
+
 @pytest.mark.asyncio
 async def test_probe_ready_when_upstream_returns_200(
     http_root_ok: str,
@@ -117,6 +144,19 @@ async def test_probe_ready_when_upstream_returns_200(
 ) -> None:
     monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", http_root_ok)
     monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    ok, detail = await probe_streamlit_ready(timeout_s=2.0)
+    assert ok is True
+    assert detail == "ok"
+
+
+@pytest.mark.asyncio
+async def test_probe_ready_when_streamlit_uses_public_mount(
+    http_mounted_ok: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", http_mounted_ok)
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    monkeypatch.setenv("FLUXLIT_ROOT_PATH", "/myapp")
     ok, detail = await probe_streamlit_ready(timeout_s=2.0)
     assert ok is True
     assert detail == "ok"
