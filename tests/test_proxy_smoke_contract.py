@@ -9,6 +9,7 @@ PROXY_DIR = REPO_ROOT / "docker" / "proxy-deployment"
 def test_proxy_smoke_script_checks_0_6_contracts() -> None:
     script = (PROXY_DIR / "smoke-test.sh").read_text(encoding="utf-8")
     assert "/api/readyz" in script
+    assert 'wait_curl "$ready_url" "API readiness"' in script
     assert "/api/smoke" in script
     assert "/api/request-id" in script
     assert "fluxlit_smoke_ok" in script

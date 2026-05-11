@@ -52,6 +52,7 @@ echo "$api_out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
 echo "API OK"
 
 echo "Checking readiness: ${ready_url}"
+wait_curl "$ready_url" "API readiness"
 ready_out="$(_curl -sfS --max-time 30 "$ready_url")"
 echo "$ready_out" | grep -q '"status"[[:space:]]*:[[:space:]]*"ready"' \
   || { echo "FAIL: unexpected readiness JSON: $ready_out"; exit 1; }

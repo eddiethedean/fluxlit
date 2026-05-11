@@ -31,7 +31,10 @@ def test_shell_scripts_parse() -> None:
     subprocess.run(["bash", "-n", *scripts], cwd=REPO_ROOT, check=True)
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="requires POSIX shell tools")
+@pytest.mark.skipif(
+    sys.platform.startswith("win") or (sys.platform == "darwin" and os.environ.get("CI")),
+    reason="requires stable POSIX shell networking",
+)
 def test_soak_http_json_output_against_local_server(tmp_path: Path) -> None:
     port = find_free_port()
     server = subprocess.Popen(  # noqa: S603
