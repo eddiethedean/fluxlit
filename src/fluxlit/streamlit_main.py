@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import streamlit as st
 
@@ -30,9 +30,12 @@ if not spec:
 
 _fluxlit = load_fluxlit(spec)
 st.set_page_config(
-    **build_set_page_config_kwargs(
-        settings_title=_fluxlit.settings.title,
-        streamlit_page_config=_fluxlit.settings.streamlit_page_config,
+    **cast(
+        dict[str, Any],
+        build_set_page_config_kwargs(
+            settings_title=_fluxlit.settings.title,
+            streamlit_page_config=_fluxlit.settings.streamlit_page_config,
+        ),
     )
 )
 _client = _fluxlit.get_client()

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any
 
+from fluxlit.json_types import JsonValue
 from fluxlit.url_session import (
     SessionStore,
     hydrate_url_session,
@@ -19,10 +19,10 @@ class DictSessionStore:
 
     def __init__(self, *, default_ttl_seconds: float | None = None) -> None:
         self._lock = threading.Lock()
-        self._data: dict[str, tuple[dict[str, Any], float | None]] = {}
+        self._data: dict[str, tuple[dict[str, JsonValue], float | None]] = {}
         self._default_ttl = default_ttl_seconds
 
-    def get(self, session_id: str) -> dict[str, Any] | None:
+    def get(self, session_id: str) -> dict[str, JsonValue] | None:
         with self._lock:
             ent = self._data.get(session_id)
             if not ent:
@@ -36,7 +36,7 @@ class DictSessionStore:
     def set(
         self,
         session_id: str,
-        data: dict[str, Any],
+        data: dict[str, JsonValue],
         *,
         ttl_seconds: float | None = None,
     ) -> None:
@@ -64,8 +64,8 @@ def test_dict_session_store_satisfies_session_store_protocol() -> None:
 def test_hydrate_and_persist_with_dict_store() -> None:
     class _St:
         def __init__(self) -> None:
-            self.session_state: dict[str, Any] = {}
-            self.query_params: dict[str, Any] = {}
+            self.session_state: dict[str, JsonValue] = {}
+            self.query_params: dict[str, str | list[str] | None] = {}
 
     store = DictSessionStore(default_ttl_seconds=None)
     st = _St()

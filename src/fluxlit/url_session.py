@@ -17,20 +17,23 @@ from __future__ import annotations
 import secrets
 import time
 from collections.abc import Mapping, MutableMapping
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, cast, runtime_checkable
+
+from fluxlit.json_types import JsonValue
+from fluxlit.streamlit_facade import StreamlitSessionFacade
 
 
 @runtime_checkable
 class SessionStore(Protocol):
-    """Server-side persistence for URL-bound session blobs (serializable dicts)."""
+    """Server-side persistence for URL-bound session blobs (JSON-serializable dicts)."""
 
-    def get(self, session_id: str) -> dict[str, Any] | None:
+    def get(self, session_id: str) -> dict[str, JsonValue] | None:
         """Return the stored dict or ``None`` if missing/expired."""
 
     def set(
         self,
         session_id: str,
-        data: dict[str, Any],
+        data: dict[str, JsonValue],
         *,
         ttl_seconds: float | None = None,
     ) -> None:
@@ -56,7 +59,7 @@ class InMemorySessionStore:
         self._max_entries = max(1, max_entries)
         self._default_ttl = default_ttl_seconds
         # session_id -> (payload, deadline_monotonic or None if no ttl)
-        self._data: dict[str, tuple[dict[str, Any], float | None]] = {}
+        self._data: dict[str, tuple[dict[str, JsonValue], float | None]] = {}
 
     def _evict_expired(self) -> None:
         now = time.monotonic()
@@ -69,7 +72,7 @@ class InMemorySessionStore:
             # Drop arbitrary oldest bucket: simple pop of first key
             self._data.pop(next(iter(self._data)))
 
-    def get(self, session_id: str) -> dict[str, Any] | None:
+    def get(self, session_id: str) -> dict[str, JsonValue] | None:
         self._evict_expired()
         ent = self._data.get(session_id)
         if not ent:
@@ -83,7 +86,7 @@ class InMemorySessionStore:
     def set(
         self,
         session_id: str,
-        data: dict[str, Any],
+        data: dict[str, JsonValue],
         *,
         ttl_seconds: float | None = None,
     ) -> None:
@@ -104,8 +107,8 @@ def new_session_id() -> str:
     return secrets.token_urlsafe(32)
 
 
-def _query_param_get(st: Any, param: str) -> str | None:
-    qp = getattr(st, "query_params", None)
+def _query_param_get(st: StreamlitSessionFacade, param: str) -> str | None:
+    qp = st.query_params
     if qp is None or not hasattr(qp, "get"):
         return None
     raw = qp.get(param)
@@ -116,23 +119,26 @@ def _query_param_get(st: Any, param: str) -> str | None:
     return str(raw)
 
 
-def _query_param_set(st: Any, param: str, value: str) -> bool:
+def _query_param_set(st: StreamlitSessionFacade, param: str, value: str) -> bool:
     """Best-effort assign *param* on ``st.query_params`` (Streamlit 1.30+)."""
-    qp = getattr(st, "query_params", None)
+    qp = st.query_params
     if qp is None:
         return False
     try:
         if isinstance(qp, MutableMapping):
-            qp[param] = value
+            cast(MutableMapping[str, str], qp)[param] = value
             return True
-        qp.__setitem__(param, value)  # type: ignore[attr-defined]
-        return True
+        setitem = getattr(qp, "__setitem__", None)
+        if callable(setitem):
+            setitem(param, value)
+            return True
+        return False
     except Exception:
         return False
 
 
 def hydrate_url_session(
-    st: Any,
+    st: StreamlitSessionFacade,
     store: SessionStore,
     *,
     param: str = "fluxlit_sid",
@@ -154,9 +160,7 @@ def hydrate_url_session(
     blob = store.get(sid)
     if blob is None:
         return sid
-    ss = getattr(st, "session_state", None)
-    if ss is None:
-        return sid
+    ss = st.session_state
     if merge:
         for k, v in blob.items():
             ss.setdefault(k, v)
@@ -167,11 +171,11 @@ def hydrate_url_session(
 
 
 def ensure_url_session(
-    st: Any,
+    st: StreamlitSessionFacade,
     store: SessionStore,
     *,
     param: str = "fluxlit_sid",
-    initial: dict[str, Any] | None = None,
+    initial: Mapping[str, JsonValue] | None = None,
     ttl_seconds: float | None = None,
 ) -> str:
     """Ensure ``st.query_params[param]`` exists; mint id, seed store, set query param.
@@ -184,7 +188,7 @@ def ensure_url_session(
     if existing:
         if initial:
             cur = store.get(existing)
-            merged = dict(cur or {})
+            merged: dict[str, JsonValue] = dict(cur or {})
             merged.update(initial)
             store.set(existing, merged, ttl_seconds=ttl_seconds)
         return existing
@@ -195,7 +199,7 @@ def ensure_url_session(
 
 
 def persist_url_session(
-    st: Any,
+    st: StreamlitSessionFacade,
     store: SessionStore,
     *,
     param: str = "fluxlit_sid",
@@ -204,26 +208,25 @@ def persist_url_session(
     """Write current ``st.session_state`` (shallow dict copy) to the store for ``param`` id.
 
     Returns the session id if the param is present, else ``None``.
+
+    Values are copied best-effort; remote stores should JSON-encode—non-JSON-safe
+    values may need app-side filtering before :meth:`SessionStore.set`.
     """
     sid = _query_param_get(st, param)
     if not sid:
         return None
-    ss = getattr(st, "session_state", None)
-    if ss is None:
-        store.set(sid, {}, ttl_seconds=ttl_seconds)
-        return sid
-    # Shallow copy; values should be JSON-serializable if you plan remote stores.
-    snap: dict[str, Any] = {}
+    ss = st.session_state
+    snap: dict[str, JsonValue] = {}
     try:
         fs = getattr(ss, "filtered_state", None)
         if isinstance(fs, Mapping):
             src = dict(fs)
         else:
-            src = {str(k): ss[k] for k in ss}  # type: ignore[arg-type]
+            src = {str(k): ss[k] for k in ss}
         for k, v in src.items():
             if str(k).startswith("__"):
                 continue
-            snap[str(k)] = v
+            snap[str(k)] = cast(JsonValue, v)
     except Exception:
         snap = {}
     store.set(sid, snap, ttl_seconds=ttl_seconds)

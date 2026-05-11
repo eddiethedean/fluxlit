@@ -4,11 +4,25 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Mapping
-from typing import Any, TypeVar
+from typing import TypeVar
 
 import httpx
+from httpx import USE_CLIENT_DEFAULT
+from httpx._client import UseClientDefault  # noqa: PLC2701 — public type surface for defaults
+from httpx._types import (  # noqa: PLC2701 — mirrors httpx Client.request annotations
+    AuthTypes,
+    CookieTypes,
+    HeaderTypes,
+    QueryParamTypes,
+    RequestContent,
+    RequestData,
+    RequestExtensions,
+    RequestFiles,
+    TimeoutTypes,
+)
 from pydantic import BaseModel, TypeAdapter
 
+from fluxlit.json_types import JsonValue
 from fluxlit.logging_context import REQUEST_ID_HEADER, get_request_id
 
 T = TypeVar("T")
@@ -59,7 +73,10 @@ class ApiClient:
         *,
         bearer_token: str | None = None,
         auth_header_factory: AuthHeaderFactory | None = None,
-        **kwargs: Any,
+        base_url: str | None = None,
+        timeout: float = 30.0,
+        default_headers: Mapping[str, str] | None = None,
+        propagate_request_id: bool = False,
     ) -> ApiClient:
         """Convenience constructor with static bearer token or factory (mutually exclusive)."""
         if bearer_token is not None and auth_header_factory is not None:
@@ -72,53 +89,208 @@ class ApiClient:
             def factory() -> Mapping[str, str]:
                 return {"Authorization": f"Bearer {token}"}
 
-        return cls(auth_header_factory=factory, **kwargs)
+        return cls(
+            base_url=base_url,
+            timeout=timeout,
+            default_headers=default_headers,
+            auth_header_factory=factory,
+            propagate_request_id=propagate_request_id,
+        )
 
-    def _merge_headers(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        headers = dict(self._default_headers)
-        user = kwargs.get("headers")
-        if user:
-            headers.update(user)
+    def _build_request_headers(self, headers: HeaderTypes | None) -> HeaderTypes:
+        merged = httpx.Headers(self._default_headers)
+        if headers is not None:
+            merged.update(headers)
         if self._auth_header_factory:
-            headers.update(self._auth_header_factory())
+            merged.update(self._auth_header_factory())
         if self._propagate_request_id:
             rid = get_request_id()
             if rid:
-                headers.setdefault(REQUEST_ID_HEADER, rid)
-        kwargs = {**kwargs, "headers": headers}
-        return kwargs
+                merged.setdefault(REQUEST_ID_HEADER, rid)
+        return merged
 
-    def request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        content: RequestContent | None = None,
+        data: RequestData | None = None,
+        files: RequestFiles | None = None,
+        json: JsonValue | None = None,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
+    ) -> httpx.Response:
         """Send a request; ``path`` may omit a leading slash."""
         url = path if path.startswith("/") else f"/{path}"
-        merged = self._merge_headers(dict(kwargs))
-        return self._client.request(method, url, **merged)
+        merged_headers = self._build_request_headers(headers)
+        return self._client.request(
+            method,
+            url,
+            content=content,
+            data=data,
+            files=files,
+            json=json,
+            params=params,
+            headers=merged_headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
 
-    def get(self, path: str, **kwargs: Any) -> httpx.Response:
+    def get(
+        self,
+        path: str,
+        *,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
+    ) -> httpx.Response:
         """``GET`` request."""
-        return self.request("GET", path, **kwargs)
+        return self.request(
+            "GET",
+            path,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
 
-    def post(self, path: str, **kwargs: Any) -> httpx.Response:
+    def post(
+        self,
+        path: str,
+        *,
+        content: RequestContent | None = None,
+        data: RequestData | None = None,
+        files: RequestFiles | None = None,
+        json: JsonValue | None = None,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
+    ) -> httpx.Response:
         """``POST`` request."""
-        return self.request("POST", path, **kwargs)
+        return self.request(
+            "POST",
+            path,
+            content=content,
+            data=data,
+            files=files,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
 
-    def put(self, path: str, **kwargs: Any) -> httpx.Response:
+    def put(
+        self,
+        path: str,
+        *,
+        content: RequestContent | None = None,
+        data: RequestData | None = None,
+        files: RequestFiles | None = None,
+        json: JsonValue | None = None,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
+    ) -> httpx.Response:
         """``PUT`` request."""
-        return self.request("PUT", path, **kwargs)
+        return self.request(
+            "PUT",
+            path,
+            content=content,
+            data=data,
+            files=files,
+            json=json,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
 
-    def delete(self, path: str, **kwargs: Any) -> httpx.Response:
+    def delete(
+        self,
+        path: str,
+        *,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
+    ) -> httpx.Response:
         """``DELETE`` request."""
-        return self.request("DELETE", path, **kwargs)
+        return self.request(
+            "DELETE",
+            path,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
 
-    def get_model(self, path: str, model: type[T], **kwargs: Any) -> T:
+    def get_model(
+        self,
+        path: str,
+        model: type[T],
+        *,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
+    ) -> T:
         """``GET`` and parse JSON into a Pydantic model (raises on 4xx/5xx or validation).
 
         Args:
             path: Relative API path.
             model: Pydantic model type for the response body.
-            kwargs: Forwarded to :meth:`get`.
+            Remaining kwargs: forwarded to :meth:`get`.
         """
-        response = self.get(path, **kwargs)
+        response = self.get(
+            path,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
         response.raise_for_status()
         return TypeAdapter(model).validate_json(response.content)
 
@@ -127,8 +299,18 @@ class ApiClient:
         path: str,
         response_model: type[T],
         *,
-        body: BaseModel | dict[str, Any] | None = None,
-        **kwargs: Any,
+        body: BaseModel | Mapping[str, JsonValue] | None = None,
+        content: RequestContent | None = None,
+        data: RequestData | None = None,
+        files: RequestFiles | None = None,
+        json: JsonValue | None = None,
+        params: QueryParamTypes | None = None,
+        headers: HeaderTypes | None = None,
+        cookies: CookieTypes | None = None,
+        auth: AuthTypes | UseClientDefault | None = USE_CLIENT_DEFAULT,
+        follow_redirects: bool | UseClientDefault = USE_CLIENT_DEFAULT,
+        timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
+        extensions: RequestExtensions | None = None,
     ) -> T:
         """``POST`` JSON body and parse the response as ``response_model``.
 
@@ -136,10 +318,27 @@ class ApiClient:
             path: Relative API path.
             response_model: Pydantic model type for the response body.
             body: Request JSON (from ``model_dump()`` if a :class:`~pydantic.BaseModel`).
-            kwargs: Forwarded to :meth:`post`.
+            Remaining kwargs: forwarded to :meth:`post`.
         """
-        json_body = body.model_dump() if isinstance(body, BaseModel) else body
-        response = self.post(path, json=json_body, **kwargs)
+        json_body: JsonValue | None
+        if isinstance(body, BaseModel):
+            json_body = body.model_dump(mode="json")
+        else:
+            json_body = dict(body) if body is not None else json
+        response = self.post(
+            path,
+            content=content,
+            data=data,
+            files=files,
+            json=json_body,
+            params=params,
+            headers=headers,
+            cookies=cookies,
+            auth=auth,
+            follow_redirects=follow_redirects,
+            timeout=timeout,
+            extensions=extensions,
+        )
         response.raise_for_status()
         return TypeAdapter(response_model).validate_json(response.content)
 

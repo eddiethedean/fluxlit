@@ -7,7 +7,13 @@ is installed (``pip install -e ".[e2e]"``).
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
+from fastapi import FastAPI
+from starlette.testclient import TestClient
+
+from fluxlit.config import FluxlitSettings
 
 try:
     import pytest_playwright  # noqa: F401, PLC0415
@@ -32,17 +38,14 @@ def gateway_test_client_factory():
 
     def _factory(
         *,
-        api_app=None,
+        api_app: FastAPI | None = None,
         upstream: str = "http://127.0.0.1:9",
         api_prefix: str = "/api",
         root_mount: str = "",
         access_log: bool = False,
-        upstream_resolver=None,
-        proxy_settings=None,
-    ):
-        from fastapi import FastAPI
-        from starlette.testclient import TestClient
-
+        upstream_resolver: Callable[[], str] | None = None,
+        proxy_settings: FluxlitSettings | None = None,
+    ) -> TestClient:
         from fluxlit.gateway import build_gateway
 
         inner = api_app if api_app is not None else FastAPI()

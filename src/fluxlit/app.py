@@ -5,9 +5,9 @@ from __future__ import annotations
 import importlib
 import logging
 import pkgutil
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from types import FunctionType
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, FastAPI
 from fastapi.responses import JSONResponse
@@ -20,6 +20,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
 from fluxlit.health import probe_streamlit_ready
+from fluxlit.json_types import JsonValue
 from fluxlit.jwt_auth import JWTBearer
 from fluxlit.logging_context import (
     REQUEST_ID_HEADER,
@@ -38,7 +39,9 @@ _CORS_MIDDLEWARE_EXCLUSIVE_KWARGS = frozenset(
 )
 
 
-def _cors_middleware_extras(cors_middleware_kwargs: dict[str, Any]) -> dict[str, Any]:
+def _cors_middleware_extras(
+    cors_middleware_kwargs: Mapping[str, JsonValue],
+) -> dict[str, JsonValue]:
     """Drop keys FluxLit always sets on ``CORSMiddleware`` so ``**extras`` never duplicates."""
     skip = _CORS_MIDDLEWARE_EXCLUSIVE_KWARGS
     return {k: v for k, v in cors_middleware_kwargs.items() if k not in skip}
@@ -88,7 +91,7 @@ class FluxLit:
         import_target: str | None = None,
         fastapi_kwargs: dict[str, Any] | None = None,
         streamlit_run_args: Sequence[str] | None = None,
-        streamlit_page_config: dict[str, Any] | None = None,
+        streamlit_page_config: dict[str, JsonValue] | None = None,
     ) -> None:
         self.import_target = import_target.strip() if import_target else None
         self._unified_asgi_cache: ASGIApp | None = None
@@ -96,7 +99,7 @@ class FluxLit:
         if title is not None:
             self.settings.title = title
 
-        settings_updates: dict[str, Any] = {}
+        settings_updates: dict[str, JsonValue] = {}
         if streamlit_run_args is not None:
             settings_updates["streamlit_run_cli_args"] = [
                 *self.settings.streamlit_run_cli_args,
@@ -127,7 +130,10 @@ class FluxLit:
                 allow_credentials=self.settings.cors_allow_credentials,
                 allow_methods=["*"],
                 allow_headers=["*"],
-                **_cors_middleware_extras(self.settings.cors_middleware_kwargs),
+                **cast(
+                    dict[str, Any],
+                    _cors_middleware_extras(self.settings.cors_middleware_kwargs),
+                ),
             )
 
         if self.settings.enable_request_logging:

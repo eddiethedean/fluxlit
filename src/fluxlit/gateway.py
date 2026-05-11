@@ -19,13 +19,14 @@ like a blank page).
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import threading
 import time
 import urllib.parse
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, Protocol, cast
 
 import anyio
 import httpx
@@ -43,22 +44,42 @@ from fluxlit.logging_redact import DEFAULT_SENSITIVE_QUERY_KEYS, redact_query_st
 
 _gateway_log = logging.getLogger("fluxlit.gateway")
 
-_gateway_prom_uninitialized = object()
-_gateway_prom_cached: Any = _gateway_prom_uninitialized
+
+class _GatewayPromCounterLabels(Protocol):
+    def inc(self) -> None: ...
+
+
+class _GatewayPromCounter(Protocol):
+    def labels(self, *, dispatch: str, method_kind: str) -> _GatewayPromCounterLabels: ...
+
+
+class _GatewayPromHistogramLabels(Protocol):
+    def observe(self, value: float) -> None: ...
+
+
+class _GatewayPromHistogram(Protocol):
+    def labels(self, *, dispatch: str) -> _GatewayPromHistogramLabels: ...
+
+
+# ``None`` = not yet resolved; ``False`` = import failed; tuple = live Counter + Histogram.
+_gateway_prom_cached: tuple[_GatewayPromCounter, _GatewayPromHistogram] | Literal[False] | None = (
+    None
+)
 _gateway_prom_lock = threading.Lock()
 
 
-def _get_gateway_prom_metrics() -> tuple[Any, Any] | None:
+def _get_gateway_prom_metrics() -> tuple[_GatewayPromCounter, _GatewayPromHistogram] | None:
     """Lazily construct Prometheus metrics (once per process) or None if unavailable."""
     global _gateway_prom_cached
     with _gateway_prom_lock:
-        if _gateway_prom_cached is not _gateway_prom_uninitialized:
+        if _gateway_prom_cached is not None:
             if _gateway_prom_cached is False:
                 return None
-            return cast("tuple[Any, Any]", _gateway_prom_cached)
+            return _gateway_prom_cached
         try:
-            from prometheus_client import Counter, Histogram
-
+            pc = importlib.import_module("prometheus_client")
+            Counter = pc.Counter
+            Histogram = pc.Histogram
             _gateway_prom_cached = (
                 Counter(
                     "fluxlit_gateway_requests_total",
@@ -92,7 +113,7 @@ def _get_gateway_prom_metrics() -> tuple[Any, Any] | None:
             )
             _gateway_prom_cached = False
             return None
-        return cast("tuple[Any, Any]", _gateway_prom_cached)
+        return _gateway_prom_cached
 
 
 @dataclass(frozen=True)
@@ -269,7 +290,7 @@ def build_gateway(
             _log_qs_keys.add(_p)
     log_sensitive_query_keys: frozenset[str] = frozenset(_log_qs_keys)
 
-    prom_metrics: tuple[Any, Any] | None = None
+    prom_metrics: tuple[_GatewayPromCounter, _GatewayPromHistogram] | None = None
     prom_path = "/__fluxlit/metrics"
     if proxy_settings and proxy_settings.enable_gateway_prometheus_metrics:
         prom_metrics = _get_gateway_prom_metrics()
@@ -304,7 +325,9 @@ def build_gateway(
                 and str(scope.get("method", "GET")).upper() == "GET"
                 and path == prom_path
             ):
-                from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+                pc = importlib.import_module("prometheus_client")
+                generate_latest = pc.generate_latest
+                CONTENT_TYPE_LATEST = pc.CONTENT_TYPE_LATEST
 
                 skip_prom_observe = True
                 body = generate_latest()

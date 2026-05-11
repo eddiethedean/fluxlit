@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from fluxlit.json_types import JsonValue
 
 
 class FluxlitSettings(BaseSettings):
@@ -206,7 +206,7 @@ class FluxlitSettings(BaseSettings):
         default=False,
         description="Set Access-Control-Allow-Credentials when CORS is enabled.",
     )
-    cors_middleware_kwargs: dict[str, Any] = Field(
+    cors_middleware_kwargs: dict[str, JsonValue] = Field(
         default_factory=dict,
         description=(
             "Additional keyword arguments for Starlette ``CORSMiddleware`` when "
@@ -224,7 +224,7 @@ class FluxlitSettings(BaseSettings):
             "controls the sidecar bind and public mount)."
         ),
     )
-    streamlit_page_config: dict[str, Any] = Field(
+    streamlit_page_config: dict[str, JsonValue] = Field(
         default_factory=dict,
         description=(
             "Keyword arguments merged into ``streamlit.set_page_config`` after "

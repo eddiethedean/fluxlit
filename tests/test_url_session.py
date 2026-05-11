@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import time
-from typing import Any
 
+from fluxlit.json_types import JsonValue
 from fluxlit.url_session import (
     InMemorySessionStore,
     ensure_url_session,
@@ -16,8 +16,8 @@ from fluxlit.url_session import (
 
 class _FakeSt:
     def __init__(self) -> None:
-        self.session_state: dict[str, Any] = {}
-        self.query_params: dict[str, Any] = {}
+        self.session_state: dict[str, JsonValue] = {}
+        self.query_params: dict[str, str | list[str] | None] = {}
 
 
 def test_new_session_id_length_and_uniqueness() -> None:

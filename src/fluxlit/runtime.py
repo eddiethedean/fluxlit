@@ -16,9 +16,9 @@ import tempfile
 import threading
 import time
 import urllib.parse
-from collections.abc import Callable, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import uvicorn
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -27,6 +27,13 @@ from fluxlit.gateway import build_gateway, normalize_root_mount
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit as FluxLitType
+
+
+class _StreamlitPopenKwargs(TypedDict, total=False):
+    env: Mapping[str, str]
+    creationflags: int
+    start_new_session: bool
+
 
 DEFAULT_PIDFILE_NAME = ".fluxlit-dev.pid"
 STREAMLIT_UPSTREAM_FILE_ENV = "FLUXLIT_STREAMLIT_UPSTREAM_FILE"
@@ -516,7 +523,7 @@ def shutdown_unified_process(
     return 1, f"Process {pid} still running after {wait_s:.1f}s (try --force)"
 
 
-def _terminate_process(proc: subprocess.Popen[Any], *, timeout_s: float = 5.0) -> None:
+def _terminate_process(proc: subprocess.Popen[bytes], *, timeout_s: float = 5.0) -> None:
     """Try graceful interrupt, then terminate, then kill."""
     if proc.poll() is not None:
         return
@@ -696,7 +703,7 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
     )
     env = _build_streamlit_env(target=target, api_prefix=api_prefix, internal_api_base=internal)
 
-    streamlit_proc: subprocess.Popen[Any] | None = None
+    streamlit_proc: subprocess.Popen[bytes] | None = None
     upstream_url: str = ""
 
     gateway_app: ASGIApp = build_gateway(
@@ -716,17 +723,18 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
         stype = scope.get("type")
         if stype == "lifespan":
             # Ensure keys required / conventional for ASGI Lifespan and framework routers.
-            lifespan_scope: dict[str, Any] = dict(scope)
+            lifespan_scope: Scope = cast(Scope, dict(scope))
             lifespan_scope.setdefault("state", {})
             asgi_info: dict[str, Any] = dict(lifespan_scope.get("asgi") or {})
             asgi_info.setdefault("version", "3.0")
             asgi_info.setdefault("spec_version", "2.0")
             lifespan_scope["asgi"] = asgi_info
 
-            lifespan_queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+            # ASGI lifespan messages are dynamic dicts; the inner app expects MutableMapping.
+            lifespan_queue: asyncio.Queue[MutableMapping[str, Any]] = asyncio.Queue()
             inner_task: asyncio.Task[None] | None = None
 
-            async def bridge_receive() -> dict[str, Any]:
+            async def bridge_receive() -> MutableMapping[str, Any]:
                 return await lifespan_queue.get()
 
             async def bridge_send(message: MutableMapping[str, Any]) -> None:
@@ -741,7 +749,7 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
                         await send({"type": "lifespan.startup.complete"})
                         continue
                     try:
-                        popen_kwargs: dict[str, Any] = {"env": env}
+                        popen_kwargs: _StreamlitPopenKwargs = {"env": env}
                         if sys.platform.startswith("win"):
                             popen_kwargs["creationflags"] = getattr(  # noqa: B009
                                 subprocess, "CREATE_NEW_PROCESS_GROUP"
@@ -914,14 +922,14 @@ def run_unified(
         extra_cli_args=fl.settings.streamlit_run_cli_args,
     )
 
-    popen_kwargs: dict[str, Any] = {"env": env}
+    popen_kwargs: _StreamlitPopenKwargs = {"env": env}
     if sys.platform.startswith("win"):
         # New process group so we can send CTRL_BREAK_EVENT.
         popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP")  # noqa: B009
     else:
         popen_kwargs["start_new_session"] = True
 
-    proc_box: list[subprocess.Popen[Any]] = [subprocess.Popen(cmd, **popen_kwargs)]
+    proc_box: list[subprocess.Popen[bytes]] = [subprocess.Popen(cmd, **popen_kwargs)]
     streamlit_restart_lock = threading.Lock()
     streamlit_reload_state: dict[str, bool] = {"intentional": False}
     streamlit_reload_done = threading.Event()
@@ -954,6 +962,7 @@ def run_unified(
                 )
             sys.stderr.flush()
             _grace = fl.settings.uvicorn_graceful_shutdown_timeout_s
+            # Uvicorn's Config accepts many optional kwargs; keep a loose dict for forward compat.
             _reload_kw: dict[str, Any] = {
                 "host": host,
                 "port": port,
@@ -969,6 +978,7 @@ def run_unified(
             config = uvicorn.Config("fluxlit.runtime:create_gateway_app", **_reload_kw)
         else:
             _grace = fl.settings.uvicorn_graceful_shutdown_timeout_s
+            # Same as reload branch: mirror uvicorn.Config keyword surface without pinning stubs.
             _plain_kw: dict[str, Any] = {
                 "host": host,
                 "port": port,
