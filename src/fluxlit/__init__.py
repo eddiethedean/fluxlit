@@ -39,6 +39,14 @@ from fluxlit.streamlit_auth import (
     prepare_streamlit_api_client,
 )
 from fluxlit.testing import FluxLitTestClient
+from fluxlit.url_session import (
+    InMemorySessionStore,
+    SessionStore,
+    ensure_url_session,
+    hydrate_url_session,
+    new_session_id,
+    persist_url_session,
+)
 
 __all__ = [
     "ApiClient",
@@ -60,6 +68,12 @@ __all__ = [
     "issue_hs256_access_token",
     "pkce_pair",
     "register_oidc_bff_routes",
+    "SessionStore",
+    "InMemorySessionStore",
+    "new_session_id",
+    "ensure_url_session",
+    "hydrate_url_session",
+    "persist_url_session",
     "__version__",
 ]
 __version__ = "0.5.0"

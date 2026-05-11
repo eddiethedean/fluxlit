@@ -1,0 +1,27 @@
+# Example Ingress (adjust host, TLS, and annotations for your cluster / ingress controller).
+# Not applied by default — reference only. See README.md in this directory.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fluxlit-app
+  annotations:
+    # nginx ingress controller (example)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: fluxlit.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fluxlit-app
+                port:
+                  number: 8000
+  tls:
+    - hosts:
+        - fluxlit.example.com
+      secretName: fluxlit-example-tls

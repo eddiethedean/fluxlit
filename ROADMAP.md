@@ -287,10 +287,11 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 | Item | Notes |
 |------|--------|
-| **Architecture note** | Short section in [PLAN.md](PLAN.md) tying this to the sidecar model. |
-| **User guide** | README pattern: minimal example (memory store + query param + hydrate on run). |
-| **Optional API** | `fluxlit.streamlit_session` (name TBD): `SessionStore` protocol, in-memory implementation, Redis adapter later; helper to “ensure sid in URL + hydrate”. |
-| **Tests** | Streamlit **AppTest**: two runs with identical `st.query_params` assert restored state; contract tests for store. |
+| **Architecture note** | Short section in [PLAN.md](PLAN.md) tying this to the sidecar model. **Done** (browser refresh / session continuity). |
+| **User guide** | Minimal example (memory store + query param + hydrate on run). **Done:** `docs/url-session.md`. |
+| **Optional API** | **`fluxlit.url_session`:** `SessionStore`, `InMemorySessionStore`, `ensure_url_session` / `hydrate_url_session` / `persist_url_session`; Redis remains app-specific. |
+| **Tests** | **AppTest** second run after clearing user session keys; unit tests for store + helpers. **Done** (`tests/test_url_session*.py`). |
+| **Observability** | Gateway access log **`query`** redacts `fluxlit_sid` and `FLUXLIT_URL_SESSION_QUERY_PARAM`. **Done.** |
 
 ### Success criteria
 
@@ -301,7 +302,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 ### Relation to other phases
 
 - **Phase 3 (sessions):** may later **combine** URL sid with signed cookies or JWT for **identity**; this item is **continuity**, not authentication.
-- **Phase 4:** observability must **redact** session query params in access logs where possible.
+- **Phase 4:** observability must **redact** session query params in access logs where possible. **Done** for gateway structured `query` (see `fluxlit.logging_redact.redact_query_string`).
 
 ---
 
@@ -404,7 +405,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 | Health / readiness | Async probe tests (200/500/refused); `readyz` via gateway + FluxLit | Broader failure modes and timeouts |
 | Auth (Phase 3 / v0.3) | Fake JWKS server, JWT/OIDC edge cases; `ApiClient` must not log bearer secrets | Broader IdP matrices |
 | `root_path` / forwards | Forwarded headers + Playwright subpath E2E | Regression matrix for more proxy shapes |
-| Streamlit URL-bound session (Phase 2 follow-on) | — | AppTest: re-run with same query params + store contract |
+| Streamlit URL-bound session (Phase 2 follow-on) | `tests/test_url_session.py`, `tests/test_url_session_apptest.py` | AppTest second run + store unit tests |
 
 ### CI targets
 

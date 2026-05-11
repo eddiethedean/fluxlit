@@ -92,7 +92,15 @@ class FluxlitSettings(BaseSettings):
         default=False,
         description=(
             "Log each gateway request at INFO with structured fields "
-            "(fluxlit_dispatch, path); default is DEBUG only."
+            "(fluxlit_dispatch, path, redacted query); default is DEBUG only."
+        ),
+    )
+    url_session_query_param: str = Field(
+        default="fluxlit_sid",
+        description=(
+            "Query parameter name used by :mod:`fluxlit.url_session` helpers for "
+            "URL-bound session continuity. The gateway access log redacts this key's "
+            "value (and the default ``fluxlit_sid``) in the structured ``query`` field."
         ),
     )
     enable_gateway_prometheus_metrics: bool = Field(

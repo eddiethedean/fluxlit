@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from fluxlit.logging_redact import redact_authorization, sanitize_headers
+from fluxlit.logging_redact import (
+    redact_authorization,
+    redact_query_string,
+    sanitize_headers,
+)
 
 
 def test_redact_bearer() -> None:
@@ -37,6 +41,21 @@ def test_sanitize_headers_case_insensitive_authorization() -> None:
 def test_sanitize_headers_non_string_values() -> None:
     out = sanitize_headers({"Authorization": "Bearer x", "X-Int": 1})  # type: ignore[arg-type]
     assert out["X-Int"] == "1"
+
+
+def test_redact_query_string_fluxlit_sid() -> None:
+    out = redact_query_string("fluxlit_sid=secret123&foo=bar")
+    assert "secret123" not in out
+    assert "redacted" in out.lower()
+    assert "foo" in out and "bar" in out
+
+
+def test_redact_query_string_custom_key() -> None:
+    out = redact_query_string(
+        "my_sid=abc&x=1", sensitive_keys=frozenset({"my_sid"})
+    )
+    assert "abc" not in out
+    assert "redacted" in out.lower()
 
 
 def test_sanitize_headers_preserves_unlisted_headers() -> None:

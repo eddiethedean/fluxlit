@@ -97,6 +97,7 @@ Full page reload can drop Streamlit’s in-process session unless state is **reh
 | Client | `fluxlit.client` | `ApiClient` for server-side calls into `/api` |
 | Testing | `fluxlit.testing` | `FluxLitTestClient` (API gateway TestClient + Streamlit AppTest helper); repo CI splits fast vs `slow`, coverage artifact, E2E, proxy smoke (see `docs/testing.md`) |
 | Gateway | `fluxlit.gateway` | ASGI dispatch and reverse proxy |
+| URL session | `fluxlit.url_session` | `SessionStore`, in-memory store, hydrate/persist helpers (Phase 2 follow-on; no cookies) |
 | Logging | `fluxlit.logging_context` | Request id context for gateway / API |
 | Runtime | `fluxlit.runtime` | Load `FluxLit` by import path, spawn Streamlit, run Uvicorn |
 | Streamlit | `fluxlit.streamlit_main` | Streamlit script; reads `FLUXLIT_APP`, builds navigation |

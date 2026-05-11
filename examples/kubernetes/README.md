@@ -10,8 +10,10 @@ Minimal **Deployment** and **Service** for running FluxLit behind a cluster load
 ## Apply
 
 ```bash
-kubectl apply -f examples/kubernetes/
+kubectl apply -f examples/kubernetes/deployment.yaml
 ```
+
+For an **Ingress** sketch (host, TLS, WebSocket-friendly timeouts), see `ingress.example.yaml` in this directory (not applied by default).
 
 Port-forward for a quick smoke test:
 

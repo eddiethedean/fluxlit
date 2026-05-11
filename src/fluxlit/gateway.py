@@ -39,6 +39,7 @@ from fluxlit.logging_context import (
     reset_request_id,
     set_request_id,
 )
+from fluxlit.logging_redact import DEFAULT_SENSITIVE_QUERY_KEYS, redact_query_string
 
 _gateway_log = logging.getLogger("fluxlit.gateway")
 
@@ -261,6 +262,13 @@ def build_gateway(
     prefix = api_prefix.rstrip("/") or "/api"
     mount = normalize_root_mount(root_mount)
 
+    _log_qs_keys = set(DEFAULT_SENSITIVE_QUERY_KEYS)
+    if proxy_settings is not None:
+        _p = (getattr(proxy_settings, "url_session_query_param", "") or "").strip()
+        if _p:
+            _log_qs_keys.add(_p)
+    log_sensitive_query_keys: frozenset[str] = frozenset(_log_qs_keys)
+
     prom_metrics: tuple[Any, Any] | None = None
     prom_path = "/__fluxlit/metrics"
     if proxy_settings and proxy_settings.enable_gateway_prometheus_metrics:
@@ -314,10 +322,18 @@ def build_gateway(
                 )
                 await send({"type": "http.response.body", "body": body})
                 return
+            qs_raw = scope.get("query_string", b"") or b""
+            try:
+                qs_dec = qs_raw.decode("latin-1")
+            except Exception:
+                qs_dec = ""
             log_extra = {
                 "fluxlit_dispatch": dispatch,
                 "http_method_or_type": method_or_type,
                 "path": path_in,
+                "query": redact_query_string(
+                    qs_dec, sensitive_keys=log_sensitive_query_keys
+                ),
             }
             log_msg = "gateway %s %s request_id=%s"
             log_args = (method_or_type, path_in, rid)

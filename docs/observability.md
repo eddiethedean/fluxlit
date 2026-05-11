@@ -31,6 +31,7 @@ When {attr}`~fluxlit.config.FluxlitSettings.enable_gateway_access_log` is `True`
 - `fluxlit_dispatch` — `api` or `streamlit`
 - `http_method_or_type` — HTTP method or `websocket`
 - `path` — ASGI path seen by the gateway
+- `query` — raw query string from the ASGI scope with **sensitive keys redacted** (default `fluxlit_sid`, plus {attr}`~fluxlit.config.FluxlitSettings.url_session_query_param` when set); see {mod}`fluxlit.logging_redact` and {doc}`url-session`
 
 With the default (`False`), the same line is logged at **DEBUG** only.
 

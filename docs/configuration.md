@@ -59,7 +59,8 @@ log_level = "info"
 | `FLUXLIT_STREAMLIT_PUBLIC_PATH` | Optional subpath used only if `FLUXLIT_ROOT_PATH` is empty; prefer `FLUXLIT_ROOT_PATH`. |
 | `FLUXLIT_INTERNAL_API_BASE` | Set by the runtime for Streamlit-side {class}`~fluxlit.client.ApiClient` (should include `/api`). |
 | `FLUXLIT_ENABLE_REQUEST_LOGGING` | If true, log API requests (method, path, status) at INFO with request id context. |
-| `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG` | If true, log each **gateway** request at INFO with structured `extra` (`fluxlit_dispatch`, path, method/type); default is DEBUG-only. See {doc}`observability`. |
+| `FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG` | If true, log each **gateway** request at INFO with structured `extra` (`fluxlit_dispatch`, path, redacted `query`, method/type); default is DEBUG-only. See {doc}`observability`. |
+| `FLUXLIT_URL_SESSION_QUERY_PARAM` | Query key used by {mod}`fluxlit.url_session` helpers (default **`fluxlit_sid`**); gateway access logs redact this key’s value in the structured `query` field. See {doc}`url-session`. |
 | `FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS` | If true, expose Prometheus text metrics on the gateway (requires `prometheus-client`). See {doc}`observability`. |
 | `FLUXLIT_GATEWAY_PROMETHEUS_METRICS_PATH` | HTTP GET path for metrics (default **`/__fluxlit/metrics`**); must not start with `api_mount_path`. |
 | `FLUXLIT_GATEWAY_UPSTREAM_CONNECT_TIMEOUT_S` | `httpx` connect timeout (seconds) for gateway → Streamlit HTTP proxy (default **30**). |

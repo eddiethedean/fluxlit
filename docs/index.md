@@ -20,6 +20,7 @@ New here? Follow {doc}`quickstart` end-to-end first (about five minutes). Use {d
 | TLS, HSTS, reverse-proxy trust, CSP notes | {doc}`production-tls` |
 | Secrets, logs, JWT/OIDC rotation | {doc}`secrets` |
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` · `pip install "fluxlit[auth]"` |
+| Survive full page reload without cookies (URL + server store) | {doc}`url-session` |
 | Fix errors (imports, 503 readiness, wrong API paths) | {doc}`troubleshooting` · {doc}`runbooks` · `fluxlit doctor` |
 | Browse Python types and functions | {doc}`api/index` |
 | Supported Python / deps (0.5.x) | {doc}`support-matrix` |
@@ -52,6 +53,7 @@ secrets
 observability
 rate-limiting
 security
+url-session
 migration-auth
 auth-recipes
 troubleshooting

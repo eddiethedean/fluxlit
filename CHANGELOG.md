@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **URL session (Phase 2 follow-on):** `fluxlit.url_session` (`SessionStore`, `InMemorySessionStore`, `ensure_url_session`, `hydrate_url_session`, `persist_url_session`) for refresh continuity **without cookies**; user guide **`docs/url-session.md`**; AppTest + unit tests.
+- **Gateway logs:** structured `query` field on gateway access / debug logs with **redacted** session query values (`fluxlit_sid` and `FLUXLIT_URL_SESSION_QUERY_PARAM`); new `FluxlitSettings.url_session_query_param`.
+- **Kubernetes:** `examples/kubernetes/ingress.example.yaml` reference Ingress (not applied by default).
 - **Supply chain & containers:** CI uploads a **CycloneDX** SBOM (`cyclonedx-sbom` artifact) alongside **`pip-audit`** on `.[auth]`; `fluxlit build`, `examples/docker_compose`, and `docker/proxy-deployment` use **digest-pinned** Python slim and **non-root** `appuser`; Compose example adds **`requirements.in` / `requirements.txt`** via **`pip-compile`**.
 - **Docs:** **`docs/production-tls.md`** (TLS, HSTS, `forwarded_allow_ips`, CSP notes), **`docs/secrets.md`** (logs, secret stores, JWT/OIDC rotation); cross-links from README, index, deployment, configuration, security, observability, auth-recipes, troubleshooting, architecture, quickstart, testing, CONTRIBUTING, example READMEs, and **`ROADMAP.md`** security row status.
 - **0.5 roadmap (remaining):** **`examples/kubernetes/`** reference manifests; deployment scaling + multi-worker docs; **`docs/runbooks.md`**; **`docs/support-matrix.md`**; **`scripts/soak_http.sh`**; **`upgrade-smoke`** workflow; OpenAPI **contract** test; optional gateway **Prometheus** metrics (`fluxlit[metrics]`); observability updates (RED metrics, traceparent recipe, correlation limits).

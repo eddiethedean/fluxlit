@@ -68,6 +68,10 @@ Generated from docstrings with Sphinx autodoc. Public modules:
    :members:
    :show-inheritance:
 
+.. automodule:: fluxlit.url_session
+   :members:
+   :show-inheritance:
+
 .. automodule:: fluxlit.security_middleware
    :members:
    :show-inheritance:
