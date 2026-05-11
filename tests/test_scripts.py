@@ -8,11 +8,14 @@ import time
 import urllib.request
 from pathlib import Path
 
+import pytest
+
 from fluxlit.runtime import find_free_port
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="requires POSIX shell tools")
 def test_shell_scripts_parse() -> None:
     scripts = [
         "scripts/soak_http.sh",
@@ -28,6 +31,7 @@ def test_shell_scripts_parse() -> None:
     subprocess.run(["bash", "-n", *scripts], cwd=REPO_ROOT, check=True)
 
 
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="requires POSIX shell tools")
 def test_soak_http_json_output_against_local_server(tmp_path: Path) -> None:
     port = find_free_port()
     server = subprocess.Popen(  # noqa: S603

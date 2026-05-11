@@ -5,7 +5,10 @@ import sys
 import types
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 import fluxlit.config.project as project_module
 from fluxlit.config import (

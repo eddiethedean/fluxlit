@@ -10,7 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE="${BASE_URL:-http://127.0.0.1:8080}"
 BASE="${BASE%/}"
-PREFIX="${PUBLIC_PREFIX:-/myapp}"
+PREFIX="${PUBLIC_PREFIX-/myapp}"
 
 # Avoid empty-array expansion under `set -u` (older bash).
 _curl() {

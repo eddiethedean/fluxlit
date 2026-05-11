@@ -1143,6 +1143,8 @@ def test_shutdown_unified_process_force_kills_after_timeout(
     pid_path = tmp_path / "force.pid"
     pid_path.write_text("123\n", encoding="ascii")
     monkeypatch.setattr("fluxlit.runtime.process_control.sys.platform", "linux")
+    sigkill = getattr(signal, "SIGKILL", signal.SIGTERM)
+    monkeypatch.setattr("fluxlit.runtime.process_control.signal.SIGKILL", sigkill, raising=False)
     states = iter([True, True, False])
     monkeypatch.setattr("fluxlit.runtime.process_control._pid_running", lambda pid: next(states))
     signals: list[int] = []
@@ -1161,7 +1163,7 @@ def test_shutdown_unified_process_force_kills_after_timeout(
     assert code == 0
     assert "process 123" in msg
     assert signal.SIGTERM in signals
-    assert signal.SIGKILL in signals
+    assert sigkill in signals
 
 
 def test_shutdown_unified_process_stops_during_wait(
@@ -1376,6 +1378,8 @@ def test_shutdown_unified_process_force_loop_sleeps_before_kill(
     pid_path = tmp_path / "force-sleep.pid"
     pid_path.write_text("123\n", encoding="ascii")
     monkeypatch.setattr("fluxlit.runtime.process_control.sys.platform", "linux")
+    sigkill = getattr(signal, "SIGKILL", signal.SIGTERM)
+    monkeypatch.setattr("fluxlit.runtime.process_control.signal.SIGKILL", sigkill, raising=False)
     states = iter([True, True, False])
     monkeypatch.setattr("fluxlit.runtime.process_control._pid_running", lambda pid: next(states))
     monkeypatch.setattr("fluxlit.runtime.process_control.os.kill", lambda pid, sig: None)

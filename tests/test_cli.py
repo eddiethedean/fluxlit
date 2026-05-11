@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import socket
 import subprocess
 import sys
 import types
@@ -682,13 +681,22 @@ def test_doctor_checks_gateway_bind_failure(
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    blocker.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    blocker.bind(("127.0.0.1", 59401))
-    try:
-        rows = cli_module._doctor_checks("doctor_bind_app:app")  # noqa: SLF001
-    finally:
-        blocker.close()
+
+    class FailingSocket:
+        def __enter__(self) -> FailingSocket:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def setsockopt(self, *args: object) -> None:
+            return None
+
+        def bind(self, addr: tuple[str, int]) -> None:
+            raise OSError("address already in use")
+
+    monkeypatch.setattr(cli_module.socket, "socket", lambda *args, **kwargs: FailingSocket())
+    rows = cli_module._doctor_checks("doctor_bind_app:app")  # noqa: SLF001
     assert any(name == "gateway_bind" and status == "FAIL" for name, status, _ in rows)
 
 
