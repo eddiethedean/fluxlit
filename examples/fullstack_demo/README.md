@@ -28,11 +28,11 @@ export PYTHONPATH="$(pwd)"
 fluxlit dev
 ```
 
-**Why `main.py` and `fluxlit.toml`?** The FluxLit instance lives in **`main.py`** as **`app`**, and the default target is **`main:app`**.
+**Why `main.py` and `fluxlit.toml`?** The FluxLit instance lives in **`main.py`** as **`app`**, and `fluxlit.toml` sets the default target to **`main:app`**.
 
-Historically this example avoided `app.py` because a polluted `PYTHONPATH` could cause `import app` to resolve to FluxLit’s internal `app.py` instead of your project’s file. FluxLit now prefers `./app.py` when you run `fluxlit dev app:app` from the project directory, so the naming collision is no longer a problem.
+The explicit target keeps the example unambiguous and lets you run plain **`fluxlit dev`** from this directory.
 
-Set **`PYTHONPATH`** to this directory so `main` resolves. **`fluxlit.toml`** sets `target = "main:app"` so you can run plain **`fluxlit dev`** from this folder. Open the **gateway** URL FluxLit prints (e.g. `http://127.0.0.1:8501`); Streamlit may use another ephemeral port internally.
+Set **`PYTHONPATH`** to this directory so `main` resolves. Open the **gateway** URL FluxLit prints, typically `http://127.0.0.1:8000`; Streamlit uses a separate ephemeral port internally.
 
 **API docs:** Swagger is served at **`/api/docs`** (and ReDoc at **`/api/redoc`**). As of recent FluxLit versions, **`/docs`** at the gateway root redirects there so you are not sent to Streamlit (which used to look like a blank page).
 

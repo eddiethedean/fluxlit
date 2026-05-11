@@ -1,26 +1,19 @@
-# FluxLit (`fluxlit`)
+# FluxLit
 
 [![Documentation Status](https://readthedocs.org/projects/fluxlit/badge/?version=stable)](https://fluxlit.readthedocs.io/en/stable/?badge=stable)
 [![PyPI version](https://img.shields.io/pypi/v/fluxlit.svg)](https://pypi.org/project/fluxlit/)
 [![Python versions](https://img.shields.io/pypi/pyversions/fluxlit.svg)](https://pypi.org/project/fluxlit/)
 [![CI](https://github.com/eddiethedean/fluxlit/actions/workflows/ci.yml/badge.svg)](https://github.com/eddiethedean/fluxlit/actions/workflows/ci.yml)
 [![Release](https://github.com/eddiethedean/fluxlit/actions/workflows/release.yml/badge.svg)](https://github.com/eddiethedean/fluxlit/actions/workflows/release.yml)
-[![License](https://img.shields.io/pypi/l/fluxlit)](https://github.com/eddiethedean/fluxlit/blob/main/LICENSE)
+[![License](https://img.shields.io/pypi/l/fluxlit)](LICENSE)
 
-**One port** for **FastAPI** and **Streamlit**: a `FluxLit` app object, a Starlette **gateway** (Uvicorn), and Streamlit in a managed subprocess.
+**FastAPI and Streamlit on one public port.** FluxLit gives you one `FluxLit` app object, a Uvicorn-powered ASGI gateway, and a managed Streamlit sidecar so your API and UI deploy together without hand-rolling a reverse proxy.
 
-**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security policy & supply chain:** [SECURITY.md](SECURITY.md)
+- **UI:** served from the app root on the URL Uvicorn prints, typically `http://127.0.0.1:8000`.
+- **API:** mounted under `/api` by default, with OpenAPI at `/api/docs`.
+- **Routing:** `/api/*` goes to FastAPI; everything else, including Streamlit WebSockets, is proxied to Streamlit.
 
-| | |
-|--|--|
-| [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html) | [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html) · [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html) · [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) |
-| [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html) · [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) · [Rate limiting](https://fluxlit.readthedocs.io/en/stable/rate-limiting.html) | [Production TLS & proxies](https://fluxlit.readthedocs.io/en/stable/production-tls.html) · [Secrets & key rotation](https://fluxlit.readthedocs.io/en/stable/secrets.html) |
-| [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html) · [Auth migration](https://fluxlit.readthedocs.io/en/stable/migration-auth.html) · [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html) · [Troubleshooting](https://fluxlit.readthedocs.io/en/stable/troubleshooting.html) | **Ops:** correlation IDs, JSON logs, gateway limits, graceful shutdown — [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html) · [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html#kubernetes-graceful-shutdown) (Kubernetes) |
-| [API reference](https://fluxlit.readthedocs.io/en/stable/api/index.html) | [Testing](https://fluxlit.readthedocs.io/en/stable/testing.html) · [Contributing](https://fluxlit.readthedocs.io/en/stable/contributing.html) · [Changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html) · [Roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) |
-
-**Kubernetes:** reference `Deployment` + `Service` in [`examples/kubernetes/`](examples/kubernetes/) (probes, graceful shutdown, `preStop`). **Runbooks:** [Runbooks](https://fluxlit.readthedocs.io/en/stable/runbooks.html). **Support matrix:** [support-matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html).
-
-Longer product context: [PLAN.md](PLAN.md).
+**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md)
 
 ---
 
@@ -34,24 +27,14 @@ pip install fluxlit
 
 Optional JWT / OIDC / BFF helpers: `pip install "fluxlit[auth]"` — see [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html).
 
-**Hack on FluxLit:** `git clone` this repo, then `pip install -e ".[dev]"`.
+For local development on FluxLit itself, clone the repository and run `pip install -e ".[dev]"`.
 
 ---
 
-## Quick start
+## Quick Start
 
 ```bash
 fluxlit new my-app && cd my-app   # optional
-```
-
-### Setup (for the commands below)
-
-```bash
-python -c "import fluxlit; print('fluxlit version:', fluxlit.__version__)"
-```
-
-```text
-fluxlit version: 0.5.0
 ```
 
 `app.py`:
@@ -75,55 +58,21 @@ def home(st, client):
 fluxlit dev    # default target app:app; or fluxlit dev your.module:app
 ```
 
-- **CLI help (real output)**:
-
-```bash
-fluxlit --help
-```
-
-```text
-                                                                                
- Usage: fluxlit [OPTIONS] COMMAND [ARGS]...                                     
-                                                                                
-╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --help          Show this message and exit.                                  │
-╰──────────────────────────────────────────────────────────────────────────────╯
-╭─ Commands ───────────────────────────────────────────────────────────────────╮
-│ dev       Run the unified stack for local development (Streamlit subprocess  │
-│           + Uvicorn gateway).                                                │
-│ shutdown  Stop ``fluxlit dev`` or ``fluxlit run`` using the PID file they    │
-│           write.                                                             │
-│ run       Run the unified stack for production-style use (no Uvicorn         │
-│           reload).                                                           │
-│ doctor    Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).       │
-│ build     Emit a minimal ``Dockerfile`` and ``.dockerignore`` for container  │
-│           deployment.                                                        │
-│ new       Create ``<name>/app.py`` with a sample API route and Streamlit     │
-│           home page.                                                         │
-╰──────────────────────────────────────────────────────────────────────────────╯
-```
-
-- **UI:** app root on the URL Uvicorn prints (default port **8000**).
-- **API:** under **`/api`** (e.g. `GET /api/users`). OpenAPI: **`/api/docs`**.
-- **Health / readiness:** **`/api/healthz`**, **`/api/readyz`** (see [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html)).
+Open the URL Uvicorn prints. The default gateway is `http://127.0.0.1:8000`; try `GET /api/users` or visit `/api/docs`.
 
 In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Secured routes need a client with credentials — [Auth recipes](https://fluxlit.readthedocs.io/en/stable/auth-recipes.html).
 
-**Routing:** `/api/*` → FastAPI (prefix stripped inside the app); **everything else** → Streamlit (HTTP + WebSocket). Details: [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html).
-
 ---
 
-## CLI (summary)
+## What Ships
 
-| Command | Role |
-|---------|------|
-| `fluxlit dev` | Dev server; optional `--reload` and `--reload-scope` (`gateway` or `full`) |
-| `fluxlit run` | Same stack, no reloader (typical in containers) |
-| `fluxlit doctor` | Import, bind, env sanity checks |
-| `fluxlit build` | Emit starter `Dockerfile` + `.dockerignore` (digest-pinned base image, non-root `appuser`; add your own lockfile for production deps) |
-| `fluxlit new` | Minimal scaffold |
+- **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages.
+- **Gateway runtime:** `fluxlit dev` and `fluxlit run` start Uvicorn plus a managed Streamlit subprocess.
+- **Operational defaults:** health/readiness probes, request IDs, optional JSON logs, configurable gateway timeouts, body limits, concurrency, and graceful shutdown.
+- **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests, and production TLS/proxy guidance.
+- **Optional auth:** JWT validation, OIDC/BFF helpers, Streamlit-safe API clients, and security docs via `fluxlit[auth]`.
 
-Proxy / subpath: **`FLUXLIT_ROOT_PATH`**, **`FLUXLIT_TRUST_PROXY`**. Full flags and PID file: [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html).
+Start with the [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html), then see [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html), [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html), [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html), and [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html).
 
 ---
 
@@ -148,7 +97,16 @@ Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/con
 
 ---
 
-## Project layout (sketch)
+## Production References
+
+- [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html): containers, probes, scaling, and Kubernetes graceful shutdown.
+- [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html): request correlation, JSON logs, Prometheus metrics, SLO notes, and runbooks.
+- [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html), [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html), and [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html): auth boundaries, proxy trust, key rotation, and log hygiene.
+- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns.
+
+---
+
+## Project Layout
 
 ```text
 my_app/
@@ -175,6 +133,8 @@ python -m mypy src/fluxlit
 
 ## Status
 
-Shipped: unified gateway, `@app.page` / `discover_pages`, `fluxlit.toml`, typed `ApiClient`, health/readiness probes, optional gateway access logs, **upstream `X-Request-ID` correlation** (HTTP + WebSocket to Streamlit), **configurable gateway timeouts / body limits / concurrency and `httpx` pool limits**, **JSON log formatter**, **Uvicorn graceful shutdown** for orchestrated deploys, dev reload scopes, **`fluxlit[auth]`**, CI (proxy smoke, Playwright e2e, **`pip-audit`** + **CycloneDX SBOM** artifact on `.[auth]` per [SECURITY.md](SECURITY.md)). **Container templates:** `fluxlit build`, `examples/docker_compose/`, and `docker/proxy-deployment/` use digest-pinned **Python slim** and **non-root** runtime where applicable; Compose example includes a **`pip-compile`** lockfile. **Docs:** [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html), [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html). **Roadmap:** [Read the Docs](https://fluxlit.readthedocs.io/en/stable/roadmap.html).
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, and deployment runbooks.
+
+See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 
 MIT — see [LICENSE](LICENSE).

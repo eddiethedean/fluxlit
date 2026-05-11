@@ -4,7 +4,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.4.x)
+## Current status (0.5.x)
 
 **Done**
 
@@ -19,17 +19,19 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Observability (baseline):** optional structured gateway access logs (`enable_gateway_access_log`); log redaction helpers for sensitive headers; temp-file upstream state so reload workers and Streamlit restarts stay aligned.
 - **Tests (deeper):** async readiness probe against threaded upstreams; gateway access-log behavior; upstream file/env precedence; reload-watcher callback; extended redaction and doctor/auth import edge cases.
 - **Unified ASGI:** `FluxLit` as a normal ASGI entrypoint (`uvicorn app:app`); lifespan bridged to the inner FastAPI app; regression suite in `tests/test_asgi_unified.py` (lifespan + concurrent HTTP, streaming body, sidecar failure) — foundation for **Version 0.5** soak/chaos work.
+- **Production hardening:** JSON log formatter, request-id correlation to Streamlit HTTP/WebSocket hops, configurable gateway limits/timeouts, optional Prometheus metrics, Docker/Kubernetes references, runbooks, support matrix, security audit, and CycloneDX SBOM workflow.
+- **URL session continuity:** `fluxlit.url_session` helpers, `SessionStore` protocol, in-memory implementation, docs, tests, and gateway query redaction for `fluxlit_sid`.
 
 **Gaps vs “production”**
 
-- CI adds **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, and Playwright **e2e** (including subpath); continue with soak/load and broader scenarios over time.
-- **Metrics** (Prometheus / OTel), hardened Docker/K8s beyond `fluxlit build` + `examples/docker_compose`, and broader proxy edge cases remain open; optional **`fluxlit[auth]`** covers JWT/OIDC/BFF patterns from **Version 0.3** onward.
-- **Browser refresh continuity** for Streamlit (cookie-free, URL + server store) is specified under **Phase 2 follow-on** in this file but not implemented yet.
-- Deeper **operational maturity** (SLOs, runbooks, chaos/load, supply-chain, multi-replica guidance) is tracked under **Version 0.5** below.
+- CI includes **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
+- **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain open.
+- **Browser refresh continuity** ships for cookie-free URL + server-store patterns; production multi-replica continuity still requires an app-provided external store such as Redis.
+- Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
 
-**Next: 0.5.x**
+**Next: later 0.x**
 
-- **Version 0.5** (below) is the planned **production-hardening** release: reliability, security supply chain, deployment/runbooks, observability, testing depth, and versioning/support policy — alongside ongoing **Phase 2 follow-on** (Streamlit refresh continuity) and **Phase 4** items folded into that slice where they overlap.
+- Later 0.x work should deepen production proof points: broader load/chaos coverage, external session-store recipes, OpenTelemetry hooks, dependency compatibility matrices, and any breaking-change cleanup needed before a future 1.0.
 
 ---
 
@@ -105,7 +107,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 ### Relation to other roadmap items
 
 - **Phase 4 (Production runtime):** 0.5 **implements the prioritized subset** (metrics, tracing correlation, K8s example, soak notes); remaining Phase 4 bullets stay until done or folded into later 0.x.
-- **Phase 2 follow-on (URL-bound session):** complementary for **multi-replica** continuity; 0.5 documents scale limits until an external store exists.
+- **Phase 2 follow-on (URL-bound session):** shipped for in-process and app-provided stores; remaining work is production recipes for external stores and multi-replica continuity.
 - **Version 0.3:** security headers, correlation, and doctor extensions **feed** 0.5 TLS/proxy/runbook work.
 
 ---
@@ -178,7 +180,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 - A **single reference app** demonstrates login → JWT (or first-party token) → Streamlit page calling FastAPI with **the same identity** and **no duplicate auth logic**.
 - Docs include a **security checklist** (cookies, CSRF, `root_path`, token storage, HTTPS).
-- Optional **`fluxlit[auth]`** (name TBD) installs audited auth dependencies with pinned lower bounds.
+- Optional **`fluxlit[auth]`** installs audited auth dependencies with pinned lower bounds.
 
 ---
 

@@ -37,8 +37,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from fluxlit import FluxLit
-from fluxlit.client import ApiClient
 from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims
+from fluxlit.client import ApiClient
 
 _bearer = JWTBearer(
     JWTAuthConfig(

@@ -162,3 +162,4 @@ def test_build_gateway_post_over_max_proxy_body_returns_413(
         r = client.post("/echo", content=b"x" * 50)
     assert r.status_code == 413
     assert b"Payload Too Large" in r.content
+    assert _HeaderEchoHandler.last_content_length is None

@@ -9,8 +9,8 @@ from fastapi import Depends
 from pydantic import BaseModel
 
 from fluxlit import FluxLit
-from fluxlit.client import ApiClient
 from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
+from fluxlit.client import ApiClient
 
 # Development secret only — use JWKS + your IdP or vault-held secrets in production.
 _SECRET = "reference-auth-dev-secret-32bytes-minimum-length-ok"

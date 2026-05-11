@@ -1,11 +1,11 @@
 # FluxLit documentation
 
-**One port.** Your **FastAPI** routes and **Streamlit** UI share a single address—no hand-rolled reverse proxy in development, and a clear story for production.
+**FastAPI and Streamlit on one public port.** FluxLit gives you one app object, one gateway URL, and a managed Streamlit sidecar so your API and UI deploy together.
 
 **Install:** `pip install fluxlit` (Python **3.10+**) · **[PyPI](https://pypi.org/project/fluxlit/)** · **[GitHub](https://github.com/eddiethedean/fluxlit)**
 
 ```{tip}
-New here? Follow {doc}`quickstart` end-to-end first (about five minutes). Use {doc}`troubleshooting` if the app will not start or URLs look wrong.
+New here? Follow {doc}`quickstart` first. You should have a working app at `http://127.0.0.1:8000` in a few minutes.
 ```
 
 ## Choose your path
@@ -14,25 +14,22 @@ New here? Follow {doc}`quickstart` end-to-end first (about five minutes). Use {d
 |------------|------------|
 | Run a minimal API + Streamlit app locally | {doc}`quickstart` |
 | Understand how requests reach FastAPI vs Streamlit | {doc}`architecture` |
-| Set ports, env vars, or deploy behind nginx / a subpath | {doc}`configuration` |
-| Use `fluxlit dev`, `fluxlit run`, reload, or Docker | {doc}`cli` · {doc}`deployment` |
-| Tune gateway proxy timeouts, body limits, logs, or Kubernetes shutdown | {doc}`configuration` · {doc}`observability` · {doc}`deployment` |
-| TLS, HSTS, reverse-proxy trust, CSP notes | {doc}`production-tls` |
-| Secrets, logs, JWT/OIDC rotation | {doc}`secrets` |
-| Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` · `pip install "fluxlit[auth]"` |
+| Configure ports, env vars, proxy paths, or reload behavior | {doc}`configuration` · {doc}`cli` |
+| Deploy with containers, Kubernetes, or a reverse proxy | {doc}`deployment` · {doc}`production-tls` |
+| Operate the app with logs, metrics, probes, and runbooks | {doc}`observability` · {doc}`runbooks` |
+| Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` |
 | Survive full page reload without cookies (URL + server store) | {doc}`url-session` |
-| Fix errors (imports, 503 readiness, wrong API paths) | {doc}`troubleshooting` · {doc}`runbooks` · `fluxlit doctor` |
-| Browse Python types and functions | {doc}`api/index` |
-| Supported Python / deps (0.5.x) | {doc}`support-matrix` |
+| Fix imports, 503 readiness, WebSockets, or wrong API paths | {doc}`troubleshooting` · `fluxlit doctor` |
+| Browse API reference, support policy, or release history | {doc}`api/index` · {doc}`support-matrix` · {doc}`changelog` |
 
 ## Ideas to remember
 
-- **Sidecar:** Streamlit runs in a **child process**. Uvicorn serves the **gateway** on the port you open in the browser.
-- **Routing:** Paths under **`/api`** (default) go to FastAPI. **Everything else** (including `/_stcore/...` WebSockets) is proxied to Streamlit.
-- **From Streamlit, call the API** with the injected `client` using paths like `"/users"`—**not** `"/api/users"`. The runtime sets the base URL for you.
+- **Gateway:** Uvicorn serves the public URL; Streamlit runs in a child process on an internal port.
+- **Routing:** `/api/*` goes to FastAPI. Everything else, including `/_stcore/...` WebSockets, is proxied to Streamlit.
+- **From Streamlit, call the API** with the injected `client` using paths like `"/users"`, not `"/api/users"`. The runtime sets the base URL for you.
 - **Secured routes:** the default page `client` has **no** `Authorization` header. Use {meth}`~fluxlit.client.ApiClient.for_fluxlit` or the patterns in {doc}`auth-recipes`.
-- **Health:** **`GET /api/healthz`** (API up). **`GET /api/readyz`** checks the Streamlit sidecar with **`GET {upstream}/`** and requires a **2xx** response when upstream is configured. Details: {doc}`deployment`, {doc}`observability`.
-- **Correlation:** the gateway resolves **`X-Request-ID`** (or generates one), stores it for logs, and **sets that value on proxied HTTP and WebSocket hops to Streamlit** so sidecar access logs can align with the gateway. JSON logging helpers and SLO-style alerting notes live in {doc}`observability`.
+- **Health:** `GET /api/healthz` checks the API. `GET /api/readyz` checks the Streamlit sidecar when the gateway is managing one.
+- **Operations:** request IDs, structured logs, Prometheus metrics, gateway limits, graceful shutdown, and Kubernetes guidance are documented in {doc}`observability` and {doc}`deployment`.
 
 ```{note}
 Contributors: the default test command and CI matrix are in {doc}`testing`. Repository guidelines: {doc}`contributing`.

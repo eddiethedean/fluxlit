@@ -126,14 +126,44 @@ async def proxy_http_inner(
             if not message.get("more_body", False):
                 break
 
+    async def collect_limited_request_body() -> bytes:
+        """Buffer a limited request body before contacting the upstream.
+
+        When a maximum body size is configured, fail closed before opening a Streamlit
+        upstream connection. This avoids sending a partial oversized request and then
+        closing the socket once the limit is discovered.
+        """
+        chunks: list[bytes] = []
+        total = 0
+        while True:
+            message = await receive()
+            if message["type"] != "http.request":
+                break
+            chunk = message.get("body", b"")
+            if chunk:
+                total += len(chunk)
+                if total > max_body:
+                    raise _GatewayPayloadTooLarge
+                chunks.append(chunk)
+            if not message.get("more_body", False):
+                break
+        return b"".join(chunks)
+
     response: httpx.Response | None = None
     try:
-        client = await httpx_client_getter()
         if method in {"GET", "HEAD"}:
             await drain_incoming_request_body()
+            content: bytes | AsyncIterator[bytes] | None = None
+        elif max_body:
+            content = await collect_limited_request_body()
+        else:
+            content = request_body()
+
+        client = await httpx_client_getter()
+        if method in {"GET", "HEAD"}:
             req = client.build_request(method, url, headers=headers)
         else:
-            req = client.build_request(method, url, headers=headers, content=request_body())
+            req = client.build_request(method, url, headers=headers, content=content)
         response = await client.send(req, stream=False)
     except _GatewayPayloadTooLarge:
         await respond_413_payload_too_large(send)

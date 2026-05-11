@@ -88,6 +88,16 @@ For a **PyPI / tag** release of FluxLit itself:
 
 Support expectations for Python and dependencies are summarized in **`docs/support-matrix.md`**.
 
+## Public-facing polish checklist
+
+Before merging changes that affect user-visible behavior, check the public surface for drift:
+
+1. **README and docs entry points** — keep `README.md`, `docs/index.md`, and `docs/quickstart.md` aligned on install commands, default port (`8000`), API prefix (`/api`), and the recommended first run.
+2. **Roadmap and changelog** — when a feature moves from planned to shipped, update both `CHANGELOG.md` and `ROADMAP.md`; avoid leaving “TBD” or “not implemented yet” language for released behavior.
+3. **Examples** — verify example READMEs use the gateway URL FluxLit prints, not Streamlit’s internal sidecar port.
+4. **Generated snippets** — regenerate `docs/_generated/` snippets when CLI help or setup output changes.
+5. **Links** — prefer relative links inside repository Markdown; use canonical GitHub URLs when the rendered docs need to point readers back to source files, workflows, or security advisories.
+
 ## Pull requests
 
 - Include tests when changing routing/runtime behavior.

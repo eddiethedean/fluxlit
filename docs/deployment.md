@@ -102,7 +102,7 @@ Behind a **Layer 7 load balancer** or Kubernetes **Service** with multiple endpo
 
 - Each replica runs **its own** gateway + Streamlit pair. **Streamlit’s default session** is tied to the server-side script run and WebSocket; after a hard refresh or new connection, users may land on a **different replica** and see a **new session** unless you add **affinity**.
 - **Sticky sessions** (session affinity / cookie-based or IP-hash) route the same browser to the same replica for a period. That improves continuity for interactive UIs but is **not** a full multi-replica session store: long-lived affinity tables, draining nodes, and failures still drop local state.
-- **When to add an external session store:** if you need **consistent application state across replicas** without sticky sessions (or in addition to them), you must persist state outside the process (database, Redis, etc.). A future **URL-bound server session** (Phase 2 follow-on in [ROADMAP.md](https://github.com/eddiethedean/fluxlit/blob/main/ROADMAP.md)) is the product direction for cookie-free continuity; until then, document your own store for cross-replica continuity.
+- **When to add an external session store:** if you need **consistent application state across replicas** without sticky sessions (or in addition to them), persist state outside the process (database, Redis, etc.). FluxLit’s URL-session helpers provide the cookie-free binding pattern; production multi-replica continuity still depends on the store you choose.
 
 ### Supported alternatives to multi-worker
 
