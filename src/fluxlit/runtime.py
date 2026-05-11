@@ -155,6 +155,7 @@ def _import_target_module(mod_name: str) -> object:
     ``PYTHONPATH`` (or similar), making FluxLit's own ``app.py`` importable as top-level
     ``import app`` and breaking ``app:app`` targets.
     """
+
     def _reuse_loaded(sys_mod_name: str, file_path: Path) -> object | None:
         existing = sys.modules.get(sys_mod_name)
         if existing is None:

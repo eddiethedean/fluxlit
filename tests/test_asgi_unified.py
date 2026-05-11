@@ -279,6 +279,67 @@ async def test_inner_lifespan_startup_failure_emits_startup_failed(
 
 
 @pytest.mark.asyncio
+async def test_inner_lifespan_shutdown_failure_emits_shutdown_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """If FastAPI lifespan fails on shutdown, ASGI server sees ``lifespan.shutdown.failed``."""
+    bad = tmp_path / "bad_shutdown_lifespan_app.py"
+    bad.write_text(
+        "from contextlib import asynccontextmanager\n"
+        "from fastapi import FastAPI\n"
+        "from fluxlit import FluxLit\n"
+        "@asynccontextmanager\n"
+        "async def lifespan(app: FastAPI):\n"
+        "    yield\n"
+        "    raise RuntimeError('shutdown boom')\n"
+        "app = FluxLit(title='x', fastapi_kwargs={'lifespan': lifespan})\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("fluxlit.runtime._wait_for_tcp", lambda *a, **k: None)
+
+    class _P:
+        def send_signal(self, _s: object) -> None:
+            return
+
+        def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002
+            return 0
+
+        def poll(self) -> int | None:
+            return None
+
+        def terminate(self) -> None:
+            return
+
+        def kill(self) -> None:
+            return
+
+    monkeypatch.setattr("fluxlit.runtime.subprocess.Popen", lambda *_a, **_kw: _P())
+    monkeypatch.setenv("FLUXLIT_APP", "bad_shutdown_lifespan_app:app")
+    monkeypatch.setenv("FLUXLIT_GATEWAY_PORT", "8000")
+
+    asgi = create_unified_app()
+    q: list[dict[str, object]] = [
+        {"type": "lifespan.startup"},
+        {"type": "lifespan.shutdown"},
+    ]
+    sent: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        return q.pop(0)
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    with pytest.raises(RuntimeError, match="shutdown boom"):
+        await asgi({"type": "lifespan"}, receive, send)
+    failed = [m for m in sent if m.get("type") == "lifespan.shutdown.failed"]
+    assert failed, "expected lifespan.shutdown.failed before inner re-raises"
+    assert "boom" in (failed[0].get("message") or "")
+
+
+@pytest.mark.asyncio
 async def test_websocket_before_sidecar_sends_close_with_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

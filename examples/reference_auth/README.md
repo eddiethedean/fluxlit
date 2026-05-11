@@ -28,4 +28,4 @@ the browser query string.
 
 ## Tests
 
-FluxLit’s main tree exercises JWT/OIDC helpers, gateway behavior, and log redaction in **`tests/`**. From the **repository root** after `pip install -e ".[dev]"`, run `python -m pytest -n auto --ignore=tests/e2e -m "not slow"` (see **[docs/testing.md](../../docs/testing.md)**).
+FluxLit’s main tree exercises JWT/OIDC helpers, gateway behavior, and log redaction in **`tests/`**. From the **repository root** after `pip install -e ".[dev]"`, run `python -m pytest -n auto -m "not slow"` (see **[docs/testing.md](../../docs/testing.md)**).

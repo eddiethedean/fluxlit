@@ -47,7 +47,7 @@ def exchange_auth_code_from_query(
     if hasattr(st_module.query_params, "pop"):
         try:
             st_module.query_params.pop(query_key)
-        except Exception:
+        except Exception:  # noqa: BLE001 — best-effort; Streamlit versions differ
             pass
     return token
 

@@ -131,8 +131,19 @@ class FluxLit:
                 content={"status": "not_ready", "detail": detail},
             )
 
+    def __setattr__(self, name: str, value: object) -> None:
+        if name == "api":
+            prior = self.__dict__.get("api")
+            if prior is not None and prior is not value:
+                self.__dict__["_unified_asgi_cache"] = None
+        super().__setattr__(name, value)
+
     def _unified_asgi(self) -> ASGIApp:
-        """Lazily build gateway + Streamlit ASGI (see :meth:`__call__`)."""
+        """Lazily build gateway + Streamlit ASGI (see :meth:`__call__`).
+
+        Assigning a new :attr:`api` clears the cached ASGI so the gateway is rebuilt
+        against the replacement app.
+        """
         if self._unified_asgi_cache is None:
             from fluxlit.runtime import asgi_from_fluxlit, resolve_import_target_for_unified
 

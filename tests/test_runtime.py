@@ -50,8 +50,7 @@ def test_load_fluxlit_prefers_local_app_py_over_polluted_syspath(
     """
     app_py = tmp_path / "app.py"
     app_py.write_text(
-        "from fluxlit import FluxLit\n"
-        "app = FluxLit(title='from_local_app_py')\n",
+        "from fluxlit import FluxLit\napp = FluxLit(title='from_local_app_py')\n",
         encoding="utf-8",
     )
 
@@ -369,7 +368,7 @@ async def test_create_unified_app_runs_inner_fastapi_lifespan(
         "from contextlib import asynccontextmanager\n"
         "from fastapi import FastAPI\n"
         "from fluxlit import FluxLit\n"
-        "STATE = {\"v\": 0}\n"
+        'STATE = {"v": 0}\n'
         "@asynccontextmanager\n"
         "async def lifespan(app: FastAPI):\n"
         "    STATE['v'] = 1\n"

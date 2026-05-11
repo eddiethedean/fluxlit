@@ -118,7 +118,7 @@ my_app/
 ```bash
 pip install -e ".[dev]"
 ruff check src tests && ruff format src tests
-python -m pytest -n auto --ignore=tests/e2e -m "not slow"
+python -m pytest -n auto -m "not slow"
 python -m mypy src/fluxlit
 ```
 

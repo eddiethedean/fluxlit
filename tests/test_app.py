@@ -5,11 +5,20 @@ import sys
 import types
 
 import pytest
+from fastapi import FastAPI
 from starlette.testclient import TestClient
 
 from fluxlit import FluxLit
 from fluxlit.config import FluxlitSettings
 from fluxlit.gateway import build_gateway
+
+
+def test_replacing_api_clears_unified_asgi_cache() -> None:
+    fl = FluxLit(title="T")
+    fl._unified_asgi_cache = object()  # type: ignore[assignment]
+    fl.api = FastAPI(title="replaced")
+    assert fl._unified_asgi_cache is None
+    assert fl.api.title == "replaced"
 
 
 def test_page_registration() -> None:

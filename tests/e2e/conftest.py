@@ -12,8 +12,6 @@ import pytest
 
 from fluxlit.runtime import find_free_port
 
-pytest_plugins = ["pytest_playwright"]
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TARGET = "tests.e2e.minimal_app:app"
 

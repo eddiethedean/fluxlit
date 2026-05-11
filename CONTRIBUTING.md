@@ -15,11 +15,11 @@ python -m pip install -e ".[dev]"
 ```bash
 ruff check src tests
 ruff format src tests
-python -m pytest -n auto --ignore=tests/e2e -m "not slow"
+python -m pytest -n auto -m "not slow"
 python -m mypy src/fluxlit
 ```
 
-Coverage (optional): `pytest -n auto --ignore=tests/e2e --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, and Docker proxy smoke.
+Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, and Docker proxy smoke.
 
 ## Documentation (Sphinx)
 

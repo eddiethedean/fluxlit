@@ -493,8 +493,7 @@ def new(name: str = typer.Argument(..., help="Project directory name.")) -> None
         raise typer.Exit(code=1)
     root.mkdir(parents=True)
     (root / "fluxlit.toml").write_text(
-        'target = "app:app"\n'
-        "gateway_port = 8000\n",
+        'target = "app:app"\ngateway_port = 8000\n',
         encoding="utf-8",
     )
     (root / "app.py").write_text(

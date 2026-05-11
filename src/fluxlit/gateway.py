@@ -476,7 +476,7 @@ async def _proxy_http(
         )
         try:
             await send({"type": "http.response.body", "body": out_body})
-        except Exception:
+        except Exception:  # noqa: BLE001 — log then re-raise; ASGI send can fail for many reasons
             _gateway_log.exception("gateway proxy: error building response body from upstream")
             raise
     finally:

@@ -118,6 +118,7 @@ source = ["src/fluxlit"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+addopts = ["--ignore=tests/e2e"]
 testpaths = ["tests"]
 markers = [
   "e2e: browser tests (install .[e2e] and run playwright install chromium)",

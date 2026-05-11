@@ -10,15 +10,15 @@ FluxLit’s tests fall into three bands: **fast** Pytest (default CI and local),
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pytest -n auto --ignore=tests/e2e -m "not slow"
+python -m pytest -n auto -m "not slow"
 ```
 
-That matches the main **`test`** CI job (fast suite, no browser tests, no `slow` marker). A plain `python -m pytest` from the repo root also collects **`tests/e2e`** (needs `.[e2e]` + Playwright browsers) and runs **`slow`** tests — use the command above for day-to-day work.
+That matches the main **`test`** CI job (fast suite, no browser tests, no `slow` marker). The project’s pytest config **ignores `tests/e2e` by default** (see `addopts` in `pyproject.toml`), so a plain `python -m pytest` from the repo root collects the fast tree without Playwright. Browser E2E still runs when you **pass the directory explicitly** (see [E2E](#e2e)). A plain `pytest` still runs **`slow`** tests unless you add `-m "not slow"`.
 
-Parallel without the `slow` filter (still ignores E2E):
+Parallel without the `slow` filter:
 
 ```bash
-python -m pytest -n auto --ignore=tests/e2e
+python -m pytest -n auto
 ```
 
 ## Markers
@@ -31,7 +31,7 @@ python -m pytest -n auto --ignore=tests/e2e
 Run everything except slow:
 
 ```bash
-python -m pytest -n auto --ignore=tests/e2e -m "not slow"
+python -m pytest -n auto -m "not slow"
 ```
 
 ## Coverage
@@ -39,7 +39,7 @@ python -m pytest -n auto --ignore=tests/e2e -m "not slow"
 Local HTML + terminal summary (same as the `coverage` CI job, without XML):
 
 ```bash
-python -m pytest -n auto --ignore=tests/e2e \
+python -m pytest -n auto \
   --cov=fluxlit --cov-report=term-missing --cov-report=html
 open htmlcov/index.html
 ```
@@ -58,6 +58,8 @@ docker compose -f docker/proxy-deployment/docker-compose.yml up --build
 See [docker/proxy-deployment/README.md](../docker/proxy-deployment/README.md) for full-path, TLS, and `run-all-proxy-smokes.sh`.
 
 ## E2E
+
+Default pytest config ignores `tests/e2e`; **pass the directory explicitly** so those tests are collected (see [`tests/conftest.py`](https://github.com/eddiethedean/fluxlit/blob/main/tests/conftest.py) for optional `pytest-playwright` registration).
 
 ```bash
 python -m pip install -e ".[dev,e2e]"

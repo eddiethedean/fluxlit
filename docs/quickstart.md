@@ -21,7 +21,7 @@ pip install -e ".[dev]"
 ```
 
 ```{note}
-Contributor tests: `python -m pytest -n auto --ignore=tests/e2e -m "not slow"`. More in {doc}`testing`.
+Contributor tests: `python -m pytest -n auto -m "not slow"`. More in {doc}`testing`.
 ```
 
 ## Scaffold (optional)
