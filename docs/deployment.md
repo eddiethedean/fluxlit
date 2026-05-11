@@ -21,7 +21,7 @@ Behind a reverse proxy, pass **`--proxy-headers`** (or set `FLUXLIT_TRUST_PROXY=
 | Probe | Path | Meaning |
 |-------|------|--------|
 | **Liveness** | `GET /api/healthz` | FastAPI app is up (does not check Streamlit). |
-| **Readiness** | `GET /api/readyz` | When the unified runtime has configured a Streamlit upstream (`FLUXLIT_STREAMLIT_UPSTREAM`), returns **200** if the sidecar responds with an HTTP status below 500, **503** if not. If no upstream is configured (e.g. tests), returns **200** with `streamlit: not_configured`. |
+| **Readiness** | `GET /api/readyz` | When the unified runtime has configured a Streamlit upstream (`FLUXLIT_STREAMLIT_UPSTREAM`), returns **200** only if `GET` on the upstream root returns **2xx**. **503** on connection errors, **5xx/4xx/3xx** from the upstream, or missing upstream state. If no upstream is configured (e.g. tests), returns **200** with `streamlit: not_configured`. |
 
 Both routes are **hidden from OpenAPI** so they do not clutter `/api/docs`. Use them in Kubernetes `livenessProbe` / `readinessProbe`, load balancers, or Compose `healthcheck` curls.
 

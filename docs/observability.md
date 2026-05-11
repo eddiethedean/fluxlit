@@ -34,4 +34,4 @@ Because the browser hits a **single port**, ingress spans should label whether w
 
 ## Readiness
 
-`GET /api/readyz` (hidden from OpenAPI) probes the Streamlit sidecar when `FLUXLIT_STREAMLIT_UPSTREAM` is set; see {mod}`fluxlit.health`. For Kubernetes-style probe configuration and curl examples, see {doc}`deployment`. If probes fail in production, see {doc}`troubleshooting`.
+`GET /api/readyz` (hidden from OpenAPI) probes the Streamlit sidecar when `FLUXLIT_STREAMLIT_UPSTREAM` is set; see {mod}`fluxlit.health`. The probe requires a **2xx** response from `GET` on the upstream root (not merely “any HTTP answer”). For Kubernetes-style probe configuration and curl examples, see {doc}`deployment`. If probes fail in production, see {doc}`troubleshooting`.

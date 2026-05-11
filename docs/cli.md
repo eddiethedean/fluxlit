@@ -39,6 +39,8 @@ The working directory should be the project root so Python can import the module
 
 **`fluxlit shutdown`** sends **SIGTERM** to the process recorded in the PID file (then optional **SIGKILL** with **`--force`** after **`--wait`** seconds). Use the same working directory and **`--pidfile`** as the server, or set **`FLUXLIT_PIDFILE`** to an absolute path.
 
+On **Windows**, **`--force` does not send SIGKILL** (POSIX only). If the process is still running after the wait window, stop it from Task Manager or `taskkill` as appropriate.
+
 ## Doctor
 
 **`fluxlit doctor`** prints one line per check with **PASS**, **WARN**, or **FAIL**.

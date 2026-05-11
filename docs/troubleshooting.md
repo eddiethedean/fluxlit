@@ -29,7 +29,7 @@ Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports 
 
 ## Readiness returns 503
 
-**`GET /api/readyz` → 503** under the unified runtime usually means the **Streamlit upstream** is down or not accepting HTTP (crash, slow start, wrong URL).
+**`GET /api/readyz` → 503** under the unified runtime usually means the **Streamlit upstream** is down, not accepting HTTP (crash, slow start, wrong URL), or returned a **non-2xx** status for `GET` on the upstream root (readiness expects **2xx**).
 
 - Confirm **`fluxlit run`** is the entrypoint (upstream env is set by the parent).
 - Check Streamlit logs from the same process tree.
@@ -72,6 +72,8 @@ See {doc}`configuration` (reverse proxies).
 ## PID file and shutdown
 
 If **`fluxlit shutdown`** cannot find the process, use the same **`--pidfile`** (or `FLUXLIT_PIDFILE`) and working directory as `dev` / `run`. See {doc}`cli`.
+
+On **Windows**, **`--force`** does not escalate to SIGKILL; if SIGTERM is not enough, end the process manually (`taskkill`, Task Manager).
 
 ## Getting help
 

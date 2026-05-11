@@ -26,7 +26,7 @@ New here? Follow {doc}`quickstart` end-to-end first (about five minutes). Use {d
 - **Routing:** Paths under **`/api`** (default) go to FastAPI. **Everything else** (including `/_stcore/...` WebSockets) is proxied to Streamlit.
 - **From Streamlit, call the API** with the injected `client` using paths like `"/users"`—**not** `"/api/users"`. The runtime sets the base URL for you.
 - **Secured routes:** the default page `client` has **no** `Authorization` header. Use {meth}`~fluxlit.client.ApiClient.for_fluxlit` or the patterns in {doc}`auth-recipes`.
-- **Health:** **`GET /api/healthz`** (API up). **`GET /api/readyz`** (Streamlit sidecar reachable when using `fluxlit dev` / `fluxlit run`). Details: {doc}`deployment`, {doc}`observability`.
+- **Health:** **`GET /api/healthz`** (API up). **`GET /api/readyz`** checks the Streamlit sidecar with **`GET {upstream}/`** and requires a **2xx** response when upstream is configured. Details: {doc}`deployment`, {doc}`observability`.
 
 ```{note}
 Contributors: the default test command and CI matrix are in {doc}`testing`. Repository guidelines: {doc}`contributing`.

@@ -74,7 +74,8 @@ def test_doctor_passes_proxy_headers_when_subpath_and_trust_proxy(
 
 
 def test_doctor_fails_fluxlit_auth_extra_when_pyjwt_unimportable(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     module_path = tmp_path / "doc_jwt_blocked.py"
     module_path.write_text(

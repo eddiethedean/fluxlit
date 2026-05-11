@@ -630,8 +630,20 @@ def run_unified(
                         port=new_port,
                         base_url_path=fl.settings.public_mount_path(),
                     )
-                    proc_box[0] = subprocess.Popen(cmd_local, **popen_kwargs)
-                    _wait_for_tcp("127.0.0.1", new_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+                    new_proc = subprocess.Popen(cmd_local, **popen_kwargs)
+                    proc_box[0] = new_proc
+                    try:
+                        _wait_for_tcp("127.0.0.1", new_port, timeout_s=_STREAMLIT_TCP_WAIT_S)
+                    except TimeoutError:
+                        _terminate_process(new_proc)
+                        sys.stderr.write(
+                            "[fluxlit] Streamlit sidecar reload failed: timed out waiting for the "
+                            "new process to listen; restart `fluxlit dev` (or `fluxlit run`).\n"
+                        )
+                        sys.stderr.flush()
+                        if not server.should_exit:
+                            server.should_exit = True
+                        return
                     new_upstream = f"http://127.0.0.1:{new_port}"
                     update_streamlit_upstream_file(path_for_updates, new_upstream)
                 finally:

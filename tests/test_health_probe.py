@@ -36,6 +36,15 @@ class _Root500Handler(BaseHTTPRequestHandler):
         return
 
 
+class _Root404Handler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:
+        self.send_response(404)
+        self.end_headers()
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
+
+
 @pytest.fixture
 def http_root_ok() -> Generator[str, None, None]:
     port = find_free_port()
@@ -53,6 +62,19 @@ def http_root_ok() -> Generator[str, None, None]:
 def http_root_500() -> Generator[str, None, None]:
     port = find_free_port()
     server = HTTPServer(("127.0.0.1", port), _Root500Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=10)
+
+
+@pytest.fixture
+def http_root_404() -> Generator[str, None, None]:
+    port = find_free_port()
+    server = HTTPServer(("127.0.0.1", port), _Root404Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
@@ -84,6 +106,18 @@ async def test_probe_not_ready_on_upstream_500(
     ok, detail = await probe_streamlit_ready(timeout_s=2.0)
     assert ok is False
     assert "500" in detail
+
+
+@pytest.mark.asyncio
+async def test_probe_not_ready_on_upstream_404(
+    http_root_404: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", http_root_404)
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    ok, detail = await probe_streamlit_ready(timeout_s=2.0)
+    assert ok is False
+    assert "404" in detail
 
 
 @pytest.mark.asyncio

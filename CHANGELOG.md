@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Readiness:** `GET /api/readyz` / `fluxlit.health.probe_streamlit_ready` require a **2xx** response from the Streamlit upstream root (stricter than treating any status below 500 as ready).
+- **Gateway:** Return **502** when the Streamlit upstream URL resolves empty at request time (e.g. missing state file).
+- **Dev:** On `--reload-scope=full`, if the new Streamlit process does not open its port in time, terminate it and print a clear stderr message.
+- **CI:** Docs job runs `sphinx-build -W` (warnings as errors).
+- **Docs:** Windows limitation for `fluxlit shutdown --force` (no SIGKILL fallback).
+
 ## 0.4.0
 
 - **Runtime:** Map IPv6 unspecified bind ``::`` to loopback for ``FLUXLIT_INTERNAL_API_BASE`` (same as ``0.0.0.0``).

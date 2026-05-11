@@ -69,7 +69,7 @@ The suite starts a real unified gateway (including Streamlit WebSocket traffic) 
 
 ## Readiness
 
-With the unified runtime, `GET /api/readyz` returns **503** if the Streamlit upstream is unreachable. In bare FastAPI tests (no `FLUXLIT_STREAMLIT_UPSTREAM`), it returns **200** with `streamlit: not_configured`.
+With the unified runtime, `GET /api/readyz` returns **503** if the Streamlit upstream is unreachable or if `GET` on the upstream root does not return **2xx**. In bare FastAPI tests (no `FLUXLIT_STREAMLIT_UPSTREAM`), it returns **200** with `streamlit: not_configured`.
 
 The runtime may expose the upstream URL via `FLUXLIT_STREAMLIT_UPSTREAM` and a companion state file so Uvicorn reload workers and Streamlit restarts stay consistent; tests cover file vs env precedence in `tests/test_runtime_upstream.py`.
 

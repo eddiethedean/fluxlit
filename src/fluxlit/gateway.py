@@ -162,6 +162,13 @@ def build_gateway(
                 await api_app(api_scope, receive, send)
                 return
             upstream = resolve_upstream()
+            if not upstream:
+                if scope["type"] == "http":
+                    await _bad_streamlit_upstream_http(send)
+                    return
+                if scope["type"] == "websocket":
+                    await _bad_streamlit_upstream_ws(receive, send)
+                    return
             if scope["type"] == "websocket":
                 await _proxy_websocket(
                     scope, receive, send, upstream, streamlit_path, forwarded_prefix=mount or None
@@ -242,6 +249,40 @@ async def _redirect(send: Send, location: str, *, status: int = 307) -> None:
         }
     )
     await send({"type": "http.response.body", "body": b""})
+
+
+_BAD_UPSTREAM_BODY = (
+    b"FluxLit: Streamlit upstream URL is missing "
+    b"(set FLUXLIT_STREAMLIT_UPSTREAM or fix FLUXLIT_STREAMLIT_UPSTREAM_FILE)."
+)
+
+
+async def _bad_streamlit_upstream_http(send: Send) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 502,
+            "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+        }
+    )
+    await send({"type": "http.response.body", "body": _BAD_UPSTREAM_BODY})
+
+
+async def _bad_streamlit_upstream_ws(receive: Receive, send: Send) -> None:
+    """Close the socket when no upstream base URL is available."""
+    while True:
+        msg = await receive()
+        if msg["type"] == "websocket.connect":
+            await send(
+                {
+                    "type": "websocket.close",
+                    "code": 1011,
+                    "reason": b"Streamlit upstream missing",
+                }
+            )
+            return
+        if msg["type"] == "websocket.disconnect":
+            return
 
 
 def _build_target_url(scope: Scope, upstream: str, *, path: str | None = None) -> str:

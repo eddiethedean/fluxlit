@@ -424,3 +424,22 @@ async def test_inject_public_root_path_does_not_touch_lifespan() -> None:
     app = _inject_public_root_path(inner, "/myapp")
     await app({"type": "lifespan"}, None, None)  # type: ignore[arg-type]
     assert seen == ["lifespan"]
+
+
+def test_build_gateway_502_when_upstream_resolver_returns_empty() -> None:
+    inner = FastAPI()
+
+    @inner.get("/x")
+    def _x() -> str:
+        return "a"
+
+    gw = build_gateway(
+        inner,
+        "http://127.0.0.1:8501",
+        upstream_resolver=lambda: "",
+        api_prefix="/api",
+    )
+    client = TestClient(gw)
+    r = client.get("/streamlit-only-path")
+    assert r.status_code == 502
+    assert "Streamlit upstream" in r.text

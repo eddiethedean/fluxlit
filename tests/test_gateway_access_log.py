@@ -32,9 +32,7 @@ def test_gateway_access_log_emits_info_with_extra(caplog: pytest.LogCaptureFixtu
     client = TestClient(gateway)
     client.get("/api/healthz", headers={"X-Request-ID": "access-log-test"})
     api_records = [
-        r
-        for r in caplog.records
-        if r.name == "fluxlit.gateway" and r.levelno == logging.INFO
+        r for r in caplog.records if r.name == "fluxlit.gateway" and r.levelno == logging.INFO
     ]
     assert api_records, "expected INFO from fluxlit.gateway"
     assert any(getattr(r, "fluxlit_dispatch", None) == "api" for r in api_records)
@@ -49,8 +47,6 @@ def test_gateway_access_log_default_stays_debug_for_streamlit_path(
     client = TestClient(gateway)
     client.get("/some-streamlit-path")
     info_gateway = [
-        r
-        for r in caplog.records
-        if r.name == "fluxlit.gateway" and r.levelno == logging.INFO
+        r for r in caplog.records if r.name == "fluxlit.gateway" and r.levelno == logging.INFO
     ]
     assert not info_gateway
