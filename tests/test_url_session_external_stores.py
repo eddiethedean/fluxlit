@@ -9,9 +9,9 @@ from examples.session_stores.sqlite_store import SQLiteSessionStore
 
 class FakeRedis:
     def __init__(self) -> None:
-        self.data: dict[str, tuple[str, float | None]] = {}
+        self.data: dict[str, tuple[str | bytes, float | None]] = {}
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str) -> str | bytes | None:
         item = self.data.get(key)
         if item is None:
             return None
@@ -51,5 +51,28 @@ def test_sqlite_session_store_expires(tmp_path: Path) -> None:
     assert store.get("sid") is None
 
 
+def test_sqlite_session_store_persists_across_instances(tmp_path: Path) -> None:
+    path = tmp_path / "sessions.sqlite3"
+    SQLiteSessionStore(path).set("sid", {"count": 3})
+    assert SQLiteSessionStore(path).get("sid") == {"count": 3}
+    SQLiteSessionStore(path).delete("sid")
+    assert SQLiteSessionStore(path).get("sid") is None
+
+
 def test_redis_session_store_contract() -> None:
     _exercise_store(RedisSessionStore(FakeRedis()))
+
+
+def test_redis_session_store_decodes_bytes_payload() -> None:
+    redis = FakeRedis()
+    redis.data["fluxlit:sid:sid"] = (b'{"count":4}', None)
+    store = RedisSessionStore(redis)
+    assert store.get("sid") == {"count": 4}
+
+
+def test_redis_session_store_honors_custom_prefix_and_expiry() -> None:
+    redis = FakeRedis()
+    store = RedisSessionStore(redis, prefix="custom:")
+    store.set("sid", {"count": 1}, ttl_seconds=-1)
+    assert "custom:sid" in redis.data
+    assert store.get("sid") is None

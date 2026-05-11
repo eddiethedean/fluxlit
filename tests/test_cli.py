@@ -86,6 +86,60 @@ def test_doctor_json_warnings_only_exits_zero(
     assert payload["warnings_only"] is True
 
 
+def test_doctor_json_warning_status_and_check_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_json_warn_only.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings("
+        "trust_proxy=True, forwarded_allow_ips='*', gateway_port=59212))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_json_warn_only:app", "--json"])
+    assert res.exit_code == 0
+    assert "FluxLit doctor" not in res.stdout
+    payload = json.loads(res.stdout)
+    assert payload["status"] == "warn"
+    assert payload["warnings_only"] is False
+    assert payload["target"] == "doc_json_warn_only:app"
+    assert all(set(check) == {"name", "status", "detail"} for check in payload["checks"])
+    assert any(
+        check["name"] == "forwarded_allow_ips" and check["status"] == "WARN"
+        for check in payload["checks"]
+    )
+
+
+def test_doctor_json_missing_upstream_file_reports_structured_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doc_json_missing_upstream.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_port=59213))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", str(tmp_path / "missing.txt"))
+
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_json_missing_upstream:app", "--json"])
+    assert res.exit_code == 1
+    payload = json.loads(res.stdout)
+    assert payload["status"] == "fail"
+    assert any(
+        check["name"] == "streamlit_upstream_state"
+        and check["status"] == "FAIL"
+        and "state file missing" in check["detail"]
+        for check in payload["checks"]
+    )
+
+
 def test_doctor_warns_when_internal_api_path_mismatches_mount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
