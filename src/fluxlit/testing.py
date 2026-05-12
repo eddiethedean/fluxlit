@@ -16,6 +16,16 @@ from fluxlit.app import FluxLit
 from fluxlit.gateway import build_gateway
 
 
+def streamlit_main_path() -> Path:
+    """Return FluxLit's supported Streamlit entry script for ``AppTest.from_file``.
+
+    Use this instead of constructing a path from ``fluxlit.__file__``; the helper is
+    part of FluxLit's testing API and can keep working if the internal package layout
+    changes.
+    """
+    return Path(__file__).resolve().parent / "streamlit" / "main.py"
+
+
 @dataclass(frozen=True)
 class FluxLitTestClient:
     """Test harness that mirrors production routing (API prefix + gateway).
@@ -89,7 +99,7 @@ class FluxLitTestClient:
 
         from streamlit.testing.v1 import AppTest
 
-        entry = Path(__file__).resolve().parent / "streamlit" / "main.py"
+        entry = streamlit_main_path()
         internal = internal_api_base or f"http://127.0.0.1:1{self.api_prefix}"
 
         with (

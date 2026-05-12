@@ -21,6 +21,27 @@ Parallel without the `slow` filter:
 python -m pytest -n auto
 ```
 
+## AppTest entrypoint
+
+When app tests need Streamlit's `AppTest.from_file(...)`, use FluxLit's public helper
+instead of constructing a path from `fluxlit.__file__`:
+
+```python
+from streamlit.testing.v1 import AppTest
+
+from fluxlit import streamlit_main_path
+
+
+def test_home_page(monkeypatch):
+    monkeypatch.setenv("FLUXLIT_APP", "app:app")
+    at = AppTest.from_file(str(streamlit_main_path())).run()
+    assert at.title
+```
+
+`streamlit_main_path()` points at the bundled Streamlit bootstrap that `fluxlit dev`
+and `FluxLitTestClient.streamlit()` use, while keeping tests independent of FluxLit's
+internal package layout.
+
 ## Markers
 
 | Marker | Meaning |

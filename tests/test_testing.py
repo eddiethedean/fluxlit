@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from fluxlit import FluxLit
+from fluxlit import FluxLit, streamlit_main_path
 from fluxlit.testing import FluxLitTestClient, _maybe_syspath, _patched_env
 
 
@@ -37,6 +37,13 @@ def test_fluxlit_test_client_api_helpers_and_openapi_success() -> None:
     assert isinstance(client.openapi(), dict)
 
 
+def test_streamlit_main_path_points_to_packaged_entry() -> None:
+    path = streamlit_main_path()
+    assert path.name == "main.py"
+    assert path.parent.name == "streamlit"
+    assert path.is_file()
+
+
 def test_fluxlit_test_client_streamlit_rejects_old_streamlit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -52,8 +59,11 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
     fake_streamlit = types.SimpleNamespace(__version__="1.30.0")
 
     class FakeAppTest:
+        captured_path = ""
+
         @classmethod
         def from_file(cls, path: str) -> FakeAppTest:
+            cls.captured_path = path
             return cls()
 
         def run(self) -> dict[str, object]:
@@ -80,6 +90,7 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
     assert result["base"] == "http://test/api"
     assert result["prefix"] == "/v1"
     assert result["syspath0"] == str(tmp_path)
+    assert FakeAppTest.captured_path == str(streamlit_main_path())
 
 
 def test_patched_env_restores_existing_values(monkeypatch: pytest.MonkeyPatch) -> None:
