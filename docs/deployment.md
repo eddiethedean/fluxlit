@@ -14,7 +14,7 @@ fluxlit run app:app --host 0.0.0.0 --port 8000
 
 The **`target`** (`module:attr`) resolves the same way as `fluxlit dev`: CLI argument → `fluxlit.toml` / `[tool.fluxlit]` `target` → `app:app`. Bind address and port also follow {doc}`configuration` precedence (CLI → env → project file → defaults).
 
-Behind a reverse proxy, pass **`--proxy-headers`** (or set `FLUXLIT_TRUST_PROXY=1`) and configure `FLUXLIT_ROOT_PATH` when the app is mounted under a subpath — see the reverse-proxy section in {doc}`configuration`.
+Behind a reverse proxy, pass **`--proxy-headers`** (or set `FLUXLIT_TRUST_PROXY=1`) and configure `FLUXLIT_ROOT_PATH` when the app is mounted under a subpath — see the reverse-proxy section in {doc}`configuration`. For a **multi-segment** public path such as **`/apps/my-app`**, nginx Compose, smoke checks, and TLS/trust notes, see {ref}`path-prefix-apps` in {doc}`production-tls` and **`docker/proxy-deployment/docker-compose.apps-prefix.yml`** in the repository.
 
 ## Running under Uvicorn directly
 

@@ -64,6 +64,17 @@ echo "$smoke_out" | grep -q '"marker"[[:space:]]*:[[:space:]]*"fluxlit_smoke_ok"
   || { echo "FAIL: unexpected smoke JSON: $smoke_out"; exit 1; }
 echo "Smoke API OK"
 
+docs_url="${BASE}${PREFIX}/api/docs"
+echo "Checking OpenAPI docs: ${docs_url}"
+docs_out="$(_curl -sfS --max-time 30 "$docs_url")"
+echo "$docs_out" | grep -qiE 'swagger|openapi|SwaggerUIBundle|swagger-ui' \
+  || {
+    echo "FAIL: docs page missing swagger/openapi markers"
+    echo "$docs_out" | head -c 800
+    exit 1
+  }
+echo "OpenAPI docs OK"
+
 echo "Checking request id header through proxy: ${request_id_url}"
 rid="proxy-smoke-$RANDOM"
 rid_out="$(_curl -sfS --max-time 30 -H "X-Request-ID: ${rid}" "$request_id_url")"

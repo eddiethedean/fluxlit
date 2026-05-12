@@ -9,6 +9,7 @@ Operator docs for TLS, HSTS, and **`forwarded_allow_ips`**: [Production TLS](htt
 |----------|---------|------------|----------------|
 | **Root path** | `+ docker-compose.root.yml` | `http://127.0.0.1:8082/` | Forwards `/api/...`, `/_stcore/...`, and `/` at origin root. |
 | **Strip prefix** (default) | `docker-compose.yml` | `http://127.0.0.1:8080/myapp/` | Forwards `/api/...`, `/_stcore/...` to FluxLit (prefix stripped). |
+| **Strip prefix** (multi-segment) | `+ docker-compose.apps-prefix.yml` | `http://127.0.0.1:8083/apps/my-app/` | Same as strip-prefix; public path `/apps/my-app/` matches `FLUXLIT_ROOT_PATH=/apps/my-app`. |
 | **Full path** | `+ docker-compose.fullpath.yml` | `http://127.0.0.1:8081/myapp/` | Forwards full URI `/myapp/...` to FluxLit (Connect-style). |
 | **HTTPS** | `+ docker-compose.https.yml` | `https://127.0.0.1:8444/myapp/` | TLS at nginx; `X-Forwarded-Proto: https`. Dev certs via `generate-test-certs.sh`. |
 
@@ -27,6 +28,13 @@ In another terminal (install **`pip install websockets`** once for the WebSocket
 ```
 
 Or open **http://127.0.0.1:8080/myapp/** in a browser.
+
+## Strip-prefix `/apps/my-app` (multi-segment path)
+
+```bash
+docker compose -f docker/proxy-deployment/docker-compose.yml -f docker/proxy-deployment/docker-compose.apps-prefix.yml up --build
+PUBLIC_PREFIX=/apps/my-app BASE_URL=http://127.0.0.1:8083 ./docker/proxy-deployment/smoke-test.sh
+```
 
 ## Full-path proxy
 
@@ -58,6 +66,7 @@ CURL_INSECURE=1 BASE_URL=https://127.0.0.1:8444 ./docker/proxy-deployment/smoke-
 
 ## What is tested
 
+- **OpenAPI / Swagger UI:** `GET …/api/docs` returns HTML that includes Swagger/OpenAPI markers (all scenarios).
 - **Backend:** `GET …/myapp/api/healthz` returns JSON `{"status":"ok"}` through nginx.
 - **Readiness:** `GET …/myapp/api/readyz` reports the managed Streamlit sidecar ready.
 - **Smoke API:** `GET …/myapp/api/smoke` returns the canonical `fluxlit_smoke_ok` marker.
