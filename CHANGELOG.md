@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-- **Internal:** Consolidate affirmative ``FLUXLIT_*`` environment parsing via ``fluxlit.runtime.env_parse.truthy_env`` (used for ``FLUXLIT_DEBUG``, URL-session test guards, and related call sites).
-
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 ## 0.11.0 - 2026-05-12
 
@@ -11,6 +9,7 @@
 - **Cookbook:** gateway Prometheus metrics, Kubernetes-style `healthz` / `readyz` probes, `fluxlit config --strict` in CI, and `FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES` / **413** guidance in {doc}`cookbook`.
 - **Diagnostics:** :func:`fluxlit.gateway.forward_headers.rejected_gateway_forward_header_allowlist` and settings capture of rejected allowlist names; `fluxlit config` / :func:`~fluxlit.config.config_print.collect_configuration_warnings` warn on credential-style names users listed but the gateway never forwards, and when `trust_proxy` is on with unlimited proxied upload body size; `fluxlit doctor` adds `gateway_forward_rejected_names`; verbose `gateway_proxy` includes `max_proxy_request_body_bytes` and `max_concurrent_upstream_http`.
 - **Packaging:** Hatch sdist excludes stray virtualenv directories under ``examples/`` so ``uv build`` / PyPI sdists do not fail on disallowed symlinks.
+- **Internal:** Consolidate affirmative ``FLUXLIT_*`` environment parsing via ``fluxlit.runtime.env_parse.truthy_env`` (used for ``FLUXLIT_DEBUG``, URL-session test guards, and related call sites).
 
 **Upgrading from 0.10.x:** Bump pins to ``fluxlit>=0.11,<1.0``. Re-check ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` if you list credential header names (they are ignored); new warnings may appear in ``fluxlit doctor`` / ``fluxlit config --strict`` when ``trust_proxy`` is enabled without a body limit.
 

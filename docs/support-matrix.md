@@ -40,7 +40,7 @@ fluxlit>=0.11,<1.0
 streamlit>=1.36
 ```
 
-After each FluxLit PyPI release, align this sketch with the current minor (for example ``fluxlit>=0.10,<1.0`` until you adopt **0.11**).
+After each FluxLit PyPI release, align this sketch with the current minor (for example ``fluxlit>=0.11,<1.0`` until you adopt **0.12**).
 
 Then `pip-compile requirements.in -o requirements.txt` and install from **`requirements.txt`** in containers.
 
