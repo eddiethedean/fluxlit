@@ -11,12 +11,12 @@ import sys
 import urllib.parse
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fluxlit.api_mount import normalize_api_mount_path
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit as FluxLitType
+    from fluxlit.app import FluxLit
 
 
 def find_free_port() -> int:
@@ -164,7 +164,7 @@ def _import_target_module(mod_name: str) -> object:
     return importlib.import_module(mod_name)
 
 
-def load_fluxlit(target: str) -> FluxLitType:
+def load_fluxlit(target: str) -> FluxLit[Any]:
     """Import ``module:attribute`` and ensure the object is a :class:`~fluxlit.app.FluxLit`.
 
     Raises:

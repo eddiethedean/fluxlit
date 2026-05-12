@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 from urllib.parse import urlencode, urlparse
 
 from starlette.requests import Request
@@ -11,7 +11,9 @@ from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.gateway.paths import normalize_root_mount
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit as FluxLitType
+    from fluxlit.app import FluxLit
+
+    FluxLitType: TypeAlias = FluxLit[Any]
 
 
 def _request_origin(request: Request) -> str:
@@ -60,7 +62,7 @@ class FluxLitPublicUrls:
                 origin = f"{pu.scheme}://{pu.netloc}".rstrip("/")
                 path = (pu.path or "").rstrip("/")
                 if path:
-                    return pb.rstrip("/")
+                    return cast(str, pb.rstrip("/"))
                 if mount:
                     return _join_url(origin, mount)
                 return origin

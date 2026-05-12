@@ -18,10 +18,14 @@ import os
 import secrets
 import time
 from collections.abc import Mapping, MutableMapping
-from typing import Protocol, cast, runtime_checkable
+from typing import Protocol, TypeVar, cast, runtime_checkable
+
+from pydantic import BaseModel, ValidationError
 
 from fluxlit.config import JsonValue
 from fluxlit.streamlit.facade import StreamlitSessionFacade
+
+ModelT = TypeVar("ModelT", bound=BaseModel)
 
 
 @runtime_checkable
@@ -256,3 +260,32 @@ def persist_url_session(
         return sid
     store.set(sid, snap, ttl_seconds=ttl_seconds)
     return sid
+
+
+def hydrate_url_session_typed(
+    st: StreamlitSessionFacade,
+    store: SessionStore,
+    model: type[ModelT],
+    *,
+    param: str = "fluxlit_sid",
+    merge: bool = True,
+    strict: bool = False,
+) -> tuple[str | None, ModelT | None]:
+    """Like :func:`hydrate_url_session`, then validate the store payload as *model*.
+
+    Returns ``(session_id_or_none, validated_model_or_none)``. On validation failure,
+    when *strict* is false, returns ``(sid, None)``; when *strict* is true, raises
+    :class:`pydantic.ValidationError`.
+    """
+    sid = hydrate_url_session(st, store, param=param, merge=merge)
+    if sid is None:
+        return None, None
+    blob = store.get(sid)
+    if blob is None:
+        return sid, None
+    try:
+        return sid, model.model_validate(dict(blob))
+    except ValidationError:
+        if strict:
+            raise
+        return sid, None

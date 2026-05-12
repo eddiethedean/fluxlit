@@ -36,7 +36,7 @@ def _streamlit_apptest_version_ok() -> bool:
 
 
 def build_doctor_verbose_detail(
-    fl: FluxLit,
+    fl: FluxLit[Any],
     *,
     resolved_target: str,
     bind_host: str,

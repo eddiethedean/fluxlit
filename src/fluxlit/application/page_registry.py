@@ -4,15 +4,28 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from types import FunctionType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeAlias
+
+from fluxlit.pages.meta import PageMeta
+from fluxlit.pages.records import PageRecord
+from fluxlit.pages.signature import validate_strict_page_signature
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit
 
+    FluxLitApp: TypeAlias = FluxLit[Any]
 
-def discover_streamlit_pages(app: FluxLit, directory: str, *, package: str) -> None:
+
+def _docstring_first_line(fn: Callable[..., Any]) -> str:
+    doc = getattr(fn, "__doc__", None)
+    if not doc or not str(doc).strip():
+        return ""
+    return str(doc).strip().split("\n", maxsplit=1)[0].strip()
+
+
+def discover_streamlit_pages(app: FluxLitApp, directory: str, *, package: str) -> None:
     """Implementation of :meth:`fluxlit.app.FluxLit.discover_pages` (mutates *app*)."""
     parent = importlib.import_module(package)
     paths = getattr(parent, "__path__", None)
@@ -39,19 +52,41 @@ def discover_streamlit_pages(app: FluxLit, directory: str, *, package: str) -> N
             continue
         register(app)
 
-    app._pages.sort(key=lambda t: (t[0], t[1]))
+    app._pages.sort(key=lambda r: (r.path, r.title))
 
 
 def register_streamlit_page(
-    app: FluxLit, path: str, *, title: str | None = None
-) -> Callable[[Callable[..., None]], Callable[..., None]]:
+    app: FluxLitApp,
+    path: str,
+    *,
+    title: str | None = None,
+    icon: str | None = None,
+    tags: Sequence[str] | None = None,
+    page_meta: PageMeta | None = None,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Implementation of :meth:`fluxlit.app.FluxLit.page` (decorator factory)."""
 
-    def decorator(fn: Callable[..., None]) -> Callable[..., None]:
+    def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
+        if app.settings.strict_page_signatures:
+            validate_strict_page_signature(fn)
         default_title = "Page"
         if isinstance(fn, FunctionType):
             default_title = fn.__name__.replace("_", " ").title()
-        app._pages.append((path, title or default_title, fn))
+        desc = _docstring_first_line(fn)
+        tag_tuple = tuple(tags or ())
+        rec = PageRecord(
+            path=path,
+            title=title or default_title,
+            fn=fn,
+            tags=tag_tuple,
+            description=desc,
+            icon=icon,
+            page_meta=page_meta,
+        )
+        app._pages.append(rec)
         return fn
 
     return decorator
+
+
+__all__ = ["discover_streamlit_pages", "register_streamlit_page"]

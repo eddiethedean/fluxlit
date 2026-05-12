@@ -27,6 +27,28 @@ from fluxlit.runtime import run_unified, shutdown_unified_process
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
+pages_cli = typer.Typer(no_args_is_help=True, add_completion=False, help="Streamlit page tooling.")
+
+
+@pages_cli.command("manifest")
+def pages_manifest(
+    target: str | None = typer.Option(
+        None,
+        "--target",
+        help="module:attr (default: project target from fluxlit.toml or app:app).",
+    ),
+) -> None:
+    """Print a JSON page manifest for the resolved FluxLit app (experimental schema)."""
+    pc = load_project_config()
+    resolved = resolve_target(target, pc)
+    from fluxlit.runtime import load_fluxlit
+
+    fl = load_fluxlit(resolved)
+    typer.echo(json.dumps(fl.build_page_manifest(), indent=2))
+
+
+app.add_typer(pages_cli, name="pages")
+
 CheckStatus = Literal["PASS", "WARN", "FAIL"]
 
 
@@ -47,7 +69,7 @@ def _dockerfile_body(target: str) -> str:
         f"# python:3.12-slim @ {_py_slim_digest}\n"
         f"FROM python@{_py_slim_digest}\n"
         "WORKDIR /app\n"
-        'RUN pip install --no-cache-dir "fluxlit>=0.8,<0.9"\n'
+        'RUN pip install --no-cache-dir "fluxlit>=0.9,<1.0"\n'
         "COPY . .\n"
         "RUN useradd --create-home --uid 1000 appuser \\\n"
         "    && chown -R appuser:appuser /app\n"

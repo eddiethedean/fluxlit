@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
@@ -108,7 +109,7 @@ class FluxLitTestClient:
     and :func:`apptest_select_page` mirror the same behavior.
     """
 
-    app: FluxLit
+    app: FluxLit[Any]
     api_prefix: str = "/api"
     root_mount: str = ""
 
@@ -197,6 +198,7 @@ class FluxLitTestClient:
         internal_api_base: str | None = None,
         extra_sys_path: str | Path | None = None,
         query_params: dict[str, str] | None = None,
+        page_overrides: dict[str, Any] | None = None,
     ) -> Any:
         """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit.main`.
 
@@ -211,6 +213,8 @@ class FluxLitTestClient:
             extra_sys_path: Optional directory prepended to ``sys.path`` (e.g. project root).
             query_params: Optional initial query string values (same as assigning to
                 ``AppTest.query_params`` before the first ``run()``).
+            page_overrides: Optional JSON-serializable map merged into handler dependency
+                injection (via ``FLUXLIT_TEST_PAGE_OVERRIDES``) for ``Header`` / test doubles.
 
         Returns:
             The result of ``AppTest.from_file(...).run()`` (Streamlit type).
@@ -225,15 +229,17 @@ class FluxLitTestClient:
         entry = streamlit_main_path()
         internal = internal_api_base or f"http://127.0.0.1:1{self._normalized_api_prefix()}"
 
+        env: dict[str, str] = {
+            "FLUXLIT_APP": target,
+            "FLUXLIT_INTERNAL_API_BASE": internal,
+            "FLUXLIT_API_PREFIX": normalize_api_mount_path(self.api_prefix),
+            "FLUXLIT_TESTS": "1",
+        }
+        if page_overrides is not None:
+            env["FLUXLIT_TEST_PAGE_OVERRIDES"] = json.dumps(page_overrides)
+
         with (
-            _patched_env(
-                {
-                    "FLUXLIT_APP": target,
-                    "FLUXLIT_INTERNAL_API_BASE": internal,
-                    "FLUXLIT_API_PREFIX": normalize_api_mount_path(self.api_prefix),
-                    "FLUXLIT_TESTS": "1",
-                }
-            ),
+            _patched_env(env),
             _maybe_syspath(extra_sys_path),
         ):
             at = AppTest.from_file(str(entry))

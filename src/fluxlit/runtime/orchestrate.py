@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from starlette.types import ASGIApp
 
@@ -22,7 +22,9 @@ from fluxlit.runtime.streamlit_proc import _build_streamlit_cmd, _build_streamli
 from fluxlit.runtime.upstream_state import read_streamlit_upstream_url
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit as FluxLitType
+    from fluxlit.app import FluxLit
+
+    FluxLitType: TypeAlias = FluxLit[Any]
 
 _STREAMLIT_MAIN = Path(__file__).resolve().parent.parent / "streamlit" / "main.py"
 

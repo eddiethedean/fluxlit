@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, Generic, TypeVar, cast
 
 from fastapi import APIRouter, FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
+from typing_extensions import Self
 
 from fluxlit.application.api_bootstrap import wire_fluxlit_api
 from fluxlit.application.auth_attachment import AuthAttachment
@@ -16,10 +17,16 @@ from fluxlit.auth.jwt import JWTBearer
 from fluxlit.auth.oidc import GenericOIDCClient
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings, JsonValue
+from fluxlit.pages.meta import PageMeta
+from fluxlit.pages.navigation import NavigationModel
+from fluxlit.pages.records import PageRecord
 from fluxlit.runtime.debug_settings import merge_debug_settings
+from fluxlit.url_session import SessionStore
+
+SettingsT = TypeVar("SettingsT", bound=FluxlitSettings)
 
 
-class FluxLit:
+class FluxLit(Generic[SettingsT]):
     """Combine a FastAPI application and registered Streamlit pages in one object.
 
     Use :attr:`api` for HTTP routes, dependencies, and OpenAPI (mounted under
@@ -54,6 +61,8 @@ class FluxLit:
         streamlit_page_config: Optional keys merged into
             :attr:`~fluxlit.config.FluxlitSettings.streamlit_page_config` for
             :func:`streamlit.set_page_config` in the Streamlit process.
+        session_store: Optional :class:`~fluxlit.url_session.SessionStore` for
+            :class:`~fluxlit.url_session.SessionStore`-annotated page parameters.
     """
 
     def __init__(
@@ -65,10 +74,11 @@ class FluxLit:
         fastapi_kwargs: dict[str, Any] | None = None,
         streamlit_run_args: Sequence[str] | None = None,
         streamlit_page_config: dict[str, JsonValue] | None = None,
+        session_store: SessionStore | None = None,
     ) -> None:
         self.import_target = import_target.strip() if import_target else None
         self._unified_asgi_cache: ASGIApp | None = None
-        self.settings = settings or FluxlitSettings()
+        self.settings = cast(SettingsT, settings or FluxlitSettings())
         if title is not None:
             self.settings.title = title
 
@@ -85,7 +95,7 @@ class FluxLit:
         if settings_updates:
             self.settings = self.settings.model_copy(update=settings_updates)
 
-        self.settings = merge_debug_settings(self.settings)
+        self.settings = cast(SettingsT, merge_debug_settings(self.settings))
 
         fa_kwargs: dict[str, Any] = dict(fastapi_kwargs or {})
         # Always align with FluxlitSettings so the gateway and Streamlit baseUrlPath match.
@@ -93,7 +103,9 @@ class FluxLit:
         fa_kwargs["root_path"] = self.settings.public_mount_path()
 
         self.api = FastAPI(**fa_kwargs)
-        self._pages: list[tuple[str, str, Callable[..., None]]] = []
+        self._pages: list[PageRecord] = []
+        self.session_store = session_store
+        self._navigation_model: NavigationModel | None = None
         self._oidc_bff_attached: bool = False
         self._auth = AuthAttachment(self)
         self._urls = FluxLitPublicUrls(self)
@@ -125,7 +137,7 @@ class FluxLit:
         """ASGI entrypoint: run ``uvicorn main:app`` like a normal FastAPI app."""
         await self._unified_asgi()(scope, receive, send)
 
-    def discover_pages(self, directory: str, *, package: str) -> FluxLit:
+    def discover_pages(self, directory: str, *, package: str) -> Self:
         """Load Streamlit page modules and call ``register(self)`` on each.
 
         Imports the subpackage ``{package}.{directory}``, then every submodule
@@ -153,24 +165,47 @@ class FluxLit:
         discover_streamlit_pages(self, directory, package=package)
         return self
 
+    def navigation(self, model: NavigationModel) -> Self:
+        """Set optional sidebar ordering for registered pages (by URL path)."""
+        self._navigation_model = model
+        return self
+
     def page(
-        self, path: str, *, title: str | None = None
-    ) -> Callable[[Callable[..., None]], Callable[..., None]]:
+        self,
+        path: str,
+        *,
+        title: str | None = None,
+        icon: str | None = None,
+        tags: Sequence[str] | None = None,
+        page_meta: PageMeta | None = None,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Decorator registering a Streamlit page at a URL path.
 
         The decorated callable should accept ``(st, client)`` where ``st`` is the
         Streamlit module and ``client`` is an :class:`~fluxlit.client.ApiClient` for
-        your mounted API.
+        your mounted API. Additional parameters may be injected (see
+        ``docs/streamlit-pages-typing.md``).
 
         Args:
             path: URL path segment for Streamlit (e.g. ``"/"``, ``"/reports"``).
             title: Sidebar / navigation title; defaults from the function name.
+            icon: Optional icon for :class:`streamlit.navigation` / ``st.Page``.
+            tags: Optional tags for manifests and tooling.
+            page_meta: Static :class:`~fluxlit.pages.meta.PageMeta` merged into ``st.Page``
+                where Streamlit supports it (e.g. ``page_icon`` as icon).
 
         Returns:
             Decorator that registers the function and returns it unchanged.
         """
 
-        return register_streamlit_page(self, path, title=title)
+        return register_streamlit_page(
+            self,
+            path,
+            title=title,
+            icon=icon,
+            tags=tags,
+            page_meta=page_meta,
+        )
 
     @property
     def urls(self) -> FluxLitPublicUrls:
@@ -220,6 +255,17 @@ class FluxLit:
         )
 
     @property
-    def pages(self) -> list[tuple[str, str, Callable[..., None]]]:
-        """``(path, title, handler)`` tuples for registered Streamlit pages."""
+    def pages(self) -> list[tuple[str, str, Callable[..., Any]]]:
+        """``(path, title, handler)`` tuples (backward compatible)."""
+        return [(r.path, r.title, r.fn) for r in self._pages]
+
+    @property
+    def page_records(self) -> list[PageRecord]:
+        """Full :class:`~fluxlit.pages.records.PageRecord` entries including tags and metadata."""
         return list(self._pages)
+
+    def build_page_manifest(self, *, version: int = 1) -> dict[str, Any]:
+        """JSON page manifest; see :func:`fluxlit.pages.manifest.build_page_manifest`."""
+        from fluxlit.pages.manifest import build_page_manifest
+
+        return build_page_manifest(self, version=version)

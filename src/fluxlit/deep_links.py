@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from fluxlit.pages.records import PageRecord
+
 
 def _scalar_query_value(raw: Any) -> str | None:
     if raw is None:
@@ -53,7 +55,7 @@ def _url_path_slug(path: str) -> str:
 
 def match_nav_page(
     params: Mapping[str, str],
-    pages: Sequence[tuple[str, str] | tuple[str, str, Any]],
+    pages: Sequence[tuple[str, str] | tuple[str, str, Any] | Any],
     *,
     page_key: str = "page",
 ) -> tuple[str, str] | None:
@@ -70,7 +72,13 @@ def match_nav_page(
     if not wanted:
         return None
     for row in pages:
-        path, title = row[0], row[1]
+        if isinstance(row, PageRecord):
+            path, title = row.path, row.title
+        elif hasattr(row, "path") and hasattr(row, "title"):
+            path = str(getattr(row, "path"))
+            title = str(getattr(row, "title"))
+        else:
+            path, title = row[0], row[1]
         slug = _url_path_slug(path)
         if wanted == title or wanted == path or wanted == slug:
             return (path, title)

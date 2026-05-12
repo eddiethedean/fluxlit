@@ -23,8 +23,11 @@ from typing import Any, cast
 import streamlit as st
 
 from fluxlit.deep_links import match_nav_page, query_params
+from fluxlit.pages.records import PageRecord
 from fluxlit.runtime import load_fluxlit
+from fluxlit.streamlit.nav_order import navigation_sort_key
 from fluxlit.streamlit.page_config import build_set_page_config_kwargs
+from fluxlit.streamlit.page_runner import run_page_record
 
 
 def run_streamlit_entrypoint() -> None:
@@ -44,26 +47,42 @@ def run_streamlit_entrypoint() -> None:
         )
     )
     client = fluxlit_app.get_client()
+    nav_model = getattr(fluxlit_app, "_navigation_model", None)
+    records = list(fluxlit_app.page_records)
+    if nav_model is not None and nav_model.order:
+        records = sorted(
+            records,
+            key=lambda r: navigation_sort_key(nav_model, r),
+        )
 
     def _bind_page(
-        fn: Callable[[Any, Any], None],
+        rec: PageRecord,
         st_mod: Any,
         page_client: Any,
     ) -> Callable[[], None]:
-        """Wrap a ``(st, client)`` page function as a zero-arg callable for Streamlit."""
+        """Wrap a page record as a zero-arg callable for Streamlit."""
 
         def inner() -> None:
-            fn(st_mod, page_client)
+            run_page_record(rec, st_mod, page_client, fluxlit_app, None)
 
         return inner
 
     nav_pages = []
-    for path, title, fn in fluxlit_app.pages:
+    for rec in records:
+        slug = rec.path.strip("/") or "home"
+        icon = rec.icon or (
+            rec.page_meta.page_icon if rec.page_meta and rec.page_meta.page_icon else None
+        )
+        page_kw: dict[str, Any] = {
+            "title": rec.title,
+            "url_path": slug,
+        }
+        if icon:
+            page_kw["icon"] = icon
         nav_pages.append(
             st.Page(
-                _bind_page(fn, st, client),
-                title=title,
-                url_path=path.strip("/") or "home",
+                _bind_page(rec, st, client),
+                **page_kw,
             )
         )
 

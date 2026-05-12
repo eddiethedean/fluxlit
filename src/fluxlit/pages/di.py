@@ -1,0 +1,251 @@
+"""FastAPI-style dependency markers and resolution for Streamlit page handlers."""
+
+from __future__ import annotations
+
+import contextvars
+import inspect
+import json
+import os
+from collections.abc import Callable, Mapping
+from typing import Annotated, Any, ForwardRef, get_args, get_origin, get_type_hints
+
+from fluxlit.client import ApiClient
+from fluxlit.config import FluxlitSettings
+from fluxlit.url_session import SessionStore
+
+_header_context: contextvars.ContextVar[Mapping[str, str] | None] = contextvars.ContextVar(
+    "fluxlit_page_headers",
+    default=None,
+)
+
+
+_HeaderCtxToken = contextvars.Token[Mapping[str, str] | None]
+
+
+def set_page_header_context(headers: Mapping[str, str] | None) -> _HeaderCtxToken:
+    """Set optional header map for :class:`Header` injection (tests or future gateway hook)."""
+    return _header_context.set(headers)
+
+
+def reset_page_header_context(token: _HeaderCtxToken) -> None:
+    _header_context.reset(token)
+
+
+class Depends:
+    """Declare a page dependency callable ``( -> T)`` resolved before the handler runs."""
+
+    def __init__(
+        self,
+        dependency: Callable[..., Any] | None = None,
+        *,
+        use_cache: bool = True,
+    ) -> None:
+        self.dependency = dependency
+        self.use_cache = use_cache
+
+
+class Header:
+    """Inject a header value by name (from :func:`set_page_header_context` or *overrides*)."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name.lower()
+
+
+class Cookie:
+    """Reserved for future cookie-based injection (same resolution path as :class:`Header`)."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name.lower()
+
+
+def env_page_overrides() -> dict[str, Any]:
+    """Parse ``FLUXLIT_TEST_PAGE_OVERRIDES`` JSON (used by tests to inject deps)."""
+    raw = os.environ.get("FLUXLIT_TEST_PAGE_OVERRIDES", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    return dict(data) if isinstance(data, dict) else {}
+
+
+def _strip_annotated(tp: Any) -> Any:
+    origin = get_origin(tp)
+    if origin is Annotated:
+        return get_args(tp)[0]
+    return tp
+
+
+def _unwrap_depends(param: inspect.Parameter, hints: dict[str, Any], name: str) -> Depends | None:
+    ann = hints.get(name, param.annotation)
+    if ann is inspect.Parameter.empty:
+        ann = Any
+    origin = get_origin(ann)
+    if origin is Annotated:
+        for meta in get_args(ann)[1:]:
+            if isinstance(meta, Depends):
+                return meta
+    if isinstance(param.default, Depends):
+        return param.default
+    return None
+
+
+def _unwrap_header(param: inspect.Parameter, hints: dict[str, Any], name: str) -> Header | None:
+    ann = hints.get(name, param.annotation)
+    origin = get_origin(ann)
+    if origin is Annotated:
+        for meta in get_args(ann)[1:]:
+            if isinstance(meta, Header):
+                return meta
+    return None
+
+
+def _unwrap_cookie(param: inspect.Parameter, hints: dict[str, Any], name: str) -> Cookie | None:
+    ann = hints.get(name, param.annotation)
+    origin = get_origin(ann)
+    if origin is Annotated:
+        for meta in get_args(ann)[1:]:
+            if isinstance(meta, Cookie):
+                return meta
+    return None
+
+
+def _call_kw_for_fn(fn: Callable[..., Any], kw: dict[str, Any]) -> dict[str, Any]:
+    sig = inspect.signature(fn)
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()):
+        return dict(kw)
+    return {k: v for k, v in kw.items() if k in sig.parameters}
+
+
+def resolve_page_kwargs(
+    fn: Callable[..., Any],
+    *,
+    st: Any,
+    client: ApiClient,
+    app: Any,
+    overrides: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build kwargs for *fn* (``st``, ``client``, typed injections, ``Depends``)."""
+    from fluxlit.application.public_urls import FluxLitPublicUrls
+
+    merged = {**env_page_overrides(), **dict(overrides or {})}
+    sig = inspect.signature(fn)
+    globalns = getattr(fn, "__globals__", None) or {}
+    hints = get_type_hints(fn, globalns=globalns, include_extras=True)
+    kwargs: dict[str, Any] = {}
+    for name, param in sig.parameters.items():
+        dep = _unwrap_depends(param, hints, name)
+        if dep is not None and dep.dependency is not None:
+            kwargs[name] = dep.dependency()
+            continue
+        hdr = _unwrap_header(param, hints, name)
+        if hdr is not None:
+            if name in merged:
+                kwargs[name] = merged[name]
+            else:
+                ctx = _header_context.get() or {}
+                kwargs[name] = ctx.get(hdr.name)
+            continue
+        ck = _unwrap_cookie(param, hints, name)
+        if ck is not None:
+            kwargs[name] = merged.get(name)
+            continue
+        if name == "st":
+            kwargs[name] = st
+            continue
+        if name == "client":
+            kwargs[name] = client
+            continue
+        ann = hints.get(name, param.annotation)
+        base = _strip_annotated(ann)
+        if base is inspect.Parameter.empty:
+            base = Any  # pragma: no cover
+        if isinstance(base, ForwardRef):  # pragma: no cover
+            base = base._evaluate(globalns, globalns, frozenset())  # noqa: SLF001
+        if base is Any:  # pragma: no cover
+            continue
+        try:
+            if issubclass(base, FluxlitSettings):
+                kwargs[name] = app.settings
+                continue
+        except TypeError:
+            pass
+        try:
+            if issubclass(base, FluxLitPublicUrls):
+                kwargs[name] = app.urls
+                continue
+        except TypeError:
+            pass
+        try:
+            from fluxlit.app import FluxLit as FluxLitCls
+
+            if issubclass(base, FluxLitCls):
+                kwargs[name] = app
+                continue
+        except TypeError:
+            pass
+        if base is ApiClient or (isinstance(base, type) and issubclass(base, ApiClient)):
+            kwargs[name] = client
+            continue
+        store = getattr(app, "session_store", None)
+        if store is not None and base is SessionStore:
+            kwargs[name] = store
+            continue
+        from fluxlit.pages.flags import FluxlitFeatureFlags
+
+        if base is FluxlitFeatureFlags:
+            kwargs[name] = FluxlitFeatureFlags.from_environ()
+            continue
+    return kwargs
+
+
+def resolve_and_call_page(
+    rec: Any,
+    st: Any,
+    client: ApiClient,
+    app: Any,
+    overrides: Mapping[str, Any] | None,
+) -> Any:
+    """Resolve kwargs, call handler, apply returned :class:`~fluxlit.pages.meta.PageMeta`."""
+    from fluxlit.pages.apply_meta import apply_returned_page_meta, coerce_page_return
+    from fluxlit.pages.flags import FluxlitFeatureFlags
+    from fluxlit.pages.records import PageRecord
+
+    if not isinstance(rec, PageRecord):
+        msg = "resolve_and_call_page expects PageRecord"
+        raise TypeError(msg)
+    merged_overrides: dict[str, Any] = {**env_page_overrides(), **dict(overrides or {})}
+    kw = resolve_page_kwargs(rec.fn, st=st, client=client, app=app, overrides=merged_overrides)
+    call_kw = _call_kw_for_fn(rec.fn, kw)
+    fn = rec.fn
+    flags = FluxlitFeatureFlags.from_environ()
+    if flags.experimental_yield_pages and inspect.isgeneratorfunction(fn):
+        gen = fn(**call_kw)
+        try:
+            first = next(gen)
+        except StopIteration:
+            return None
+        apply_returned_page_meta(st, coerce_page_return(st, first))
+        try:
+            second = next(gen)
+        except StopIteration:
+            return first
+        apply_returned_page_meta(st, coerce_page_return(st, second))
+        return second
+    out = fn(**call_kw)
+    meta = coerce_page_return(st, out)
+    apply_returned_page_meta(st, meta)
+    return out
+
+
+__all__ = [
+    "Cookie",
+    "Depends",
+    "Header",
+    "env_page_overrides",
+    "reset_page_header_context",
+    "resolve_and_call_page",
+    "resolve_page_kwargs",
+    "set_page_header_context",
+]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 from urllib.parse import urlparse
 
 from fluxlit.api_mount import normalize_api_mount_path
@@ -11,7 +11,9 @@ from fluxlit.config.project import ProjectConfig
 from fluxlit.runtime.import_target import internal_api_base_url
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit as FluxLitType
+    from fluxlit.app import FluxLit
+
+    FluxLitType: TypeAlias = FluxLit[Any]
 
 _SENSITIVE_FIELDS = frozenset(
     {

@@ -268,6 +268,14 @@ class FluxlitSettings(BaseSettings):
             "FLUXLIT_PUBLIC_BASE_URL are both set to different values."
         ),
     )
+    strict_page_signatures: bool = Field(
+        default=False,
+        description=(
+            "If True, :meth:`fluxlit.app.FluxLit.page` rejects Streamlit handlers whose "
+            "parameters are not recognized injectables (``st``, ``client``, typed deps, "
+            "``Depends``, etc.)."
+        ),
+    )
     jwt_issuer: str = Field(
         default="",
         description=(

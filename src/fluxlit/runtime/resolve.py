@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit as FluxLitType
+    from fluxlit.app import FluxLit
+
+    FluxLitType: TypeAlias = FluxLit[Any]
 
 
 def resolve_import_target_for_unified(fl: FluxLitType) -> str:

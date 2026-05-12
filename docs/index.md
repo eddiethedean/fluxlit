@@ -22,6 +22,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Deep links, query params, and invite-style URLs to Streamlit | {doc}`deep-links` |
 | Test API routes, Streamlit pages, multipage nav, and query params in Pytest | {doc}`testing` |
 | Call the FastAPI app from Streamlit pages (`client`, bearer, errors) | {doc}`streamlit-api-client` |
+| FastAPI-style typing, ``Depends``, query models, manifests | {doc}`streamlit-pages-typing` |
 | Fix imports, 503 readiness, WebSockets, or wrong API paths | {doc}`troubleshooting` · `fluxlit doctor` |
 | Browse API reference, support policy, or release history | {doc}`api/index` · {doc}`support-matrix` · {doc}`changelog` |
 
@@ -59,6 +60,7 @@ url-session
 url-session-token-security
 deep-links
 streamlit-api-client
+streamlit-pages-typing
 migration-auth
 auth-recipes
 troubleshooting

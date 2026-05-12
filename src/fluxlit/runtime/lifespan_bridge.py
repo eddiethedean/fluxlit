@@ -6,7 +6,7 @@ import asyncio
 import subprocess
 import sys
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -16,7 +16,9 @@ from fluxlit.runtime.streamlit_proc import _StreamlitPopenKwargs, _terminate_pro
 from fluxlit.runtime.wait_tcp import _invoke_wait_for_tcp
 
 if TYPE_CHECKING:
-    from fluxlit.app import FluxLit as FluxLitType
+    from fluxlit.app import FluxLit
+
+    FluxLitType: TypeAlias = FluxLit[Any]
 
 
 def build_unified_fluxlit_asgi_app(

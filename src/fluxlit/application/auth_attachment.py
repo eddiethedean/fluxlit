@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from fastapi import APIRouter
 
@@ -12,11 +12,13 @@ from fluxlit.auth.oidc import GenericOIDCClient, OIDCBFFConfig, register_oidc_bf
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit
 
+    FluxLitApp: TypeAlias = FluxLit[Any]
+
 
 class AuthAttachment:
     """Collaborator for JWT and OIDC routes on the host :class:`~fluxlit.app.FluxLit`."""
 
-    def __init__(self, app: FluxLit) -> None:
+    def __init__(self, app: FluxLitApp) -> None:
         self._fluxlit = app
 
     def make_jwt_bearer(self) -> JWTBearer:

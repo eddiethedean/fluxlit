@@ -41,6 +41,17 @@ from fluxlit.auth.streamlit import (
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
 from fluxlit.deep_links import match_nav_page, query_params
+from fluxlit.pages import (
+    Cookie,
+    Depends,
+    Header,
+    NavigationModel,
+    Page,
+    PageMeta,
+    Query,
+    SessionModel,
+    parse_query_params,
+)
 from fluxlit.testing import (
     FluxLitTestClient,
     apptest_assert_no_errors,
@@ -54,12 +65,21 @@ from fluxlit.url_session import (
     SessionStore,
     ensure_url_session,
     hydrate_url_session,
+    hydrate_url_session_typed,
     new_session_id,
     persist_url_session,
 )
 
 __all__ = [
     "ApiClient",
+    "Cookie",
+    "Depends",
+    "Header",
+    "NavigationModel",
+    "Page",
+    "PageMeta",
+    "Query",
+    "SessionModel",
     "FluxLitTestClient",
     "apptest_assert_no_errors",
     "apptest_select_page",
@@ -85,9 +105,11 @@ __all__ = [
     "SessionStore",
     "InMemorySessionStore",
     "match_nav_page",
+    "parse_query_params",
     "new_session_id",
     "ensure_url_session",
     "hydrate_url_session",
+    "hydrate_url_session_typed",
     "persist_url_session",
     "query_params",
     "reset_trace_hook",
@@ -96,4 +118,4 @@ __all__ = [
     "trace_span",
     "__version__",
 ]
-__version__ = "0.8.1"
+__version__ = "0.9.0"

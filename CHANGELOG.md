@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.9.0 - 2026-05-12
+
+- **Streamlit pages (0.9):** :class:`~fluxlit.pages.records.PageRecord` registry with :attr:`~fluxlit.app.FluxLit.page_records`; :meth:`~fluxlit.app.FluxLit.page` accepts ``icon``, ``tags``, and static ``page_meta``; handlers may return :class:`~fluxlit.pages.meta.PageMeta` for breadcrumbs and similar post-run UI. :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, and :class:`~fluxlit.pages.di.Cookie` resolve extra parameters beside ``(st, client)`` (see {doc}`streamlit-pages-typing`). Optional :class:`~fluxlit.url_session.SessionStore` on :class:`~fluxlit.app.FluxLit` enables ``SessionStore`` injection.
+- **Navigation:** :meth:`~fluxlit.app.FluxLit.navigation` with :class:`~fluxlit.pages.navigation.NavigationModel` orders multipage sidebar entries by path.
+- **Query / session:** :func:`~fluxlit.pages.query.parse_query_params`, :class:`~fluxlit.pages.query.Query`, :class:`~fluxlit.pages.session_state.SessionModel`, and :func:`~fluxlit.url_session.hydrate_url_session_typed` for typed URL/session payloads.
+- **Manifest:** :meth:`~fluxlit.app.FluxLit.build_page_manifest` and ``fluxlit pages manifest`` (experimental ``manifest_version`` **1**). :class:`~fluxlit.config.FluxlitSettings` adds ``strict_page_signatures`` for registration-time handler checks.
+- **Testing:** :meth:`~fluxlit.testing.FluxLitTestClient.streamlit` accepts ``page_overrides`` (JSON via ``FLUXLIT_TEST_PAGE_OVERRIDES``) for dependency injection in AppTest.
+- **Feature flags:** :class:`~fluxlit.pages.flags.FluxlitFeatureFlags` reads ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES``; when enabled, generator handlers run **two** ``next()`` steps in one script run (experimental).
+- **Typing:** :class:`~fluxlit.app.FluxLit` is a :class:`typing.Generic` over settings type for static checkers; :class:`~fluxlit.streamlit.page.PageFn` allows optional :class:`~fluxlit.pages.meta.PageMeta` returns.
+- **CLI / packaging:** ``fluxlit pages`` subgroup; ``fluxlit build`` Dockerfile pin updated to ``fluxlit>=0.9,<1.0``.
+
+**Upgrading from 0.8.x:** Bump pins to ``fluxlit>=0.9,<1.0``. :attr:`~fluxlit.app.FluxLit.pages` remains ``(path, title, handler)`` tuples. Opt into ``strict_page_signatures``, manifest, and DI markers as needed; see {doc}`streamlit-pages-typing`.
+
 ## 0.8.1 - 2026-05-12
 
 - **Gateway / settings:** ``normalize_api_mount_path`` in ``fluxlit.api_mount`` aligns gateway dispatch with ``internal_api_base_url`` and ``FluxLitPublicUrls`` when ``api_mount_path`` / ``FLUXLIT_API_MOUNT_PATH`` omits a leading slash (e.g. ``api`` → ``/api``); :class:`~fluxlit.config.FluxlitSettings` validates ``api_mount_path``; ``create_gateway_app`` normalizes ``FLUXLIT_API_PREFIX`` the same way.

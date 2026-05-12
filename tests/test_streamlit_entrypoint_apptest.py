@@ -87,7 +87,7 @@ def test_streamlit_entrypoint_bound_page_invokes_registered_function(
     fake_st.CALLED = called
 
     class Page:
-        def __init__(self, fn, *, title: str, url_path: str) -> None:
+        def __init__(self, fn, *, title: str, url_path: str, **kwargs: object) -> None:
             self.fn = fn
             self.title = title
             self.url_path = url_path

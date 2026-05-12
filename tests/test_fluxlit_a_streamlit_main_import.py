@@ -44,6 +44,11 @@ def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
 
     st.error = error
     st.stop = stop
+    st.switch_page = mock.Mock()
+    st.query_params = {}
+    sb = types.SimpleNamespace()
+    sb.caption = mock.Mock()
+    st.sidebar = sb
 
     sys.modules["streamlit"] = st
     try:
@@ -113,7 +118,7 @@ def test_streamlit_main_with_pages_runs_navigation(
             self.pages[0].fn()
 
     fake_streamlit.Page = mock.Mock(
-        side_effect=lambda fn, **kwargs: types.SimpleNamespace(fn=fn, kwargs=kwargs)
+        side_effect=lambda fn, **kwargs: types.SimpleNamespace(fn=fn, **kwargs)
     )
     fake_streamlit.navigation = mock.Mock(side_effect=lambda pages: Navigation(pages))
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -160,6 +165,7 @@ def test_streamlit_main_query_page_triggers_switch_page(
             fn=fn,
             title=kwargs.get("title"),
             url_path=kwargs.get("url_path"),
+            icon=kwargs.get("icon"),
         )
     )
     fake_streamlit.navigation = mock.Mock(side_effect=lambda pages: Navigation(pages))

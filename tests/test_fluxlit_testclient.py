@@ -139,6 +139,29 @@ def test_fluxlit_testclient_streamlit_query_params(
     assert at.text_input(key="tkey").value == "from-query"
 
 
+def test_fluxlit_testclient_streamlit_page_overrides(
+    tmp_path: Path,
+    requires_streamlit_apptest,
+) -> None:
+    module_path = tmp_path / "ov_tc_app.py"
+    module_path.write_text(
+        "from typing import Annotated\n"
+        "from fluxlit import FluxLit, Header\n\n"
+        "app = FluxLit(title='OV App')\n\n"
+        "@app.page('/')\n"
+        "def home(st, client, h: Annotated[str | None, Header('x-override')]):\n"
+        "    st.title(h or 'none')\n",
+        encoding="utf-8",
+    )
+    fl = FluxLit(title="x")
+    at = FluxLitTestClient(fl).streamlit(
+        target="ov_tc_app:app",
+        extra_sys_path=tmp_path,
+        page_overrides={"h": "injected"},
+    )
+    assert at.title and at.title[0].value == "injected"
+
+
 def test_fluxlit_testclient_custom_api_prefix() -> None:
     fl = FluxLit(title="T")
 
