@@ -50,7 +50,13 @@ token = params.get("token", "")
 
 When you send users to the app root with a **page title** or path segment in the
 query string, {func}`fluxlit.match_nav_page` resolves it against
-{attr}`~fluxlit.app.FluxLit.pages` (``path``, ``title``, handler):
+{attr}`~fluxlit.app.FluxLit.pages` (``path``, ``title``, handler). The unified
+Streamlit entrypoint (:mod:`fluxlit.streamlit.main`) applies this automatically **before**
+:func:`streamlit.navigation`, so ``?page=`` opens the matching registered page (same
+behavior you can exercise with :meth:`fluxlit.testing.FluxLitTestClient.streamlit`).
+
+You can still call {func}`fluxlit.match_nav_page` yourself when you need custom logic
+beyond navigation:
 
 ```python
 from fluxlit import match_nav_page, query_params

@@ -23,5 +23,23 @@ def test_home(monkeypatch):
     assert at.title and at.title[0].value == "Home Page"
 ```
 
+With :class:`~fluxlit.testing.FluxLitTestClient` you can seed ``query_params`` and use
+``select_page`` without hand-rolling ``FLUXLIT_*`` env for each ``run()``:
+
+```python
+from fluxlit import FluxLit, FluxLitTestClient
+
+
+def test_admin_page(tmp_path):
+    tc = FluxLitTestClient(FluxLit())
+    at = tc.streamlit(
+        target="examples.multipage_apptest.app:app",
+        extra_sys_path="<repository root>",
+        query_params={"page": "Admin"},
+    )
+    assert at.title[0].value == "Admin Page"
+    tc.assert_no_streamlit_exception(at)
+```
+
 Keep multipage AppTest checks thin: assert that each important page can render, then
 cover table mutations and navigation-heavy flows with API tests or browser E2E.
