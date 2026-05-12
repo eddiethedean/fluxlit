@@ -1352,10 +1352,35 @@ def test_build_gateway_creates_upstream_semaphore() -> None:
     assert client.get("/anything").status_code == 502
 
 
-def test_build_gateway_prometheus_metrics_endpoint() -> None:
+def test_build_gateway_prometheus_metrics_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip("prometheus_client")
+    import importlib
+
+    pc = importlib.import_module("prometheus_client")
+    monkeypatch.setattr(pc, "CONTENT_TYPE_LATEST", "text/plain; version=0.0.4")
     from fluxlit.config import FluxlitSettings
 
+    settings = FluxlitSettings(enable_gateway_prometheus_metrics=True)
+    gw = build_gateway(
+        FastAPI(),
+        "http://127.0.0.1:9",
+        api_prefix="/api",
+        proxy_settings=settings,
+    )
+    client = TestClient(gw)
+    r = client.get("/__fluxlit/metrics")
+    assert r.status_code == 200
+    assert "fluxlit_gateway_requests_total" in r.text
+
+
+def test_build_gateway_prometheus_metrics_endpoint_bytes_content_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("prometheus_client")
+    import importlib
+
+    pc = importlib.import_module("prometheus_client")
+    monkeypatch.setattr(pc, "CONTENT_TYPE_LATEST", b"text/plain; version=0.0.4")
     settings = FluxlitSettings(enable_gateway_prometheus_metrics=True)
     gw = build_gateway(
         FastAPI(),

@@ -41,6 +41,7 @@ The working directory should be the project root so Python can import the module
 | `fluxlit dev [target]` | Development: Streamlit subprocess + gateway. See reload options below. |
 | `fluxlit run [target]` | Production-style: same stack, **no** Uvicorn reload. |
 | `fluxlit doctor [target]` | Static diagnostics (imports, bind, env). See **Doctor** below. |
+| `fluxlit config [target]` | Effective resolved settings (redacted), binding, and warnings; **`--json`**, **`--strict`**. |
 | `fluxlit build [target]` | Writes `Dockerfile` + `.dockerignore`; refuses to overwrite without **`--force`**. |
 | `fluxlit new <name>` | Creates `<name>/app.py`; use `--profile minimal`, `auth-ready`, or `deploy`. |
 | `fluxlit shutdown` | Stops a running `dev` / `run` using the PID file (see below). |

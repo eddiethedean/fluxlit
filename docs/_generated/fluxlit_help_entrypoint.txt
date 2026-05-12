@@ -12,6 +12,8 @@
 │ run       Run the unified stack for production-style use (no Uvicorn         │
 │           reload).                                                           │
 │ doctor    Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).       │
+│ config    Print effective FluxLit configuration after precedence rules (env, │
+│           project file, app).                                                │
 │ build     Emit a minimal ``Dockerfile`` and ``.dockerignore`` for container  │
 │           deployment.                                                        │
 │ new       Create ``<name>/app.py`` with a sample API route and Streamlit     │
