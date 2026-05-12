@@ -4,7 +4,8 @@ FluxLit serves the **Streamlit shell** on the public app base (respecting
 `FLUXLIT_ROOT_PATH` / `FLUXLIT_STREAMLIT_PUBLIC_PATH`) and the **API** under
 `FLUXLIT_API_MOUNT_PATH` (default `/api`). Email links, invite flows, and
 password-reset entrypoints should point at the **Streamlit** URL with query
-parameters, not at POST-only API routes.
+parameters, not at POST-only API routes. For **security** when those parameters
+carry session or reset tokens, read {doc}`url-session-token-security`.
 
 ## Build links from FastAPI
 

@@ -16,7 +16,7 @@ Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recip
 | Risk | Mitigation direction |
 |------|---------------------|
 | **XSS in Streamlit UI** | Do not store long-lived refresh tokens or IdP client secrets in `st.session_state` or display bearer tokens with `st.write`. Prefer short-lived access tokens minted by your FastAPI “BFF” and server-side `ApiClient` only. |
-| **Token leakage via URL** | OAuth callbacks that put secrets in query strings can leak via Referer, logs, and shared links. FluxLit’s BFF pattern uses a **short-lived one-time `auth_code`** exchanged **server-side** over `POST /auth/exchange` before placing a bearer token in Streamlit session state. |
+| **Token leakage via URL** | OAuth callbacks that put secrets in query strings can leak via Referer, logs, and shared links. FluxLit’s BFF pattern uses a **short-lived one-time `auth_code`** exchanged **server-side** over `POST /auth/exchange` before placing a bearer token in Streamlit session state. For URL-session ids, invite links, and logging expectations, see {doc}`url-session-token-security`. |
 | **CSRF** | If you add **cookie-based** sessions, use SameSite and anti-CSRF patterns; document that Streamlit’s model is not a generic SPA. Prefer bearer tokens from server-side exchange for API calls. |
 | **Spoofed forward-auth headers** | Use {class}`~fluxlit.auth.TrustedProxyUser` only when the network path guarantees clients cannot reach the app with forged `X-Remote-User`-style headers (e.g. app listens on loopback behind nginx that strips identity headers from untrusted clients). |
 | **Clock skew** | JWT `exp` / `nbf` validation is sensitive to time; run NTP on production hosts. `fluxlit doctor` reminds you of this when tightening operations. |

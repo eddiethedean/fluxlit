@@ -49,6 +49,8 @@ environment.
 
 ## Security
 
+**Extended guidance** (URL session vs auth tokens, email links, JWTs in URLs, Referrer-Policy, debug logging): {doc}`url-session-token-security`.
+
 - **HTTPS** in production: the token is effectively a **bearer secret** in the URL (bookmarks, `Referer`, shared links, screenshots).
 - **TTL:** {class}`~fluxlit.url_session.InMemorySessionStore` supports TTL; cap size with `max_entries`.
 - **Logging:** do not log raw tokens at INFO. The gateway structured log field `query` redacts `fluxlit_sid` and your configured `url_session_query_param`.
@@ -116,5 +118,6 @@ Production notes:
 
 ## Related
 
+- {doc}`url-session-token-security` — query tokens, invites, logging, and debug mode.
 - Roadmap **Phase 2 follow-on** in {doc}`roadmap`.
 - Architecture note in `PLAN.md` (“Browser refresh and session continuity”).

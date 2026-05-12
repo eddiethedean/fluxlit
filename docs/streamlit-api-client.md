@@ -82,4 +82,5 @@ Use {class}`~fluxlit.testing.FluxLitTestClient` for gateway-aware API tests, the
 
 - {doc}`troubleshooting` — wrong paths, `FLUXLIT_INTERNAL_API_BASE`, proxy prefixes
 - {doc}`auth-recipes` — OIDC BFF, refresh, `prepare_streamlit_api_client`
+- {doc}`url-session-token-security` — query tokens, email links, and logging
 - {class}`~fluxlit.client.ApiClient` — API reference

@@ -2,7 +2,7 @@
 
 How to keep **credentials and tokens** out of logs, images, and the wrong process—and how to rotate **JWT** and **OIDC** signing material without taking unrelated dependencies offline.
 
-For architecture and token placement, see {doc}`security` and {doc}`auth-recipes`. For gateway and JSON logging, see {doc}`observability`. For TLS and HSTS at the edge, see {doc}`production-tls`.
+For architecture and token placement, see {doc}`security` and {doc}`auth-recipes`. For gateway and JSON logging, see {doc}`observability`. For TLS and HSTS at the edge, see {doc}`production-tls`. For **query-string tokens** (URL sessions, email links, redaction), see {doc}`url-session-token-security`.
 
 ## Principles
 
