@@ -70,7 +70,7 @@ Use **`FLUXLIT_DEBUG=1`** or **`fluxlit dev` / `run` / `workbench --debug`** for
 
 - **`get_client()`** forwards **`X-Request-ID`** to `/api` when debug is on so API logs line up with the browser request (advanced correlation).
 - If **`api_mount_path`** equals **`/__fluxlit/debug`** or is a prefix of it, the debug HTTP route is **disabled** (returns 404) so your API keeps that path.
-- Turn debug off in production unless you intend the extra logs and the snapshot endpoint; treat **`/__fluxlit/debug`** like internal diagnostics (see {doc}`secrets`).
+- Turn debug off in production unless you intend the extra logs and the snapshot endpoint; treat **`/__fluxlit/debug`** like internal diagnostics (see {doc}`secrets` and query-token logging notes in {doc}`url-session-token-security`).
 
 ## Subpath / static assets / WebSockets
 

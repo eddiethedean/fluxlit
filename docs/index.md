@@ -18,7 +18,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Deploy with containers, Kubernetes, platforms, or a reverse proxy | {doc}`deployment` · {doc}`platforms` · {doc}`production-tls` |
 | Operate the app with logs, metrics, probes, and runbooks | {doc}`observability` · {doc}`runbooks` |
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` |
-| Survive full page reload without cookies (URL + server store) | {doc}`url-session` |
+| Survive full page reload without cookies (URL + server store) | {doc}`url-session` · {doc}`url-session-token-security` |
 | Deep links, query params, and invite-style URLs to Streamlit | {doc}`deep-links` |
 | Call the FastAPI app from Streamlit pages (`client`, bearer, errors) | {doc}`streamlit-api-client` |
 | Test API routes and Streamlit pages in Pytest | {doc}`testing` |
@@ -56,6 +56,7 @@ observability
 rate-limiting
 security
 url-session
+url-session-token-security
 deep-links
 streamlit-api-client
 migration-auth
