@@ -1,4 +1,5 @@
-"""Typer CLI: ``fluxlit dev``, ``run``, ``shutdown``, ``doctor``, ``config``, ``build``, ``new``.
+"""Typer CLI: ``fluxlit dev``, ``run``, ``workbench``, ``shutdown``, ``doctor``, ``config``,
+``build``, ``new``.
 
 The ``fluxlit`` setuptools entrypoint calls :func:`main`. Commands resolve defaults from
 :func:`fluxlit.config.load_project_config` and :class:`~fluxlit.config.FluxlitSettings`.
@@ -170,6 +171,57 @@ def _tcp_url_reachable(url: str, *, timeout_s: float = 0.25) -> tuple[bool, str]
         return False, f"{parsed.hostname}:{port} unreachable ({exc})"
 
 
+def _execute_unified_cli(
+    *,
+    target: str | None,
+    host: str | None,
+    port: int | None,
+    log_level: str | None,
+    proxy_headers: bool,
+    forwarded_allow_ips: str | None,
+    pidfile: Path | None,
+    no_pidfile: bool,
+    reload: bool,
+    reload_scope: str,
+    workbench: bool,
+) -> None:
+    """Shared entry for ``fluxlit dev``, ``run``, and ``workbench``."""
+    if reload and reload_scope not in {"gateway", "full"}:
+        typer.echo(
+            "--reload-scope must be 'gateway' or 'full'.",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    from fluxlit.runtime import load_fluxlit
+
+    pc = load_project_config()
+    resolved_target = resolve_target(target, pc)
+    fl = load_fluxlit(resolved_target)
+    host_r, port_r, log_r = resolve_binding(
+        cli_host=host,
+        cli_port=port,
+        cli_log_level=log_level,
+        pc=pc,
+        settings_gateway_host=fl.settings.gateway_host,
+        settings_gateway_port=fl.settings.gateway_port,
+        settings_log_level=fl.settings.log_level,
+    )
+    run_unified(
+        resolved_target,
+        host=host_r,
+        port=port_r,
+        reload=reload,
+        reload_scope=reload_scope,
+        log_level=log_r,
+        proxy_headers=proxy_headers or workbench,
+        forwarded_allow_ips=forwarded_allow_ips,
+        pidfile=pidfile,
+        write_pidfile=not no_pidfile,
+        workbench_mode=workbench,
+    )
+
+
 @app.command()
 def dev(
     target: str | None = typer.Argument(
@@ -207,44 +259,32 @@ def dev(
         "--no-pidfile",
         help="Do not write a PID file (also respect FLUXLIT_NO_PIDFILE=1).",
     ),
+    workbench: bool = typer.Option(
+        False,
+        "--workbench",
+        help=(
+            "Posit Workbench/Connect-style: enable Uvicorn proxy_headers and print a "
+            "loopback browser URL hint (set FLUXLIT_ROOT_PATH when using a subpath)."
+        ),
+    ),
 ) -> None:
     """Run the unified stack for local development (Streamlit subprocess + Uvicorn gateway).
 
     Resolves ``target``, bind address, port, and log level from CLI, project file, and
     :class:`~fluxlit.config.FluxlitSettings`. See :func:`fluxlit.runtime.run_unified`.
     """
-    if reload and reload_scope not in {"gateway", "full"}:
-        typer.echo(
-            "--reload-scope must be 'gateway' or 'full'.",
-            err=True,
-        )
-        raise typer.Exit(code=2)
-
-    from fluxlit.runtime import load_fluxlit
-
-    pc = load_project_config()
-    resolved_target = resolve_target(target, pc)
-    fl = load_fluxlit(resolved_target)
-    host_r, port_r, log_r = resolve_binding(
-        cli_host=host,
-        cli_port=port,
-        cli_log_level=log_level,
-        pc=pc,
-        settings_gateway_host=fl.settings.gateway_host,
-        settings_gateway_port=fl.settings.gateway_port,
-        settings_log_level=fl.settings.log_level,
-    )
-    run_unified(
-        resolved_target,
-        host=host_r,
-        port=port_r,
-        reload=reload,
-        reload_scope=reload_scope,
-        log_level=log_r,
+    _execute_unified_cli(
+        target=target,
+        host=host,
+        port=port,
+        log_level=log_level,
         proxy_headers=proxy_headers,
         forwarded_allow_ips=forwarded_allow_ips,
         pidfile=pidfile,
-        write_pidfile=not no_pidfile,
+        no_pidfile=no_pidfile,
+        reload=reload,
+        reload_scope=reload_scope,
+        workbench=workbench,
     )
 
 
@@ -308,36 +348,81 @@ def run_cmd(
         "--no-pidfile",
         help="Do not write a PID file (also respect FLUXLIT_NO_PIDFILE=1).",
     ),
+    workbench: bool = typer.Option(
+        False,
+        "--workbench",
+        help=(
+            "Posit Workbench/Connect-style: enable Uvicorn proxy_headers and print a "
+            "loopback browser URL hint (set FLUXLIT_ROOT_PATH when using a subpath)."
+        ),
+    ),
 ) -> None:
     """Run the unified stack for production-style use (no Uvicorn reload).
 
     Same resolution rules as :func:`dev`; always calls :func:`fluxlit.runtime.run_unified`
     with ``reload=False``.
     """
-    from fluxlit.runtime import load_fluxlit
-
-    pc = load_project_config()
-    resolved_target = resolve_target(target, pc)
-    fl = load_fluxlit(resolved_target)
-    host_r, port_r, log_r = resolve_binding(
-        cli_host=host,
-        cli_port=port,
-        cli_log_level=log_level,
-        pc=pc,
-        settings_gateway_host=fl.settings.gateway_host,
-        settings_gateway_port=fl.settings.gateway_port,
-        settings_log_level=fl.settings.log_level,
-    )
-    run_unified(
-        resolved_target,
-        host=host_r,
-        port=port_r,
-        reload=False,
-        log_level=log_r,
+    _execute_unified_cli(
+        target=target,
+        host=host,
+        port=port,
+        log_level=log_level,
         proxy_headers=proxy_headers,
         forwarded_allow_ips=forwarded_allow_ips,
         pidfile=pidfile,
-        write_pidfile=not no_pidfile,
+        no_pidfile=no_pidfile,
+        reload=False,
+        reload_scope="gateway",
+        workbench=workbench,
+    )
+
+
+@app.command("workbench")
+def workbench_cmd(
+    target: str | None = typer.Argument(
+        default=None,
+        help="Import path to your FluxLit instance (default: from fluxlit.toml or app:app).",
+    ),
+    host: str | None = typer.Option(None, help="Bind address for the unified gateway."),
+    port: int | None = typer.Option(None, help="Port for the unified gateway."),
+    log_level: str | None = typer.Option(
+        None, help="Uvicorn log level (debug, info, warning, error)."
+    ),
+    forwarded_allow_ips: str | None = typer.Option(
+        None,
+        help="Comma-separated IPs to trust for forwarded headers (uvicorn forwarded_allow_ips).",
+    ),
+    pidfile: Annotated[
+        Path | None,
+        typer.Option(
+            "--pidfile",
+            help="Where to write the PID file (default: .fluxlit-dev.pid or FLUXLIT_PIDFILE).",
+        ),
+    ] = None,
+    no_pidfile: bool = typer.Option(
+        False,
+        "--no-pidfile",
+        help="Do not write a PID file (also respect FLUXLIT_NO_PIDFILE=1).",
+    ),
+) -> None:
+    """Run the unified stack for Posit Workbench / Posit Connect-style path proxies.
+
+    Equivalent to ``fluxlit run`` with ``--workbench``: Uvicorn ``proxy_headers`` is enabled,
+    ``forwarded_allow_ips`` defaults follow :class:`~fluxlit.config.FluxlitSettings`, and a
+    startup banner prints suggested loopback URLs (set ``FLUXLIT_ROOT_PATH`` for subpaths).
+    """
+    _execute_unified_cli(
+        target=target,
+        host=host,
+        port=port,
+        log_level=log_level,
+        proxy_headers=False,
+        forwarded_allow_ips=forwarded_allow_ips,
+        pidfile=pidfile,
+        no_pidfile=no_pidfile,
+        reload=False,
+        reload_scope="gateway",
+        workbench=True,
     )
 
 

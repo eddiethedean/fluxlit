@@ -26,6 +26,22 @@ app below a prefix, need consistent public path configuration:
 - Tighten `FLUXLIT_FORWARDED_ALLOW_IPS` to the proxy IP/CIDR in production.
 - Set `FLUXLIT_PUBLIC_BASE_URL=https://host.example/your/prefix` for OAuth redirects.
 
+### Posit Workbench / Posit Connect CLI
+
+For the same subpath + trusted-proxy setup, you can start the unified stack with either:
+
+```bash
+fluxlit workbench app:app
+# or
+fluxlit run app:app --workbench
+# or during local development
+fluxlit dev app:app --workbench
+```
+
+These modes **turn on Uvicorn `proxy_headers`** (so `X-Forwarded-*` is honored) and print a **loopback** URL hint (`http://127.0.0.1:<port><prefix>/…`) before serving. They do **not** replace `FLUXLIT_ROOT_PATH`: when users reach you under a content path (for example `/content/123`), set `FLUXLIT_ROOT_PATH=/content/123` so the gateway, OpenAPI, Streamlit `baseUrlPath`, and WebSockets stay aligned. Automated tests cover prefixed `/api/healthz`, `/api/docs`, and Streamlit-bound paths under the mount; see `tests/test_gateway.py`.
+
+Tighten **`FLUXLIT_FORWARDED_ALLOW_IPS`** to your reverse proxy’s IP range in production instead of relying on the default `*` when proxy trust is on.
+
 Run `fluxlit doctor` in the deployment image or shell when path, proxy, or OAuth
 URLs look wrong; it checks common root path and proxy-trust mismatches.
 

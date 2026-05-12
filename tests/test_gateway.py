@@ -195,3 +195,10 @@ def test_subpath_inject_non_api_still_proxies_to_streamlit(api: FastAPI) -> None
     client = _wrapped_subpath_gateway(api, root="/mount")
     res = client.get("/mount/some-streamlit-asset")
     assert res.status_code == 502
+
+
+def test_subpath_inject_mount_root_proxies_to_streamlit_not_404(api: FastAPI) -> None:
+    """Posit-style published root under a prefix should hit the Streamlit proxy (not 404)."""
+    client = _wrapped_subpath_gateway(api, root="/connect/app99")
+    res = client.get("/connect/app99/")
+    assert res.status_code == 502

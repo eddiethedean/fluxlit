@@ -19,7 +19,7 @@ fluxlit --help
 ```
 
 ```{tip}
-**`fluxlit dev`** — local development; optional `--reload` and `--reload-scope`. **`fluxlit run`** — production-style process (no reloader). Both start the same **gateway + Streamlit** stack.
+**`fluxlit dev`** — local development; optional `--reload` and `--reload-scope`. **`fluxlit run`** — production-style process (no reloader). **`fluxlit workbench`** (or **`--workbench`** on `dev` / `run`) — Posit Workbench / Connect-style proxy headers plus a printed loopback URL hint. All start the same **gateway + Streamlit** stack.
 ```
 
 ## Resolving `target`
@@ -40,6 +40,7 @@ The working directory should be the project root so Python can import the module
 |---------|-------------|
 | `fluxlit dev [target]` | Development: Streamlit subprocess + gateway. See reload options below. |
 | `fluxlit run [target]` | Production-style: same stack, **no** Uvicorn reload. |
+| `fluxlit workbench [target]` | Same as ``run`` with Workbench/Connect defaults: trusted proxy headers + startup URL hints. |
 | `fluxlit doctor [target]` | Static diagnostics (imports, bind, env). See **Doctor** below. |
 | `fluxlit config [target]` | Effective resolved settings (redacted), binding, and warnings; **`--json`**, **`--strict`**. |
 | `fluxlit build [target]` | Writes `Dockerfile` + `.dockerignore`; refuses to overwrite without **`--force`**. |
@@ -49,6 +50,7 @@ The working directory should be the project root so Python can import the module
 ## Common options (`dev` / `run`)
 
 - `--host`, `--port`, `--log-level`
+- `--workbench` — Posit Workbench / Connect-style: enable Uvicorn ``proxy_headers`` and print loopback URL hints (see {doc}`platforms`)
 - `--proxy-headers`, `--forwarded-allow-ips` (Uvicorn / reverse proxy trust)
 - `--pidfile` / `--no-pidfile` — PID file path for **`fluxlit shutdown`** (default file or `FLUXLIT_PIDFILE`; skip with `--no-pidfile` or `FLUXLIT_NO_PIDFILE=1`)
 
