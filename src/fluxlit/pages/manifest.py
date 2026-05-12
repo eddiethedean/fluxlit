@@ -41,7 +41,7 @@ def _depends_qualnames(fn: Callable[..., Any]) -> list[str]:
 
 
 def build_page_manifest(app: FluxLit[Any], *, version: int = 1) -> dict[str, Any]:
-    """Return a versioned manifest dict (``manifest_version`` **1** is experimental).
+    """Return a versioned manifest dict (``manifest_version`` **1**, stability **stable**).
 
     Pages include path, title, tags, description, parameter metadata, and dependency
     qualnames (no code objects).
@@ -55,8 +55,7 @@ def build_page_manifest(app: FluxLit[Any], *, version: int = 1) -> dict[str, Any
         for pname, p in sig.parameters.items():
             ann = hints.get(pname, p.annotation)
             params.append({"name": pname, "annotation": _annotation_str(ann)})
-        pages_out.append(
-            {
+        entry: dict[str, Any] = {
                 "path": rec.path,
                 "title": rec.title,
                 "tags": list(rec.tags),
@@ -65,10 +64,12 @@ def build_page_manifest(app: FluxLit[Any], *, version: int = 1) -> dict[str, Any
                 "parameters": params,
                 "dependencies": _depends_qualnames(rec.fn),
             }
-        )
+        if rec.page_meta and rec.page_meta.children:
+            entry["children"] = list(rec.page_meta.children)
+        pages_out.append(entry)
     return {
         "manifest_version": version,
-        "manifest_stability": "experimental",
+        "manifest_stability": "stable",
         "title": app.settings.title,
         "pages": pages_out,
     }

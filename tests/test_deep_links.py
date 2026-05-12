@@ -139,6 +139,20 @@ def test_query_params_mapping_without_get_uses_getitem() -> None:
     assert query_params(SimpleNamespace(query_params=NoGet())) == {"k": "v"}
 
 
+def test_match_nav_page_accepts_page_record_rows() -> None:
+    from fluxlit.pages.records import PageRecord
+
+    def _fn(st, client):
+        del st, client
+
+    recs = [
+        PageRecord("/reports", "Reports", _fn),
+        PageRecord("/", "Home", _fn),
+    ]
+    assert match_nav_page({"page": "Home"}, recs) == ("/", "Home")
+    assert match_nav_page({"page": "reports"}, recs) == ("/reports", "Reports")
+
+
 def test_apptest_prefills_from_query_params(requires_streamlit_apptest: None) -> None:
     from streamlit.testing.v1 import AppTest
 

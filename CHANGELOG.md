@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **CLI:** ``fluxlit doctor --check-pages`` (and ``--verbose``) runs ``fluxlit pages validate``-style checks; warns when experimental generator pages are enabled.
+- **Settings:** ``experimental_yield_pages`` and ``async_page_depends`` mirror ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES`` and ``FLUXLIT_ASYNC_PAGE_DEPENDS`` for ``fluxlit config`` / doctor visibility.
+- **Streamlit nav:** ``PageMeta.children`` merges title/icon overrides and sibling ordering with registered pages before ``st.navigation`` (unknown paths warn and are skipped).
+- **Depends:** optional async dependency callables when ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` (resolved with ``anyio.run`` when no asyncio loop is running).
+- **Docs:** PageMeta vs ``set_page_config`` truth table; gateway header bridge notes; generator and Protocol typing guidance; testing recipes for ``page_overrides`` / ``FLUXLIT_TEST_PAGE_OVERRIDES``.
+- **CLI:** ``fluxlit pages validate`` checks manifest JSON-serializability and optional strict page signatures (``--strict``).
+- **Manifest:** ``manifest_stability`` for ``manifest_version`` **1** is now **stable** (was experimental in the initial 0.9.0 notes).
+
 ## 0.9.0 - 2026-05-12
 
 - **Streamlit pages (0.9):** :class:`~fluxlit.pages.records.PageRecord` registry with :attr:`~fluxlit.app.FluxLit.page_records`; :meth:`~fluxlit.app.FluxLit.page` accepts ``icon``, ``tags``, and static ``page_meta``; handlers may return :class:`~fluxlit.pages.meta.PageMeta` for breadcrumbs and similar post-run UI. :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, and :class:`~fluxlit.pages.di.Cookie` resolve extra parameters beside ``(st, client)`` (see {doc}`streamlit-pages-typing`). Optional :class:`~fluxlit.url_session.SessionStore` on :class:`~fluxlit.app.FluxLit` enables ``SessionStore`` injection.

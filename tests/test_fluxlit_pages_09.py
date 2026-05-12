@@ -146,7 +146,7 @@ def test_build_page_manifest_contains_dep() -> None:
         del st, client, x
 
     man = build_page_manifest(app)
-    assert man["manifest_stability"] == "experimental"
+    assert man["manifest_stability"] == "stable"
     assert man["pages"][0]["dependencies"]
 
 
@@ -303,3 +303,207 @@ def test_pages_manifest_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert r.exit_code == 0
     data = json.loads(r.stdout)
     assert data["manifest_version"] == 1 and data["pages"]
+    assert data.get("manifest_stability") == "stable"
+
+
+def test_pages_validate_cli_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from typer.testing import CliRunner
+
+    p = tmp_path / "vapp.py"
+    p.write_text(
+        "from fluxlit import FluxLit\napp=FluxLit()\n@app.page('/')\ndef h(st,client): pass\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_TESTS", "1")
+    from fluxlit.cli import app as cli_app
+
+    runner = CliRunner()
+    r = runner.invoke(cli_app, ["pages", "validate", "--target", "vapp:app"])
+    assert r.exit_code == 0
+
+
+def test_pages_validate_cli_strict_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from typer.testing import CliRunner
+
+    p = tmp_path / "badpage.py"
+    p.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "# strict off at import so the module loads; CLI --strict catches the bad param.\n"
+        "app=FluxLit(settings=FluxlitSettings(strict_page_signatures=False))\n"
+        "@app.page('/')\n"
+        "def h(st, client, nope: int):\n"
+        "    del st, client, nope\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_TESTS", "1")
+    from fluxlit.cli import app as cli_app
+
+    runner = CliRunner()
+    r = runner.invoke(
+        cli_app, ["pages", "validate", "--target", "badpage:app", "--strict"]
+    )
+    assert r.exit_code == 1
+    out = (r.stdout or "") + (r.stderr or "")
+    assert "nope" in out.lower() or "unknown" in out.lower() or "/" in out
+
+
+def test_build_page_manifest_includes_page_meta_children() -> None:
+    app = FluxLit()
+
+    @app.page("/", page_meta=PageMeta(children=[{"path": "/b", "title": "Bee"}]))
+    def a(st, client):
+        del st, client
+
+    @app.page("/b")
+    def b(st, client):
+        del st, client
+
+    man = app.build_page_manifest()
+    by_path = {p["path"]: p for p in man["pages"]}
+    assert by_path["/"]["children"] == [{"path": "/b", "title": "Bee"}]
+
+
+def test_validate_strict_page_signature_wraps_nameerror() -> None:
+    from fluxlit.pages.signature import validate_strict_page_signature
+
+    def fn(st, client, q: "AbsolutelyNotDefined"):  # noqa: F821, UP037
+        del st, client, q
+
+    with pytest.raises(TypeError, match="Could not resolve annotations"):
+        validate_strict_page_signature(fn)
+
+
+def test_validate_strict_page_signature_wraps_typeerror(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fluxlit.pages.signature as sigmod
+
+    def bad(*_a: Any, **_k: Any) -> Any:
+        raise TypeError("nope")
+
+    monkeypatch.setattr(sigmod, "get_type_hints", bad)
+
+    def fn(st, client):
+        del st, client
+
+    with pytest.raises(TypeError, match="Invalid type hints"):
+        sigmod.validate_strict_page_signature(fn)
+
+
+async def _async_dep() -> int:
+    return 7
+
+
+def test_resolve_page_kwargs_async_depends_with_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit()
+
+    def fn(st, client, x: int = Depends(_async_dep)):  # noqa: B008
+        del st, client, x
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["x"] == 7
+
+
+def test_resolve_page_kwargs_async_depends_without_flag_errors() -> None:
+    app = FluxLit()
+
+    def fn(st, client, x: int = Depends(_async_dep)):  # noqa: B008
+        del st, client, x
+
+    with pytest.raises(TypeError, match="async"):
+        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_page_kwargs_async_dep_inside_running_loop_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def fn(st, client, x: int = Depends(_async_dep)):  # noqa: B008
+        del st, client, x
+
+    with pytest.raises(TypeError, match="active asyncio"):
+        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+
+
+def test_validate_fluxlit_pages_manifest_not_json_serializable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fluxlit.pages.validate import validate_fluxlit_pages
+
+    app = FluxLit()
+
+    @app.page("/")
+    def h(st, client):
+        del st, client
+
+    def cyclic(_a: Any) -> Any:
+        o: dict[str, Any] = {"pages": []}
+        o["self"] = o
+        return o
+
+    monkeypatch.setattr("fluxlit.pages.validate.build_page_manifest", cyclic)
+    errs = validate_fluxlit_pages(app)
+    assert len(errs) == 1
+    assert "manifest JSON" in errs[0]
+
+
+def test_resolve_page_kwargs_sync_dep_returns_coro_without_flag_errors() -> None:
+    app = FluxLit()
+
+    def dep() -> Any:
+        async def inner() -> int:
+            return 1
+
+        return inner()
+
+    def fn(st, client, x: int = Depends(dep)):  # noqa: B008
+        del st, client, x
+
+    with pytest.raises(TypeError, match="returned a coroutine"):
+        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_page_kwargs_sync_dep_returns_coro_in_loop_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def dep() -> Any:
+        async def inner() -> int:
+            return 1
+
+        return inner()
+
+    def fn(st, client, x: int = Depends(dep)):  # noqa: B008
+        del st, client, x
+
+    with pytest.raises(TypeError, match="active asyncio"):
+        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+
+
+def test_resolve_page_kwargs_sync_dep_returns_coro_resolved_with_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def dep() -> Any:
+        async def inner() -> int:
+            return 99
+
+        return inner()
+
+    def fn(st, client, x: int = Depends(dep)):  # noqa: B008
+        del st, client, x
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["x"] == 99

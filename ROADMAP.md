@@ -4,28 +4,21 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.8.x)
+## Current status (0.9.x)
 
-**Done**
+**Done (0.9.0+)**
 
-- **Foundation:** `src/` layout, `pyproject.toml`, Hatchling build, Ruff, Mypy (strict), Pytest.
-- **Unified dev/prod entry:** `fluxlit dev` / `fluxlit run` with a single public port; Streamlit runs in a managed subprocess with an internal port.
-- **Gateway:** configurable API prefix (default `/api`); path prefix stripped for the inner FastAPI app; HTTP + WebSocket proxy to Streamlit for all other paths.
-- **App model:** `FluxLit` holds `FastAPI` on `.api`, `@app.page` registers Streamlit pages; `ApiClient` for server-side calls with `FLUXLIT_INTERNAL_API_BASE`.
-- **Scaffold:** `fluxlit new <name>` minimal app.
-- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client, `streamlit_main_path()` helper, multipage AppTest smoke example, AppTest navigation/query-param helpers (`apptest_select_page`, `apptest_assert_no_errors`), and URL-session test-mode defaults.
-- **Readiness:** `GET /api/readyz` probes the Streamlit upstream when `FLUXLIT_STREAMLIT_UPSTREAM` is set (Kubernetes-style readiness; hidden from OpenAPI).
-- **Dev reload:** `--reload-scope=gateway` (default) vs `--reload-scope=full` (Uvicorn reload plus Streamlit restart via `watchfiles`); invalid scope fails before spawning Streamlit.
-- **Observability (baseline):** optional structured gateway access logs (`enable_gateway_access_log`); log redaction helpers for sensitive headers; temp-file upstream state so reload workers and Streamlit restarts stay aligned.
-- **Tests (deeper):** async readiness probe against threaded upstreams; gateway access-log behavior; upstream file/env precedence; reload-watcher callback; extended redaction and doctor/auth import edge cases.
-- **Unified ASGI:** `FluxLit` as a normal ASGI entrypoint (`uvicorn app:app`); lifespan bridged to the inner FastAPI app; regression suite in `tests/test_asgi_unified.py` (lifespan + concurrent HTTP, streaming body, sidecar failure) — foundation for **Version 0.5** soak/chaos work.
-- **Production hardening:** JSON log formatter, request-id correlation to Streamlit HTTP/WebSocket hops, configurable gateway limits/timeouts, optional Prometheus metrics, Docker/Kubernetes references, runbooks, support matrix, security audit, and CycloneDX SBOM workflow.
-- **URL session continuity:** `fluxlit.url_session` helpers, `SessionStore` protocol, in-memory implementation, docs, tests, and gateway query redaction for `fluxlit_sid`.
-- **Developer diagnostics:** `fluxlit doctor` reports import shadowing candidates, loaded module files, `sys.path` summary, URL-session state, proxy/public-base-url configuration, optional extras guidance, and optional `--verbose` / `--json` effective-config snapshots.
-- **Configuration clarity:** `FLUXLIT_PUBLIC_BASE_URL` is the preferred namespaced OAuth public URL; `PUBLIC_BASE_URL` is a documented fallback with doctor warnings/failures for conflicting values.
-- **CLI / public URLs (0.8.0):** `fluxlit config` (resolved binding, redacted settings, `--json` / `--strict`); `FluxLit.urls` for browser-visible bases, docs, health, readiness, and page links under `FLUXLIT_ROOT_PATH`.
-- **Deep links:** `fluxlit.query_params` / `fluxlit.match_nav_page` and optional `?page=` routing with `st.navigation` multipage apps (see `docs/deep-links.md`).
-- **Proxy / TLS docs:** path-prefixed mount guide (`/apps/my-app`), nginx + Compose smoke on port **8083**, and `/api/docs` checks in `docker/proxy-deployment/smoke-test.sh` (see `docs/production-tls.md`).
+- **Typed Streamlit pages:** :class:`~fluxlit.pages.records.PageRecord` registry; :meth:`~fluxlit.app.FluxLit.page` with ``icon``, ``tags``, ``page_meta``; :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, :class:`~fluxlit.pages.di.Cookie`; optional :class:`~fluxlit.url_session.SessionStore` injection; strict registration via :class:`~fluxlit.config.FluxlitSettings.strict_page_signatures`.
+- **Navigation:** :meth:`~fluxlit.app.FluxLit.navigation` with :class:`~fluxlit.pages.navigation.NavigationModel` ordering; ``PageMeta.children`` merges display overrides and sidebar order in the Streamlit entrypoint; ``?page=`` deep links align with that order (see :doc:`deep-links`).
+- **Manifest / CLI:** :meth:`~fluxlit.app.FluxLit.build_page_manifest` (``manifest_version`` **1**, **stable**); ``fluxlit pages manifest`` and ``fluxlit pages validate`` for CI.
+- **Doctor / config:** ``fluxlit doctor --verbose`` snapshots; ``--check-pages`` runs validate-style checks; settings expose ``experimental_yield_pages`` and ``async_page_depends`` for env parity.
+- **Async Depends (optional):** ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` resolves async dependency callables when no asyncio loop is running (see :doc:`streamlit-pages-typing`).
+- **0.8.x foundation** (gateway, URL session, testing client, observability, docs) remains as documented in prior roadmap sections.
+
+**Next: 0.9.1–0.10**
+
+- **0.9.x polish:** Broader proxy matrices, richer doctor signals, and cookbook docs as usage grows.
+- **0.10 (tentative):** Deeper async integration with Streamlit’s threading model if needed; optional gateway auto-wiring for header context behind strict security review — prefer explicit ``set_page_header_context`` until then.
 
 **Gaps vs “production”**
 
@@ -33,11 +26,6 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain ongoing.
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
-
-**Next: 0.9**
-
-- **Typed Streamlit surface:** optional FastAPI-like patterns for `@app.page` — return types, `Annotated` / dependency injection, validated query and session models, structured multipage nav, and a machine-readable page manifest. See **Version 0.9 — Typed Streamlit pages & developer contracts** below.
-- **Ongoing hardening:** broader load/chaos coverage, more deployment recipes, deeper OpenTelemetry examples, compatibility signals, and any breaking-change cleanup needed before a future **1.0**.
 
 ---
 

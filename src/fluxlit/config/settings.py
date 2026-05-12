@@ -276,6 +276,20 @@ class FluxlitSettings(BaseSettings):
             "``Depends``, etc.)."
         ),
     )
+    experimental_yield_pages: bool = Field(
+        default=False,
+        description=(
+            "When True (``FLUXLIT_EXPERIMENTAL_YIELD_PAGES=1``), generator page handlers "
+            "run ``next()`` twice per script execution (experimental)."
+        ),
+    )
+    async_page_depends: bool = Field(
+        default=False,
+        description=(
+            "When True (``FLUXLIT_ASYNC_PAGE_DEPENDS=1``), :class:`~fluxlit.pages.di.Depends` "
+            "callables may be ``async def`` or return awaitables."
+        ),
+    )
     jwt_issuer: str = Field(
         default="",
         description=(

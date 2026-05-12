@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import inspect
 import json
@@ -118,6 +119,53 @@ def _call_kw_for_fn(fn: Callable[..., Any], kw: dict[str, Any]) -> dict[str, Any
     return {k: v for k, v in kw.items() if k in sig.parameters}
 
 
+def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> Any:
+    allow_async = bool(getattr(app.settings, "async_page_depends", False))
+
+    def _run_coro_no_loop(coro: Any) -> Any:
+        import anyio
+
+        async def _await() -> Any:
+            return await coro
+
+        return anyio.run(_await)
+
+    if inspect.iscoroutinefunction(dependency):
+        if not allow_async:
+            msg = (
+                f"Depends({dependency!r}) is async; set FLUXLIT_ASYNC_PAGE_DEPENDS=1 "
+                "or use a synchronous callable."
+            )
+            raise TypeError(msg)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return _run_coro_no_loop(dependency())
+        qual = getattr(dependency, "__qualname__", dependency)
+        msg = (
+            f"Async Depends({qual!r}) cannot be resolved under an active asyncio event loop."
+        )
+        raise TypeError(msg)
+    out = dependency()
+    if inspect.iscoroutine(out):
+        if not allow_async:
+            msg = (
+                "Depends(...) returned a coroutine; set FLUXLIT_ASYNC_PAGE_DEPENDS=1 "
+                "or return a plain value from the dependency."
+            )
+            raise TypeError(msg)
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return _run_coro_no_loop(out)
+        msg = (
+            "Depends(...) returned a coroutine under an active asyncio event loop; "
+            "use a synchronous dependency."
+        )
+        raise TypeError(msg)
+    return out
+
+
 def resolve_page_kwargs(
     fn: Callable[..., Any],
     *,
@@ -137,7 +185,7 @@ def resolve_page_kwargs(
     for name, param in sig.parameters.items():
         dep = _unwrap_depends(param, hints, name)
         if dep is not None and dep.dependency is not None:
-            kwargs[name] = dep.dependency()
+            kwargs[name] = _resolve_depends_callable(dep.dependency, app=app)
             continue
         hdr = _unwrap_header(param, hints, name)
         if hdr is not None:
@@ -220,7 +268,10 @@ def resolve_and_call_page(
     call_kw = _call_kw_for_fn(rec.fn, kw)
     fn = rec.fn
     flags = FluxlitFeatureFlags.from_environ()
-    if flags.experimental_yield_pages and inspect.isgeneratorfunction(fn):
+    yield_pages = flags.experimental_yield_pages or bool(
+        getattr(app.settings, "experimental_yield_pages", False)
+    )
+    if yield_pages and inspect.isgeneratorfunction(fn):
         gen = fn(**call_kw)
         try:
             first = next(gen)

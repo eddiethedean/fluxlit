@@ -55,11 +55,13 @@ For **Pydantic-validated** query models (single keys, defaults, coercion), use
 ## Optional `?page=` routing
 
 When you send users to the app root with a **page title** or path segment in the
-query string, {func}`fluxlit.match_nav_page` resolves it against
-{attr}`~fluxlit.app.FluxLit.pages` (``path``, ``title``, handler). The unified
-Streamlit entrypoint (:mod:`fluxlit.streamlit.main`) applies this automatically **before**
-:func:`streamlit.navigation`, so ``?page=`` opens the matching registered page (same
-behavior you can exercise with :meth:`fluxlit.testing.FluxLitTestClient.streamlit`).
+query string, {func}`fluxlit.match_nav_page` resolves against a **sequence of pages**
+(``(path, title, handler)`` tuples, :class:`~fluxlit.pages.records.PageRecord` instances,
+or similar duck-typed rows). The unified Streamlit entrypoint (:mod:`fluxlit.streamlit.main`)
+passes the **same ordered** :attr:`~fluxlit.app.FluxLit.page_records` list it uses to build
+``st.navigation`` (including :meth:`~fluxlit.app.FluxLit.navigation` sort when
+``NavigationModel.order`` is set), **not** the raw :attr:`~fluxlit.app.FluxLit.pages` tuple
+view, so ``?page=`` tie-breaking follows the **sidebar order** you see in the UI.
 
 You can still call {func}`fluxlit.match_nav_page` yourself when you need custom logic
 beyond navigation:
@@ -75,11 +77,17 @@ from fluxlit.client import ApiClient
 def apply_deep_link(st: Any, client: ApiClient, fl: FluxLit) -> None:
     _ = client
     params = query_params(st)
-    hit = match_nav_page(params, fl.pages, page_key="page")
+    hit = match_nav_page(params, list(fl.page_records), page_key="page")
     if hit:
         path, title = hit
         # drive your own UI (e.g. default widget values) from path/title
 ```
+
+If you call {func}`fluxlit.match_nav_page` yourself, pass the **same** ordered
+``list[PageRecord]`` the entrypoint would use (after optional
+:meth:`~fluxlit.app.FluxLit.navigation` sorting via
+:func:`~fluxlit.streamlit.nav_order.navigation_sort_key`), not ``fl.pages``, so
+ordering matches the sidebar and ``?page=`` resolution.
 
 Matching order: exact **title**, exact **path**, Streamlit-style **slug** (``"/"`` →
 ``"home"``), then path segments with slashes stripped from **both** sides (so

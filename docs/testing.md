@@ -220,6 +220,36 @@ tc.assert_no_streamlit_exception(at)
 at_home = tc.select_page(at, "Home", target="my_pkg.app:app", extra_sys_path=".")
 ```
 
+### ``page_overrides`` and ``FLUXLIT_TEST_PAGE_OVERRIDES``
+
+Pass ``page_overrides=`` to :meth:`~fluxlit.testing.FluxLitTestClient.streamlit` to inject
+values for :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, and
+:class:`~fluxlit.pages.di.Cookie` parameters (same keys as handler parameter names). For
+subprocess-style tests, set ``FLUXLIT_TEST_PAGE_OVERRIDES`` to a JSON object of overrides
+before importing the page module.
+
+```python
+import json
+import os
+
+from fluxlit import FluxLit, FluxLitTestClient
+
+
+def test_page_with_dep(tmp_path, monkeypatch):
+    app = FluxLit(title="T")
+
+    @app.page("/")
+    def home(st, client, trace_id: str = ""):  # noqa: ARG001
+        st.write(trace_id)
+
+    monkeypatch.setenv(
+        "FLUXLIT_TEST_PAGE_OVERRIDES",
+        json.dumps({"trace_id": "test-trace"}),
+    )
+    at = FluxLitTestClient(app).streamlit(target="my_app:app", extra_sys_path=tmp_path)
+    assert at.get("markdown")
+```
+
 ### Bearer tokens: `with_bearer`, `for_fluxlit`, and the injected `client`
 
 The page **injected `client`** has no `Authorization` header by default. For a token in

@@ -177,3 +177,149 @@ def test_streamlit_main_query_page_triggers_switch_page(
     assert len(switched) == 1
     assert switched[0].url_path == "admin"
     fake_streamlit.navigation.assert_called_once()
+
+
+def test_streamlit_main_navigation_order_sorts_nav_pages(
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``NavigationModel.order`` reorders ``st.Page`` list (not only lexicographic path)."""
+    (tmp_path / "sm_ord.py").write_text(
+        "from fluxlit import FluxLit, NavigationModel\n"
+        "app = FluxLit(title='Ord')\n"
+        "@app.page('/z', title='Zed')\n"
+        "def z(st, client):\n"
+        "    st.title('z')\n"
+        "@app.page('/a', title='Alpha')\n"
+        "def a(st, client):\n"
+        "    st.title('a')\n"
+        "app.navigation(NavigationModel(order=('/z', '/a')))\n",
+        encoding="utf-8",
+    )
+
+    captured: list[Any] = []
+
+    class Navigation:
+        def __init__(self, pages: list[Any]) -> None:
+            self.pages = pages
+
+        def run(self) -> None:
+            return None
+
+    def capture_nav(pages: list[Any]) -> Navigation:
+        captured.extend(pages)
+        return Navigation(pages)
+
+    fake_streamlit.Page = mock.Mock(
+        side_effect=lambda fn, **kwargs: types.SimpleNamespace(
+            fn=fn,
+            title=kwargs.get("title"),
+            url_path=kwargs.get("url_path"),
+            icon=kwargs.get("icon"),
+        )
+    )
+    fake_streamlit.navigation = mock.Mock(side_effect=capture_nav)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_APP", "sm_ord:app")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+    importlib.import_module("fluxlit.streamlit.main")
+
+    assert len(captured) == 2
+    assert captured[0].url_path == "z"
+    assert captured[1].url_path == "a"
+
+
+def test_streamlit_main_query_page_match_uses_same_order_as_navigation(
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``?page=`` matching uses ordered ``page_records`` (with ``NavigationModel`` sort)."""
+    (tmp_path / "sm_ord2.py").write_text(
+        "from fluxlit import FluxLit, NavigationModel\n"
+        "app = FluxLit(title='Ord')\n"
+        "@app.page('/z', title='Zed')\n"
+        "def z(st, client):\n"
+        "    st.title('z')\n"
+        "@app.page('/a', title='Alpha')\n"
+        "def a(st, client):\n"
+        "    st.title('a')\n"
+        "app.navigation(NavigationModel(order=('/z', '/a')))\n",
+        encoding="utf-8",
+    )
+
+    switched: list[Any] = []
+
+    class Navigation:
+        def __init__(self, pages: list[Any]) -> None:
+            self.pages = pages
+
+        def run(self) -> None:
+            return None
+
+    fake_streamlit.query_params = {"page": "Alpha"}
+    fake_streamlit.switch_page = switched.append
+    fake_streamlit.Page = mock.Mock(
+        side_effect=lambda fn, **kwargs: types.SimpleNamespace(
+            fn=fn,
+            title=kwargs.get("title"),
+            url_path=kwargs.get("url_path"),
+            icon=kwargs.get("icon"),
+        )
+    )
+    fake_streamlit.navigation = mock.Mock(side_effect=lambda pages: Navigation(pages))
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_APP", "sm_ord2:app")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+    importlib.import_module("fluxlit.streamlit.main")
+
+    assert len(switched) == 1
+    assert switched[0].url_path == "a"
+
+
+def test_streamlit_main_page_meta_children_reorders_and_titles(
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "sm_ch.py").write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.pages.meta import PageMeta\n"
+        "app = FluxLit(title='Ch')\n"
+        "@app.page('/a', title='A', "
+        "page_meta=PageMeta(children=[{'path': '/z', 'title': 'Zed board'}]))\n"
+        "def a(st, client):\n"
+        "    st.title('a')\n"
+        "@app.page('/z', title='Z', icon='ico')\n"
+        "def z(st, client):\n"
+        "    st.title('z')\n",
+        encoding="utf-8",
+    )
+
+    captured: list[Any] = []
+
+    class Navigation:
+        def __init__(self, pages: list[Any]) -> None:
+            self.pages = pages
+
+        def run(self) -> None:
+            return None
+
+    def capture_nav(pages: list[Any]) -> Navigation:
+        captured.extend(pages)
+        return Navigation(pages)
+
+    fake_streamlit.Page = mock.Mock(
+        side_effect=lambda fn, **kwargs: types.SimpleNamespace(
+            fn=fn,
+            title=kwargs.get("title"),
+            url_path=kwargs.get("url_path"),
+            icon=kwargs.get("icon"),
+        )
+    )
+    fake_streamlit.navigation = mock.Mock(side_effect=capture_nav)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_APP", "sm_ch:app")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+    importlib.import_module("fluxlit.streamlit.main")
+
+    assert len(captured) == 2
+    assert captured[0].url_path == "a"
+    assert captured[1].url_path == "z"
+    assert captured[1].title == "Zed board"
+    assert captured[1].icon == "ico"

@@ -38,13 +38,41 @@ def pages_manifest(
         help="module:attr (default: project target from fluxlit.toml or app:app).",
     ),
 ) -> None:
-    """Print a JSON page manifest for the resolved FluxLit app (experimental schema)."""
+    """Print a JSON page manifest for the resolved FluxLit app (``manifest_version`` 1, stable)."""
     pc = load_project_config()
     resolved = resolve_target(target, pc)
     from fluxlit.runtime import load_fluxlit
 
     fl = load_fluxlit(resolved)
     typer.echo(json.dumps(fl.build_page_manifest(), indent=2))
+
+
+@pages_cli.command("validate")
+def pages_validate(
+    target: str | None = typer.Option(
+        None,
+        "--target",
+        help="module:attr (default: project target from fluxlit.toml or app:app).",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Run strict page signature checks even if settings.strict_page_signatures is off.",
+    ),
+) -> None:
+    """Validate page handlers and manifest JSON-serializability (exit 1 on errors)."""
+    pc = load_project_config()
+    resolved = resolve_target(target, pc)
+    from fluxlit.pages.validate import validate_fluxlit_pages
+    from fluxlit.runtime import load_fluxlit
+
+    fl = load_fluxlit(resolved)
+    strict_sig = True if strict else None
+    errs = validate_fluxlit_pages(fl, strict_signatures=strict_sig)
+    if errs:
+        for line in errs:
+            typer.echo(line)
+        raise typer.Exit(code=1)
 
 
 app.add_typer(pages_cli, name="pages")
@@ -158,7 +186,10 @@ if __name__ == "__main__":
 '''
     return '''"""FluxLit demo app."""
 
-from fluxlit import FluxLit
+from typing import Any
+
+from fluxlit import Depends, FluxLit
+from fluxlit.client import ApiClient
 
 app = FluxLit(title="FluxLit Demo")
 
@@ -168,8 +199,13 @@ def users():
     return [{"name": "Ada"}]
 
 
+def _demo_user() -> int:
+    """Example dependency; see docs/streamlit-pages-typing."""
+    return 1
+
+
 @app.page("/")
-def home(st, client):
+def home(st: Any, client: ApiClient, user_id: int = Depends(_demo_user)):  # noqa: B008
     st.title("Dashboard")
     r = client.get("/users")
     st.write(r.json())
@@ -483,11 +519,15 @@ def _doctor_collect(
     pc: ProjectConfig | None,
     *,
     verbose: bool,
+    check_pages: bool = False,
 ) -> tuple[list[tuple[str, CheckStatus, str]], dict[str, object] | None]:
     """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``.
 
     When ``verbose`` is True and the app imports, also return a redacted configuration
     snapshot for JSON / human ``--verbose`` output.
+
+    When ``check_pages`` is True or ``verbose`` is True, runs the same validation as
+    ``fluxlit pages validate`` (non-strict signatures unless settings enable strict).
     """
     from fluxlit.runtime import load_fluxlit
     from fluxlit.runtime.import_target import import_target_candidates
@@ -795,6 +835,32 @@ def _doctor_collect(
             )
         )
 
+    if fl is not None and (check_pages or verbose):
+        from fluxlit.pages.flags import FluxlitFeatureFlags
+        from fluxlit.pages.validate import validate_fluxlit_pages
+
+        errs = validate_fluxlit_pages(fl, strict_signatures=None)
+        if errs:
+            rows.append(("pages_validate", "FAIL", "; ".join(errs)))
+        else:
+            rows.append(
+                (
+                    "pages_validate",
+                    "PASS",
+                    "manifest JSON-serializable and page signature checks passed",
+                )
+            )
+        if FluxlitFeatureFlags.from_environ().experimental_yield_pages or (
+            fl.settings.experimental_yield_pages
+        ):
+            rows.append(
+                (
+                    "experimental_yield_pages",
+                    "WARN",
+                    "FLUXLIT_EXPERIMENTAL_YIELD_PAGES is on — generator pages are experimental",
+                )
+            )
+
     verbose_detail: dict[str, object] | None = None
     if verbose:
         if fl is not None and host_r is not None and port_r is not None:
@@ -811,9 +877,13 @@ def _doctor_collect(
     return rows, verbose_detail
 
 
-def _doctor_checks(target: str, *, verbose: bool = False) -> list[tuple[str, CheckStatus, str]]:
+def _doctor_checks(
+    target: str, *, verbose: bool = False, check_pages: bool = False
+) -> list[tuple[str, CheckStatus, str]]:
     """Backward-compatible wrapper used by tests."""
-    rows, _ = _doctor_collect(target, load_project_config(), verbose=verbose)
+    rows, _ = _doctor_collect(
+        target, load_project_config(), verbose=verbose, check_pages=check_pages
+    )
     return rows
 
 
@@ -866,6 +936,11 @@ def doctor(
         help="After checks, print a redacted effective-config snapshot (also included as "
         "``verbose`` in ``--json`` output).",
     ),
+    check_pages: bool = typer.Option(
+        False,
+        "--check-pages",
+        help="Run ``fluxlit pages validate``-style checks (manifest + signatures per settings).",
+    ),
 ) -> None:
     """Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).
 
@@ -874,7 +949,9 @@ def doctor(
     pc = load_project_config()
     resolved_target = resolve_target(target, pc)
 
-    rows, verbose_detail = _doctor_collect(resolved_target, pc, verbose=verbose)
+    rows, verbose_detail = _doctor_collect(
+        resolved_target, pc, verbose=verbose, check_pages=check_pages
+    )
     if json_output:
         typer.echo(
             json.dumps(

@@ -36,6 +36,78 @@ def test_doctor_prints_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert "demo_cli_app:app" in res.stdout
 
 
+def test_doctor_check_pages_runs_pages_validate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_pages_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        f"app = FluxLit(title='D', settings=FluxlitSettings(gateway_port={port}))\n\n"
+        "@app.page('/')\n"
+        "def h(st, client):\n"
+        "    del st, client\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_pages_app:app", "--check-pages"])
+    assert res.exit_code == 0
+    assert "pages_validate" in res.stdout
+
+
+def test_doctor_check_pages_warns_experimental_yield(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FLUXLIT_EXPERIMENTAL_YIELD_PAGES", "1")
+    port = find_free_port()
+    module_path = tmp_path / "doc_yield_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        f"app = FluxLit(title='Y', settings=FluxlitSettings(gateway_port={port}))\n\n"
+        "@app.page('/')\n"
+        "def h(st, client):\n"
+        "    del st, client\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_yield_app:app", "--check-pages"])
+    assert res.exit_code == 0
+    assert "experimental_yield_pages" in res.stdout
+
+
+def test_doctor_check_pages_fails_when_validate_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import fluxlit.pages.validate as vmod
+
+    port = find_free_port()
+    module_path = tmp_path / "doc_bad_pages_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        f"app = FluxLit(title='B', settings=FluxlitSettings(gateway_port={port}))\n\n"
+        "@app.page('/')\n"
+        "def h(st, client):\n"
+        "    del st, client\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(
+        vmod,
+        "validate_fluxlit_pages",
+        lambda *_a, **_k: ["manifest JSON: forced failure for doctor test"],
+    )
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_bad_pages_app:app", "--check-pages"])
+    assert res.exit_code == 1
+    assert "pages_validate" in res.stdout
+    assert "FAIL" in res.stdout
+
+
 def test_doctor_verbose_prints_effective_block(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -713,6 +785,7 @@ def test_new_scaffold_writes_app_py(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     app_py = root / "app.py"
     assert app_py.is_file()
     assert "FluxLit" in app_py.read_text(encoding="utf-8")
+    assert "Depends" in app_py.read_text(encoding="utf-8")
     toml = root / "fluxlit.toml"
     assert toml.is_file()
     assert 'target = "app:app"' in toml.read_text(encoding="utf-8")

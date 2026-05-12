@@ -25,6 +25,7 @@ import streamlit as st
 from fluxlit.deep_links import match_nav_page, query_params
 from fluxlit.pages.records import PageRecord
 from fluxlit.runtime import load_fluxlit
+from fluxlit.streamlit.nav_build import apply_children_overrides, order_records_with_children
 from fluxlit.streamlit.nav_order import navigation_sort_key
 from fluxlit.streamlit.page_config import build_set_page_config_kwargs
 from fluxlit.streamlit.page_runner import run_page_record
@@ -54,6 +55,7 @@ def run_streamlit_entrypoint() -> None:
             records,
             key=lambda r: navigation_sort_key(nav_model, r),
         )
+    records = apply_children_overrides(order_records_with_children(records))
 
     def _bind_page(
         rec: PageRecord,
@@ -90,7 +92,7 @@ def run_streamlit_entrypoint() -> None:
         st.title(fluxlit_app.settings.title)
         st.info('Register UI with `@app.page("/")` on functions that accept `(st, client)`.')
     else:
-        matched = match_nav_page(query_params(st), fluxlit_app.pages)
+        matched = match_nav_page(query_params(st), records)
         if matched is not None:
             want_slug = matched[0].strip("/") or "home"
             for pg in nav_pages:

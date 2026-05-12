@@ -17,6 +17,24 @@ Use {meth}`~fluxlit.app.FluxLit.page` as today, with optional metadata:
 Full records are available as {attr}`~fluxlit.app.FluxLit.page_records`; {attr}`~fluxlit.app.FluxLit.pages`
 remains a list of ``(path, title, handler)`` tuples for backward compatibility.
 
+## ``PageMeta`` vs ``set_page_config`` vs ``st.Page``
+
+Streamlit only guarantees ``streamlit.set_page_config`` **before any other Streamlit command**
+on a run. FluxLit calls global ``set_page_config`` once from the Streamlit entrypoint using
+:class:`~fluxlit.config.FluxlitSettings` (``title`` and ``streamlit_page_config``). Per-page
+:class:`~fluxlit.pages.meta.PageMeta` is applied in two different ways:
+
+| Field | ``@app.page(..., page_meta=…)`` (static, start of run) | Returned ``PageMeta`` (after handler) | ``st.Page`` / sidebar |
+| --- | --- | --- | --- |
+| ``page_title``, ``page_icon``, ``layout``, ``initial_sidebar_state`` | Merged into ``set_page_config`` **when** those keys are present (must be first commands; FluxLit applies static ``page_meta`` before running the page). | Same keys are **best-effort** via ``set_page_config`` only if Streamlit still allows it; otherwise they are **no-ops** at runtime. | ``page_icon`` may also feed ``st.Page(icon=…)`` when building multipage nav (see entrypoint). |
+| ``breadcrumb`` | Ignored until the handler runs. | Sidebar caption via ``st.sidebar.caption``. | — |
+| ``order``, ``description``, ``children`` | Used for **manifest / nav ordering** (``children`` merges with registered pages; see below), not Streamlit layout APIs. | Same as static if returned and validated. | ``children`` influences multipage **order** and per-slug **title/icon** overrides in the entrypoint. |
+
+Official Streamlit multipage and ``set_page_config`` behaviour is described in the
+`Streamlit multipage apps <https://docs.streamlit.io/develop/concepts/multipage-apps>`_ and
+`st.set_page_config <https://docs.streamlit.io/develop/api-reference/configuration/st.set_page_config>`_
+documentation.
+
 ## Dependency injection
 
 Import {class}`~fluxlit.pages.di.Depends`, {class}`~fluxlit.pages.di.Header`, and
@@ -27,10 +45,17 @@ Import {class}`~fluxlit.pages.di.Depends`, {class}`~fluxlit.pages.di.Header`, an
 - **Session store:** pass ``session_store=...`` to {class}`~fluxlit.app.FluxLit` and annotate a parameter
   with {class}`~fluxlit.url_session.SessionStore` to receive the same instance.
 - **Depends:** ``def page(st, client, user: Annotated[User, Depends(load_user)]): ...`` where
-  ``load_user()`` returns the dependency value (sync only in 0.9.0).
+  ``load_user()`` returns the dependency value (async callables are supported when
+  ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` is set; otherwise use sync callables only).
 - **Header / Cookie:** resolved from test overrides or a header map set with
   {func}`~fluxlit.pages.di.set_page_header_context`. Streamlit children do **not** see
   browser HTTP headers unless your deployment sets this context from a gateway hook.
+
+  **Gateway bridge:** the FluxLit gateway proxies HTTP to Streamlit in a **separate**
+  process, so browser headers are not automatically visible inside ``@app.page`` handlers.
+  Map trusted forwarded headers into ``set_page_header_context`` from code that runs in
+  the Streamlit process (for example a small bootstrap before ``run_streamlit_entrypoint``),
+  with strict allowlists and redaction—never log raw ``Authorization`` or session cookies.
 
 **Claims-style models:** use ``Depends`` with a callable that returns a Pydantic model;
 pair with your FastAPI JWT stack on the API side—FluxLit does not parse JWTs in Streamlit
@@ -48,12 +73,22 @@ unless you supply the callable.
 {meth}`~fluxlit.app.FluxLit.navigation` accepts a {class}`~fluxlit.pages.navigation.NavigationModel`
 with an ``order`` tuple of URL paths (``"/"`` slugifies like the Streamlit entrypoint).
 
+Optional ``PageMeta.children`` entries are dictionaries with ``path`` or ``url_path`` (and
+optional ``title`` / ``icon``). They **merge** with registered pages: matching slugs pick
+up display overrides; listed children are ordered **immediately after** the parent in the
+multipage sidebar. Unknown paths emit a **runtime warning** and are skipped for ``st.Page``
+(they do not create routes).
+
 ## Manifest and CLI
 
 - {meth}`~fluxlit.app.FluxLit.build_page_manifest` returns JSON-serializable metadata
-  (``manifest_version`` **1**, stability **experimental**).
-- ``fluxlit pages manifest [--target module:attr]`` prints the same JSON using project
+  (``manifest_version`` **1**, ``manifest_stability`` **stable**).
+- ``fluxlit pages manifest [--target module:attr]`` prints JSON using project
   config when ``--target`` is omitted.
+- ``fluxlit pages validate [--target ...] [--strict]`` exits **0** when the manifest
+  is JSON-serializable and (if ``strict_page_signatures`` is on, or ``--strict`` is
+  passed) every page handler passes strict signature checks; exits **1** with errors
+  printed to stdout for CI.
 
 ## Strict registration
 
@@ -65,6 +100,22 @@ so unknown page parameters raise at **decorator** time.
 When ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES=1``, a **generator** handler runs ``next()`` twice in
 one script execution (setup yield, then body). This is **experimental**; prefer plain
 functions unless you understand rerun semantics.
+
+Reruns re-execute the whole script: both ``next()`` calls happen again, so generator
+state does **not** survive reruns like a session. Do not rely on the generator for
+teardown-critical resources unless you understand that **every** rerun repeats setup.
+The first yielded value and the final return/second yield may each carry ``PageMeta``
+(breadcrumb, etc.); invalid dicts are surfaced with ``st.error`` when validation fails.
+
+## Optional ``st`` typing (Protocol)
+
+:class:`~fluxlit.streamlit.page.PageFn` keeps ``st`` typed as ``typing.Any`` so apps are not
+forced to satisfy the full Streamlit surface. For stricter local typing, define a
+``typing.Protocol`` with only the members your page uses (e.g. ``title``, ``write``,
+``sidebar``) and annotate ``def home(st: MySt, client): ...``. You can also import
+``streamlit`` only under ``typing.TYPE_CHECKING`` in shared modules and use string
+annotations. FluxLit does not change the default ``PageFn`` generic to avoid widespread
+false positives from partial stubs.
 
 ## Static typing
 

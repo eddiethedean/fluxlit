@@ -3,6 +3,11 @@
 Responses are read with ``stream=False`` and the full body buffered before returning
 to the client; very large upstream payloads can use significant memory. For limits on
 **request** bodies proxied to Streamlit, see ``gateway_max_proxy_request_body_bytes``.
+
+Browser request headers are **not** forwarded into the Streamlit script process. For
+``fluxlit.pages.di.Header`` / ``Cookie`` injection in pages, see
+:func:`fluxlit.pages.di.set_page_header_context` and :doc:`streamlit-pages-typing`
+(gateway bridge notes).
 """
 
 from __future__ import annotations
