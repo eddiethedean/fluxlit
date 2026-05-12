@@ -272,3 +272,24 @@ def test_config_cli_errors_on_invalid_public_base_json(
     runner = CliRunner()
     res = runner.invoke(app, ["config", "cfg_bad_pub:app", "--json"])
     assert res.exit_code == 1
+
+
+def test_collect_warnings_gateway_forward_blocked_names() -> None:
+    fl = FluxLit(
+        settings=FluxlitSettings(
+            gateway_forward_client_headers_to_streamlit=["Authorization", "traceparent"]
+        )
+    )
+    w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
+    assert any(x["code"] == "gateway_forward_blocked_names" for x in w)
+    assert any(
+        "authorization" in x["message"].lower()
+        for x in w
+        if x["code"] == "gateway_forward_blocked_names"
+    )
+
+
+def test_collect_warnings_gateway_max_body_unlimited_with_trust_proxy() -> None:
+    fl = FluxLit(settings=FluxlitSettings(trust_proxy=True, gateway_max_proxy_request_body_bytes=0))
+    w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
+    assert any(x["code"] == "gateway_max_body_unlimited_trust_proxy" for x in w)

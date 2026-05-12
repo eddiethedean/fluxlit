@@ -2,14 +2,32 @@
 
 from __future__ import annotations
 
+import json
 import os
+from collections.abc import Callable
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.config.json_types import JsonValue
+
+
+def _parse_raw_gateway_forward_env(env_raw: str) -> list[str]:
+    """Parse ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` for reject diagnostics."""
+    text = env_raw.strip()
+    if not text:
+        return []
+    if text.startswith("["):
+        try:
+            parsed = json.loads(text)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(parsed, list):
+            return [str(x).strip() for x in parsed if str(x).strip()]
+        return []
+    return [p.strip() for p in text.split(",") if p.strip()]
 
 
 class FluxlitSettings(BaseSettings):
@@ -42,6 +60,8 @@ class FluxlitSettings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    _rejected_forward_headers: tuple[str, ...] = PrivateAttr(default_factory=tuple)
 
     title: str = "FluxLit"
     gateway_host: str = "127.0.0.1"
@@ -355,6 +375,29 @@ class FluxlitSettings(BaseSettings):
             "used by ``FluxLit.attach_oidc_login``."
         ),
     )
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _capture_forward_header_rejects(cls, data: Any, handler: Callable[[Any], Any]) -> Any:
+        """Record header names users requested that are rejected (never forwarded)."""
+        raw_list: list[str] = []
+        keyed = isinstance(data, dict) and "gateway_forward_client_headers_to_streamlit" in data
+        if keyed:
+            raw = data["gateway_forward_client_headers_to_streamlit"]
+            if isinstance(raw, str):
+                raw_list = [p.strip() for p in raw.split(",") if p.strip()]
+            elif isinstance(raw, list):
+                raw_list = [str(x).strip() for x in raw if str(x).strip()]
+        if not raw_list and not keyed:
+            raw_list = _parse_raw_gateway_forward_env(
+                os.environ.get("FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT", "")
+            )
+        model = handler(data)
+        if isinstance(model, FluxlitSettings):
+            from fluxlit.gateway.forward_headers import rejected_gateway_forward_header_allowlist
+
+            model._rejected_forward_headers = rejected_gateway_forward_header_allowlist(raw_list)
+        return model
 
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)

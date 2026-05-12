@@ -1,0 +1,22 @@
+# Traefik strip-prefix smoke (port 8085). Compose with base file:
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+#   PUBLIC_PREFIX=/myapp BASE_URL=http://127.0.0.1:8085 ./smoke-test.sh
+
+services:
+  traefik:
+    image: traefik:v3.2
+    command:
+      - "--log.level=INFO"
+      - "--api.dashboard=false"
+      - "--ping=false"
+      - "--entrypoints.web.address=:80"
+      - "--providers.file.filename=/etc/traefik/dynamic/traefik-dynamic.yml"
+      - "--providers.file.watch=false"
+    ports:
+      - "8085:80"
+    volumes:
+      - ./traefik-dynamic.yml:/etc/traefik/dynamic/traefik-dynamic.yml:ro
+    depends_on:
+      fluxlit:
+        condition: service_healthy
+    restart: unless-stopped

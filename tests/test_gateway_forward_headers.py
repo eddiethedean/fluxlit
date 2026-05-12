@@ -17,6 +17,17 @@ def test_normalize_drops_secrets_and_invalid() -> None:
     assert n == frozenset({"x-request-id", "traceparent"})
 
 
+def test_rejected_gateway_forward_lists_blocked_requested_names() -> None:
+    from fluxlit.gateway.forward_headers import rejected_gateway_forward_header_allowlist
+
+    assert rejected_gateway_forward_header_allowlist(["Authorization", "traceparent"]) == (
+        "authorization",
+    )
+    assert rejected_gateway_forward_header_allowlist(["cookie", "Cookie", "x"]) == ("cookie",)
+    assert rejected_gateway_forward_header_allowlist(["traceparent"]) == ()
+    assert rejected_gateway_forward_header_allowlist(["", "host"]) == ("host",)
+
+
 def test_merge_allowlisted_sets_matching_headers() -> None:
     h = httpx.Headers()
     raw = [

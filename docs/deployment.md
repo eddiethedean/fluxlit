@@ -91,13 +91,21 @@ Runnable smoke stacks live under **`docker/proxy-deployment/`** in the repositor
 | nginx full-path | 8081 | Proxy passes full browser path | nginx 1.27 | Match `FLUXLIT_ROOT_PATH` / Streamlit `baseUrlPath` to proxy |
 | nginx `/apps/my-app` prefix | 8083 | Multi-segment prefix; see {ref}`path-prefix-apps` in {doc}`production-tls` | nginx 1.27 | Same Upgrade map |
 | HTTPS + nginx | 8444 | Strip-prefix with TLS | nginx + test certs | Use `CURL_INSECURE=1` for self-signed in smoke |
-| Caddy strip-prefix | 8084 | `handle_path /myapp/*` → upstream | Caddy 2.8 | Second engine for matrix diversity |
+| Caddy strip-prefix | 8084 | `handle_path /myapp/*` → upstream | Caddy 2.8 | Third engine; same strip-prefix contract |
+| Traefik strip-prefix | 8085 | `stripPrefix` + `PathPrefix(/myapp)` | Traefik 3.2 | File provider; same contract as nginx strip-prefix |
 
 Caddy uses **`docker-compose.caddy.yml`** merged with the base **`docker-compose.yml`** (FluxLit service unchanged). Run:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
 PUBLIC_PREFIX=/myapp BASE_URL=http://127.0.0.1:8084 ./smoke-test.sh
+```
+
+Traefik uses **`docker-compose.traefik.yml`** merged with the base file (strip-prefix via file provider). Run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+PUBLIC_PREFIX=/myapp BASE_URL=http://127.0.0.1:8085 ./smoke-test.sh
 ```
 
 ## Observability in production

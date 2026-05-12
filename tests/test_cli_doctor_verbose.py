@@ -43,6 +43,8 @@ def test_build_doctor_verbose_detail_includes_pages_openapi_and_redacted_setting
     assert "internal_api_base_derived" in detail["effective"]
     assert "gateway_proxy" in detail
     assert detail["gateway_proxy"]["upstream_read_timeout_s"] == 120.0
+    assert detail["gateway_proxy"]["max_proxy_request_body_bytes"] == 0
+    assert detail["gateway_proxy"]["max_concurrent_upstream_http"] == 0
 
 
 def test_verbose_gateway_proxy_reflects_forward_header_allowlist() -> None:

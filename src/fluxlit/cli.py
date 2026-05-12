@@ -97,7 +97,7 @@ def _dockerfile_body(target: str) -> str:
         f"# python:3.12-slim @ {_py_slim_digest}\n"
         f"FROM python@{_py_slim_digest}\n"
         "WORKDIR /app\n"
-        'RUN pip install --no-cache-dir "fluxlit>=0.10,<1.0"\n'
+        'RUN pip install --no-cache-dir "fluxlit>=0.11,<1.0"\n'
         "COPY . .\n"
         "RUN useradd --create-home --uid 1000 appuser \\\n"
         "    && chown -R appuser:appuser /app\n"
@@ -875,6 +875,16 @@ def _doctor_collect(
                     "PASS",
                     "no browser→Streamlit HTTP header forwarding (default); "
                     "set_page_header_context for explicit injection",
+                )
+            )
+        rejected = tuple(getattr(fl.settings, "_rejected_forward_headers", ()))
+        if rejected:
+            rows.append(
+                (
+                    "gateway_forward_rejected_names",
+                    "WARN",
+                    f"allowlist contained rejected names {list(rejected)} — never forwarded; "
+                    "see docs/security.html",
                 )
             )
 

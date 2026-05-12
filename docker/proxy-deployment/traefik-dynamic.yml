@@ -1,0 +1,22 @@
+# Traefik file-provider dynamic config (strip-prefix, same contract as nginx.conf).
+# Mounted read-only; used with docker-compose.traefik.yml (public port 8085).
+http:
+  routers:
+    fluxlit:
+      rule: "PathPrefix(`/myapp`)"
+      entryPoints:
+        - web
+      middlewares:
+        - fluxlit-strip-prefix
+      service: fluxlit-svc
+  middlewares:
+    fluxlit-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/myapp"
+  services:
+    fluxlit-svc:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://fluxlit:8000"

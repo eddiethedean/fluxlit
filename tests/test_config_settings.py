@@ -143,3 +143,62 @@ def test_gateway_forward_headers_unknown_sequence_type_returns_empty() -> None:
 def test_gateway_forward_headers_constructor_coerces_int_to_empty() -> None:
     s = FluxlitSettings(gateway_forward_client_headers_to_streamlit=9)  # type: ignore[arg-type]
     assert s.gateway_forward_client_headers_to_streamlit == []
+
+
+def test_forward_header_rejects_from_env_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT",
+        '["Authorization", "traceparent"]',
+    )
+    s = FluxlitSettings.model_validate({})
+    assert s._rejected_forward_headers == ("authorization",)
+
+
+def test_forward_header_rejects_env_json_decode_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT", "[broken-json")
+    with pytest.raises(SettingsError):
+        FluxlitSettings()
+
+
+def test_forward_header_rejects_env_json_array(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT",
+        '["cookie", "traceparent"]',
+    )
+    s = FluxlitSettings.model_validate({})
+    assert s._rejected_forward_headers == ("cookie",)
+
+
+def test_forward_header_rejects_explicit_empty_skips_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT",
+        '["Authorization"]',
+    )
+    s = FluxlitSettings.model_validate({"gateway_forward_client_headers_to_streamlit": []})
+    assert s._rejected_forward_headers == ()
+
+
+def test_parse_raw_gateway_forward_env_helpers() -> None:
+    from fluxlit.config.settings import _parse_raw_gateway_forward_env
+
+    assert _parse_raw_gateway_forward_env("") == []
+    assert _parse_raw_gateway_forward_env("  a , b ") == ["a", "b"]
+    assert _parse_raw_gateway_forward_env('["x", "y"]') == ["x", "y"]
+    assert _parse_raw_gateway_forward_env("[not-json") == []
+    assert _parse_raw_gateway_forward_env("[1]") == ["1"]
+
+
+def test_parse_raw_gateway_forward_env_json_non_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    import fluxlit.config.settings as sm
+
+    real_loads = json.loads
+
+    def fake_loads(s: str) -> object:
+        if s == "[special]":
+            return {"not": "list"}
+        return real_loads(s)
+
+    monkeypatch.setattr(sm.json, "loads", fake_loads)
+    assert sm._parse_raw_gateway_forward_env("[special]") == []

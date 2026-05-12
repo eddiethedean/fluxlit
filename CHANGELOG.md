@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.11.0 - 2026-05-12
+
+- **Proxy matrix:** Traefik **v3.2** strip-prefix smoke stack on port **8085** (`docker-compose.traefik.yml`, `traefik-dynamic.yml`); wired into `docker/proxy-deployment/run-all-proxy-smokes.sh` and the reverse-proxy matrix in {doc}`deployment`.
+- **Cookbook:** gateway Prometheus metrics, Kubernetes-style `healthz` / `readyz` probes, `fluxlit config --strict` in CI, and `FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES` / **413** guidance in {doc}`cookbook`.
+- **Diagnostics:** :func:`fluxlit.gateway.forward_headers.rejected_gateway_forward_header_allowlist` and settings capture of rejected allowlist names; `fluxlit config` / :func:`~fluxlit.config.config_print.collect_configuration_warnings` warn on credential-style names users listed but the gateway never forwards, and when `trust_proxy` is on with unlimited proxied upload body size; `fluxlit doctor` adds `gateway_forward_rejected_names`; verbose `gateway_proxy` includes `max_proxy_request_body_bytes` and `max_concurrent_upstream_http`.
+- **Packaging:** Hatch sdist excludes stray virtualenv directories under ``examples/`` so ``uv build`` / PyPI sdists do not fail on disallowed symlinks.
+
+**Upgrading from 0.10.x:** Bump pins to ``fluxlit>=0.11,<1.0``. Re-check ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` if you list credential header names (they are ignored); new warnings may appear in ``fluxlit doctor`` / ``fluxlit config --strict`` when ``trust_proxy`` is enabled without a body limit.
+
 ## 0.10.0 - 2026-05-12
 
 - **Gateway:** optional ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` / :attr:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit` copies an allowlist of browser header names onto the gateway → Streamlit **HTTP** hop (``st.context.headers`` / :class:`~fluxlit.pages.di.Header`); credential and hop-by-hop names are rejected. See :mod:`fluxlit.gateway.forward_headers` and {doc}`configuration`.

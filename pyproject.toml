@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fluxlit"
-version = "0.10.0"
+version = "0.11.0"
 description = "Production-oriented unified runtime for FastAPI + Streamlit"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -97,6 +97,12 @@ include = [
   "ROADMAP.md",
   "pyproject.toml",
   ".readthedocs.yaml",
+]
+# Local example trees may contain venvs; symlinks break sdist packing.
+exclude = [
+  "examples/**/.venv",
+  "examples/**/.venv*",
+  "examples/**/venv",
 ]
 
 [tool.ruff]

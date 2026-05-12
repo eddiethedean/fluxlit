@@ -239,6 +239,35 @@ def collect_configuration_warnings(
             }
         )
 
+    rejected = tuple(getattr(s, "_rejected_forward_headers", ()))
+    if rejected:
+        joined = ", ".join(rejected)
+        warnings.append(
+            {
+                "level": "warn",
+                "code": "gateway_forward_blocked_names",
+                "message": (
+                    "gateway_forward_client_headers_to_streamlit included names that are "
+                    f"rejected and never forwarded: {joined} — remove them; see security docs."
+                ),
+                "doc": _DOCS_SECURITY,
+            }
+        )
+
+    if s.trust_proxy and s.gateway_max_proxy_request_body_bytes == 0:
+        warnings.append(
+            {
+                "level": "warn",
+                "code": "gateway_max_body_unlimited_trust_proxy",
+                "message": (
+                    "trust_proxy is enabled but gateway_max_proxy_request_body_bytes is 0 "
+                    "(unlimited). Large uploads to Streamlit-proxied paths buffer in the gateway; "
+                    "set FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES for production."
+                ),
+                "doc": _DOCS_CONFIGURATION,
+            }
+        )
+
     return warnings
 
 

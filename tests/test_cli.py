@@ -1335,6 +1335,26 @@ def test_doctor_warns_gateway_forward_headers_when_configured(
     )
 
 
+def test_doctor_warns_gateway_forward_rejected_sensitive_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_fwd_reject.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}, "
+        "gateway_forward_client_headers_to_streamlit=['Authorization', 'traceparent']))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doc_fwd_reject:app")  # noqa: SLF001
+    assert any(
+        name == "gateway_forward_rejected_names" and status == "WARN" for name, status, _ in rows
+    )
+
+
 def test_doctor_default_010_operational_rows_pass(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

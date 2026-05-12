@@ -98,6 +98,8 @@ def build_doctor_verbose_detail(
             "upstream_connect_timeout_s": s.gateway_upstream_connect_timeout_s,
             "upstream_read_timeout_s": s.gateway_upstream_read_timeout_s,
             "ws_open_timeout_s": s.gateway_ws_open_timeout_s,
+            "max_proxy_request_body_bytes": s.gateway_max_proxy_request_body_bytes,
+            "max_concurrent_upstream_http": s.gateway_max_concurrent_upstream_http,
             "forward_client_headers_http": list(
                 getattr(s, "gateway_forward_client_headers_to_streamlit", []) or []
             ),
@@ -157,6 +159,8 @@ def format_doctor_verbose_human(detail: dict[str, Any]) -> list[str]:
         f"connect_timeout_s={gp['upstream_connect_timeout_s']}; "
         f"read_timeout_s={gp['upstream_read_timeout_s']}; "
         f"ws_open_timeout_s={gp['ws_open_timeout_s']}; "
+        f"max_proxy_body_bytes={gp['max_proxy_request_body_bytes']}; "
+        f"max_concurrent_upstream_http={gp['max_concurrent_upstream_http']}; "
         f"forward_client_headers_http={gp['forward_client_headers_http']!r}"
     )
     pd = detail.get("project_defaults")

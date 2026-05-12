@@ -1,4 +1,5 @@
-# Regenerate after publishing a new FluxLit version to PyPI:
+# Regenerate the lockfile (from repo root):
 #   uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt
-# After v0.10.0+ is on PyPI, set the line below to fluxlit>=0.10,<1.0 and recompile so the lock matches the current line.
-fluxlit>=0.9,<1.0
+# If the requested FluxLit range is not on PyPI yet, build wheels first (`uv build -o /tmp/fluxlit-wheels`)
+# and add `--find-links /tmp/fluxlit-wheels` to the compile command.
+fluxlit>=0.11,<1.0

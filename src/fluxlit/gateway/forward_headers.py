@@ -46,6 +46,26 @@ def normalize_gateway_forward_header_allowlist(names: Iterable[str]) -> frozense
     return frozenset(out)
 
 
+def rejected_gateway_forward_header_allowlist(names: Iterable[str]) -> tuple[str, ...]:
+    """Header names from *names* that are rejected and never forwarded (subset of blocklist).
+
+    Users may list ``authorization`` or ``cookie`` expecting them to reach Streamlit, but
+    :func:`normalize_gateway_forward_header_allowlist` drops them. Diagnostics use this tuple
+    to surface a warning.
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in names:
+        s = (raw or "").strip()
+        if not s:
+            continue
+        sl = s.lower()
+        if sl in _FORWARD_HTTP_BLOCKLIST and sl not in seen:
+            seen.add(sl)
+            out.append(sl)
+    return tuple(sorted(out, key=str.lower))
+
+
 def merge_allowlisted_browser_headers(
     headers: httpx.Headers,
     raw_scope_headers: list[tuple[bytes, bytes]],

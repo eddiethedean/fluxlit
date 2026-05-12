@@ -4,7 +4,97 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.10.x)
+## Path to 1.0 (phased plan)
+
+<a id="path-to-1-0"></a>
+
+**1.0** means a deliberate **stability promise** for teams shipping to production: documented **CLI** commands and flags, **`fluxlit.toml` / `[tool.fluxlit]`** keys called out as stable, the **`FLUXLIT_*`** surface described in configuration docs, and **public Python APIs** (package exports and documented helpers such as `FluxLit`, `ApiClient`, `FluxLitTestClient`, page typing utilities, and optional `fluxlit[auth]` entry points). Breaking changes after 1.0 follow **semver** with **deprecation windows** where practical; experimental features stay explicitly labeled until promoted.
+
+The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep **historical and thematic** detail. This spine is the **forward-looking** sequence to GA.
+
+| Phase | Target line | Primary goal |
+|-------|-------------|--------------|
+| **1** | **0.10.1 → 0.11.x** | Close operational and documentation gaps without growing unstable API surface. |
+| **2** | **0.12.x** | Evidence-backed production contracts (multi-replica, load/chaos, stability charter for metrics/manifest/settings). |
+| **3** | **1.0.0rc*** | Release candidate: freeze intentional breaking changes; migration guides; RC-blocker triage only. |
+| **4** | **1.0.0** | General availability: semver promise + published support matrix as the compatibility contract. |
+
+### Phase 1 — 0.10.1 → 0.11.x: Hardening and gap closure
+
+**Goal:** Burn down known rough edges on **documented golden paths** (local `fluxlit dev` / `run`, reference Compose, Kubernetes manifests, proxy smokes: nginx, Traefik, Caddy, subpaths).
+
+**Workstreams**
+
+- **Operational:** broaden proxy matrices and cookbook recipes as real deployments surface edge cases; extend `fluxlit doctor` / verbose JSON where it prevents misconfigured production (headers, `root_path`, WebSocket expectations, timeouts).
+- **Quality bar:** keep **100%** line coverage on `src/fluxlit` and existing CI gates (Ruff, Mypy, `ty`, docs `-W`, audit/SBOM) green on the published [support matrix](docs/support-matrix.md).
+- **Product:** patch-level fixes for gateway → Streamlit proxy, async `Depends`, optional header forwarding, and Streamlit page typing — without new **stable** contracts unless they fill a documented hole.
+
+**Exit criteria (enter Phase 2)**
+
+- No open **P0/P1** defects on golden paths; remaining issues are **documented limitations** with workarounds, or scheduled for Phase 2 with an issue link.
+- **Gaps vs “production”** (in **Current status** below) reviewed: each item is either **done**, **scoped to Phase 2**, or **explicitly out of scope for 1.0** (called out in this file).
+
+### Phase 2 — 0.12.x: Evidence, multi-replica clarity, and stability charter
+
+**Goal:** Replace “we believe it scales” with **repeatable evidence** and a clear **what is stable for 1.0** story.
+
+**Workstreams**
+
+- **Evidence:** publish or extend scripted **load / soak / chaos** scenarios with expected signals (metrics, logs, `readyz`); align outcomes with [runbooks](docs/runbooks.md).
+- **Scale:** first-class docs for **multi-replica** Streamlit + gateway: sticky sessions, external `SessionStore` (e.g. Redis), rollout/drain — building on existing examples and URL-session guides.
+- **Stability charter:** classify **Prometheus metric names/labels**, **page manifest** fields (`manifest_version` 1), log field names, and experimental settings (`experimental_yield_pages`, etc.) into **stable for 1.0** vs **experimental** in docs; adjust code comments/README if needed so CI and operators share one vocabulary.
+- **DX:** clearer startup and CLI errors for invalid combinations (unsafe `forwarded_allow_ips`, `public_base_url` / `root_path` mismatch, multi-worker unified mode).
+
+**Exit criteria (enter Phase 3)**
+
+- Runbooks and observability docs describe what FluxLit emits, what it **does not** emit, and how to correlate gateway, API, and Streamlit-side logs under load.
+- Support matrix includes a concise **1.0 compatibility commitment** (Python, Streamlit, core deps) and **deprecation policy** for the 1.x line.
+- No **hidden** public API that downstreams rely on without docs — either document and freeze, or mark internal.
+
+### Phase 3 — 1.0.0rc*: Release candidate and migration freeze
+
+**Goal:** Validate real upgrades and freeze breaking changes except agreed RC fixes.
+
+**Workstreams**
+
+- Ship **`1.0.0rcN`** to PyPI; gather feedback on upgrade paths from **last 0.12.x** (or last pre-1.0 minor).
+- **CHANGELOG** and **migration guide**: list behavior changes, removed shims, and config renames since the last stable 0.x.
+- **API audit:** resolve deprecations; remove or shim with a clear removal version in 1.x.
+- **Security / supply chain:** maintain or improve SBOM, `pip-audit`, and container baseline from last 0.x.
+
+**Exit criteria (ship 1.0.0)**
+
+- No **RC-blocker** issues on stable CLI, config, and documented public APIs.
+- Docs site **stable** branch describes 1.0 as current; quickstart and deployment guides tested against RC artifacts.
+
+### Phase 4 — 1.0.0: General availability
+
+**Deliverables**
+
+- **`fluxlit==1.0.0`** on PyPI; git tag `v1.0.0`.
+- **Semver commitment** for the scoped stable surface; **Streamlit / FastAPI major** upgrades handled via FluxLit semver minor/patch with matrix updates (exact policy text lives in support matrix + changelog).
+- **Post-1.0 roadmap** (does **not** block 1.0): **Phase 5** native ASGI / embedding research, **Phase 6** plugin ecosystem, deeper OpenTelemetry, broader IdP/proxy matrices, optional per-push min/max dependency CI — continue as 1.1+ work.
+
+### 1.0 readiness checklist (summary)
+
+| Area | Must be true at 1.0 |
+|------|---------------------|
+| **Runtime** | Sidecar gateway model documented; HTTP + WebSocket proxy behavior and limits documented. |
+| **Operations** | `healthz` / `readyz`, graceful shutdown, gateway timeouts and body limits, structured logging story. |
+| **Configuration** | Documented precedence (CLI → env → file → defaults); `fluxlit config` matches runtime. |
+| **Security** | TLS/proxy trust, secrets, and auth (`fluxlit[auth]`) documented; optional metrics extra stable where promised. |
+| **Developer** | `FluxLitTestClient`, AppTest helpers, page manifest + validate CLI, optional typed pages stable per charter. |
+| **Release** | Support matrix, upgrade guide, and semver/deprecation policy published. |
+
+---
+
+## Current status (0.11.x)
+
+**Shipped (0.11.0)**
+
+- **Traefik proxy smoke:** ``docker-compose.traefik.yml`` (strip-prefix, port **8085**) in ``docker/proxy-deployment/``; integrated into ``run-all-proxy-smokes.sh`` and the reverse-proxy matrix in {doc}`deployment`.
+- **Cookbook:** gateway Prometheus scrape hints, Kubernetes-style ``healthz`` / ``readyz`` probe snippets, ``fluxlit config --strict`` in CI, and ``FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES`` / **413** note in {doc}`cookbook`.
+- **Diagnostics:** ``fluxlit doctor`` / ``fluxlit config`` warn when gateway header allowlists request **rejected** credential-style names (never forwarded); warn when ``trust_proxy`` is on with **unlimited** proxied upload size; ``fluxlit doctor --verbose`` ``gateway_proxy`` JSON includes max body bytes and concurrent upstream cap; :class:`~fluxlit.config.FluxlitSettings` records rejected forward-header names for those warnings.
 
 **Done (0.10.0)**
 
@@ -22,17 +112,26 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **0.8.x foundation** (gateway, URL session, testing client, observability, docs) remains as documented in prior roadmap sections.
 - **Pins:** Optional env-driven features and supported Python / Streamlit ranges are summarized in [docs/support-matrix.md](docs/support-matrix.md).
 
-**Next: 0.10.1+ polish**
-
-- Broader proxy matrices and cookbook growth as usage expands.
-- Deeper observability and ecosystem recipes remain ongoing (see **Gaps vs “production”** below).
+**Next: 0.12.x (Phase 2)** — see **[Path to 1.0](#path-to-1-0)** Phase 2: evidence-backed load/chaos baselines, stability charter for metrics/manifest, multi-replica narrative upgrades, and stricter misconfiguration handling where appropriate.
 
 **Gaps vs “production”**
 
 - CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
 - **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain ongoing.
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
-- Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
+- Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes — **1.0 readiness** is now spelled out in **[Path to 1.0](#path-to-1-0)** above.
+
+**Triage: 0.11.0 vs deferred (0.12.x / Phase 2)**
+
+| Topic | 0.11.0 | Deferred |
+|-------|--------|----------|
+| Proxy matrix parity (Traefik + docs) | **Done** | Further engines / shapes as needed |
+| Cookbook / doctor misconfig signals | **Done** (above) | Deeper startup validation (e.g. hard errors for some combos) |
+| Broader load/chaos **evidence** | Partially (existing scripts/CI) | **0.12.x** — published baselines + runbook alignment |
+| OpenTelemetry depth | Hooks + docs recipes | **0.12.x** — fuller propagation story |
+| Multi-replica + external ``SessionStore`` as first-class ops narrative | Examples + URL-session docs | **0.12.x** — expanded playbooks |
+| Stability charter (metric/manifest field classes) | — | **0.12.x** |
+| Per-push min/max dependency matrix | — | Optional / **post-1.0** cost tradeoff (see support matrix) |
 
 ---
 
@@ -208,7 +307,7 @@ repositories, especially monorepos and Streamlit AppTest suites.
 
 ## Version 0.9 — Typed Streamlit pages & developer contracts (released)
 
-**Status:** Shipped on PyPI as **0.9.0**. Follow-on work (async `Depends` when an asyncio loop is already running, optional allowlisted gateway → Streamlit **HTTP** headers, richer `fluxlit doctor` / cookbook docs) is in **0.10.0** — see **Current status (0.10.x)** above.
+**Status:** Shipped on PyPI as **0.9.0**. Follow-on work (async `Depends` when an asyncio loop is already running, optional allowlisted gateway → Streamlit **HTTP** headers, richer `fluxlit doctor` / cookbook docs) is in **0.10.0** — see **Current status (0.11.x)** above.
 
 **Theme:** Bring **optional**, FastAPI-style **type annotations** and **Pydantic (or `TypedDict`) models** to Streamlit integrations so teams can express page metadata, inputs, and shared dependencies explicitly — without breaking existing `(st, client) -> None` handlers.
 
@@ -604,7 +703,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 
 ## Versioning note
 
-Roadmap phases do not map 1:1 to semver. Expect **0.x** to move quickly; **1.0** implies stable CLI/config contracts and a documented support matrix (Python + Streamlit versions).
+Roadmap **historical** phases (0.3–0.10, Phase 0–6) do not map 1:1 to semver. Expect **0.x** to move quickly until the **Phase 3** RC freeze. **1.0** implies the stability scope in **[Path to 1.0](#path-to-1-0)** — stable CLI/config for documented keys, a published **support matrix**, and semver with deprecations for incompatible changes where practical.
 
 ---
 
