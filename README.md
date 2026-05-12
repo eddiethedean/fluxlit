@@ -104,6 +104,7 @@ Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/con
 - [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html): containers, probes, scaling, and Kubernetes graceful shutdown.
 - [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html): request correlation, JSON logs, Prometheus metrics, SLO notes, and runbooks.
 - [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html), [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html), and [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html): auth boundaries, proxy trust, key rotation, and log hygiene.
+- [Support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html): Python and dependency versions tested in CI, pinning guidance (`uv` / `pip-tools` / constraints), and upgrade notes for `FluxLitTestClient` and Streamlit `AppTest`.
 - [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns.
 
 ---
