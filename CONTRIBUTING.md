@@ -81,10 +81,12 @@ Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` mar
 For a **PyPI / tag** release of FluxLit itself:
 
 1. **CHANGELOG** — add a dated section under `CHANGELOG.md` (move items from **Unreleased** if present).
-2. **Version** — bump `version` in `pyproject.toml` (semver **0.x**; document breaking changes in CHANGELOG).
+2. **Version** — bump `version` in `pyproject.toml` (semver **0.x**; document breaking changes in CHANGELOG). Keep **`src/fluxlit/__init__.py`** `__version__` identical so imports and `fluxlit doctor` stay consistent; CI’s docs job regenerates `docs/_generated/setup.txt` from `importlib.metadata.version("fluxlit")`, which must match the committed file after `pip install -e .`.
 3. **Upgrade note** — if CLI, env, import behavior, or defaults changed, add a short **“Upgrading from X.Y.Z”** note in CHANGELOG (commands to run, renamed env vars, removed shims, and test-layout notes).
 4. **Tag** — `git tag vX.Y.Z` after merge to the release branch / `main` per your workflow.
 5. **Read the Docs** — confirm the **stable** build points at the new tag when applicable.
+
+6. **Examples lockfile** — after the wheel is on PyPI, bump **`examples/docker_compose/requirements.in`** (for example `fluxlit>=0.10,<1.0`) and run **`uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt`** so the pinned example matches installable releases.
 
 Before tagging, run the canonical smoke app once locally when runtime or deployment behavior
 changed:

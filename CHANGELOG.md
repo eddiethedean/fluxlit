@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-Nothing unreleased yet.
-
 ## 0.10.0 - 2026-05-12
 
 - **Gateway:** optional ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` / :attr:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit` copies an allowlist of browser header names onto the gateway → Streamlit **HTTP** hop (``st.context.headers`` / :class:`~fluxlit.pages.di.Header`); credential and hop-by-hop names are rejected. See :mod:`fluxlit.gateway.forward_headers` and {doc}`configuration`.

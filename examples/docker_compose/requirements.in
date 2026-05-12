@@ -1,4 +1,4 @@
 # Regenerate after publishing a new FluxLit version to PyPI:
 #   uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt
-# Bump bounds when adopting a newly published FluxLit minor, then recompile.
+# After v0.10.0+ is on PyPI, set the line below to fluxlit>=0.10,<1.0 and recompile so the lock matches the current line.
 fluxlit>=0.9,<1.0
