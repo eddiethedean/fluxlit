@@ -60,13 +60,14 @@ Recommended test environment for Streamlit UI tests:
 
 ```bash
 export FLUXLIT_TESTS=1
-export FLUXLIT_DISABLE_URL_SESSION=1
 python -m pytest
 ```
 
-`FLUXLIT_TESTS=1` is a convention for test-only branches in app code. Explicitly
-setting `FLUXLIT_DISABLE_URL_SESSION=1` keeps headless `AppTest` runs from depending
-on browser query-string continuity; production defaults are unchanged.
+`FLUXLIT_TESTS=1` tells FluxLit's URL-session helpers to no-op by default, keeping
+headless `AppTest` runs from depending on browser query-string continuity. Production
+defaults are unchanged. Set `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1` only for tests
+that explicitly cover URL-session behavior, or set `FLUXLIT_DISABLE_URL_SESSION=1`
+to disable URL-session helpers in any environment.
 
 ## What to test where
 
@@ -109,9 +110,27 @@ internal package layout.
 
 ## Multipage and menu-heavy UIs
 
-Streamlit `AppTest` is strongest when a test starts on one page and checks simple
-widget state. It can be awkward for sidebar radios, `st.navigation`, fragment reruns,
-or tests that switch pages after the first `.run()`. For now:
+FluxLit's Streamlit bootstrap uses `st.navigation(...)`, which `AppTest` can smoke-test
+when the test starts on the default page. A minimal example lives in
+`examples/multipage_apptest/`.
+
+```python
+from my_app import app
+from fluxlit import FluxLitTestClient
+
+
+def test_multipage_home(tmp_path):
+    # Put your project root on sys.path, then point target at your FluxLit app.
+    at = FluxLitTestClient(app).streamlit(target="my_app:app", extra_sys_path=tmp_path)
+    assert at.title and at.title[0].value == "Home Page"
+```
+
+`FluxLitTestClient.streamlit()` sets `FLUXLIT_TESTS=1` during the run, so URL-session
+helpers no-op by default unless you set `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1`.
+
+Streamlit `AppTest` is still strongest when a test starts on one page and checks simple
+widget state. It can be awkward for sidebar radios, fragment reruns, or tests that
+switch pages after the first `.run()`. For now:
 
 - Keep page-selection state behind app-level keys that tests can seed before `.run()`.
 - Give important widgets stable `key=` values.
