@@ -20,15 +20,24 @@ Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recip
 | **CSRF** | If you add **cookie-based** sessions, use SameSite and anti-CSRF patterns; document that Streamlit’s model is not a generic SPA. Prefer bearer tokens from server-side exchange for API calls. |
 | **Spoofed forward-auth headers** | Use {class}`~fluxlit.auth.TrustedProxyUser` only when the network path guarantees clients cannot reach the app with forged `X-Remote-User`-style headers (e.g. app listens on loopback behind nginx that strips identity headers from untrusted clients). |
 | **Clock skew** | JWT `exp` / `nbf` validation is sensitive to time; run NTP on production hosts. `fluxlit doctor` reminds you of this when tightening operations. |
-| **Credential leakage via header forwarding** | ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` (and :attr:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit`) is **off by default**. When enabled, only **explicitly allowlisted** header **names** are copied from the browser request onto the gateway’s **HTTP** upstream to Streamlit; **Authorization**, **Cookie**, and other sensitive / hop-by-hop names are **rejected**. Misconfiguration can still expose PII in logs or ``st.context``; prefer {func}`~fluxlit.pages.di.set_page_header_context` from app-owned middleware after validating a trusted proxy path. See {doc}`configuration` and {doc}`cookbook`. |
+| **Credential leakage via header forwarding** | ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` / :attr:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit` defaults to **empty**. When **non-empty**, FluxLit **merges** those header **names** from the raw browser scope onto the gateway → Streamlit **HTTP** ``httpx`` hop; **Authorization**, **Cookie**, and hop-by-hop names are **rejected from the allowlist** itself. **Separately**, the HTTP proxy already forwards **most** other client headers that survive :func:`~fluxlit.gateway.header_filter.filter_request_headers` (cookies and auth headers are **not** stripped by FluxLit at the wire). What appears in ``st.context.headers`` depends on Streamlit. Misconfiguration can still expose PII in logs; prefer {func}`~fluxlit.pages.di.set_page_header_context` after validating a trusted proxy path. See the subsection below, {doc}`configuration`, and {doc}`cookbook`. **WebSockets** do not use this allowlist — see :mod:`fluxlit.gateway.websocket_proxy`. |
 
-## Gateway → Streamlit HTTP header forwarding (opt-in)
+## Gateway → Streamlit: HTTP vs WebSocket headers
 
-FluxLit’s gateway normally does **not** treat the browser’s request headers as authoritative context inside the Streamlit script process. **0.10** adds an **optional** path to merge a **small allowlist** of header names (for example ``traceparent`` or operator-chosen forward-auth tokens) onto the **HTTP** proxy hop to Streamlit so ``st.context.headers`` / :class:`~fluxlit.pages.di.Header` can observe them.
+### HTTP proxy hop
 
-- **Default:** forwarding list is **empty** — behavior matches earlier releases.
-- **Threats:** header smuggling, accidental logging of sensitive values, cache poisoning if names overlap with cache semantics — treat the allowlist like firewall policy.
-- **Recommendation:** keep allowlists minimal; never forward session or credential headers; validate edge trust (``FLUXLIT_FORWARDED_ALLOW_IPS``, ``trust_proxy``) as documented in {doc}`production-tls`.
+1. **Baseline:** For each request, upstream headers are seeded from the client scope after :func:`fluxlit.gateway.header_filter.filter_request_headers` (drops hop-by-hop headers, client ``Host``, and client ``X-Forwarded-*``). **Most other client header lines are copied** — including typical ``Cookie`` and ``Authorization`` values — before FluxLit applies synthetic ``Host``, trusted ``X-Forwarded-*`` / prefix lines, and ``X-Request-ID``.
+2. **Optional allowlist (0.10+):** ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` **merges** allowlisted names from the **raw** browser scope onto that header map. It **does not remove** headers that were already copied in step 1. An **empty** list means “skip this merge”; it does **not** disable cookie or bearer forwarding at the wire. Names like ``authorization`` and ``cookie`` cannot appear in the allowlist.
+3. **Script visibility:** ``st.context.headers`` and :class:`~fluxlit.pages.di.Header` read what Streamlit exposes; that may differ from the full upstream request.
+
+### WebSocket proxy
+
+The allowlist **does not apply**. :mod:`fluxlit.gateway.websocket_proxy` forwards most browser handshake headers to the Streamlit upstream, except a fixed denylist (notably ``Sec-WebSocket-Extensions`` is dropped so the gateway’s own compression negotiation does not break the upstream handshake).
+
+### Guidance
+
+- **Threats:** header smuggling, accidental logging of sensitive values, cache poisoning if names overlap with cache semantics — treat the allowlist like firewall policy even though it only **adds** lines.
+- **Recommendation:** keep allowlists minimal; validate edge trust (``FLUXLIT_FORWARDED_ALLOW_IPS``, ``trust_proxy``) per {doc}`production-tls`; use {func}`~fluxlit.pages.di.set_page_header_context` when you need explicit, validated injection for typed pages.
 
 ## Where tokens should live
 

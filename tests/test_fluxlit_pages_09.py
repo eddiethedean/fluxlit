@@ -191,6 +191,49 @@ def test_parse_query_params_adapter() -> None:
     assert v["a"] == 3
 
 
+def test_parse_query_params_debug_logs_when_query_keys_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class Opt(BaseModel):
+        a: int | None = None
+
+    class BadQP:
+        def keys(self) -> list[str]:
+            raise RuntimeError("no keys")
+
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    st = SimpleNamespace(query_params=BadQP(), error=lambda *a, **k: None)
+    caplog.set_level(10, logger="fluxlit.pages.query")
+    v = parse_query_params(st, Opt, strict=False)
+    assert v.a is None
+    assert any("_query_dict_from_st" in rec.message for rec in caplog.records)
+
+
+def test_parse_query_params_debug_logs_when_key_read_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class Opt(BaseModel):
+        a: int | None = None
+
+    class QP:
+        def keys(self) -> list[str]:
+            return ["a", "bad"]
+
+        def get(self, key: str) -> Any:
+            if key == "bad":
+                raise RuntimeError("no get")
+            return "1"
+
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    st = SimpleNamespace(query_params=QP(), error=lambda *a, **k: None)
+    caplog.set_level(10, logger="fluxlit.pages.query")
+    v = parse_query_params(st, Opt, strict=False)
+    assert v.a == 1
+    assert any("could not read key" in rec.message for rec in caplog.records)
+
+
 def test_strict_depends_without_callable() -> None:
     def bad(st, client, x: Annotated[int, Depends()]):
         del st, client, x

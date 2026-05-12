@@ -100,6 +100,28 @@ def test_exchange_auth_code_swallows_query_pop_errors(monkeypatch: pytest.Monkey
     assert exchange_auth_code_from_query(st, client) == "ok"
 
 
+def test_exchange_auth_code_pop_failure_logs_when_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    st = MagicMock()
+    st.query_params = MagicMock()
+    st.query_params.get.return_value = "longenough"
+    st.query_params.pop.side_effect = RuntimeError("read-only")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"access_token": "ok", "token_type": "bearer"})
+
+    transport = httpx.MockTransport(handler)
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    client = ApiClient(base_url="http://127.0.0.1:8000/api")
+    client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+    caplog.set_level(10, logger="fluxlit.auth.streamlit")
+    assert exchange_auth_code_from_query(st, client) == "ok"
+    assert any("query_params.pop" in rec.message for rec in caplog.records)
+
+
 def test_bearer_headers_from_session_empty_and_set() -> None:
     st = MagicMock()
     st.session_state = {}

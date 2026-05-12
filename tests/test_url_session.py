@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import time
+
+import pytest
 
 from fluxlit.config import JsonValue
 from fluxlit.url_session import (
     InMemorySessionStore,
+    _query_param_set,
     ensure_url_session,
     hydrate_url_session,
     new_session_id,
@@ -268,7 +272,7 @@ def test_persist_iterable_session_state_without_filtered_state() -> None:
     assert store.get("s") == {"ok": 1}
 
 
-def test_persist_preserves_existing_store_on_state_error() -> None:
+def test_persist_preserves_existing_store_on_state_error(caplog: pytest.LogCaptureFixture) -> None:
     class _BadState:
         def __iter__(self):
             raise RuntimeError("bad state")
@@ -278,8 +282,44 @@ def test_persist_preserves_existing_store_on_state_error() -> None:
     st.session_state = _BadState()  # type: ignore[assignment]
     store = InMemorySessionStore(default_ttl_seconds=None)
     store.set("s", {"existing": "value"})
+    caplog.set_level(logging.WARNING, logger="fluxlit.url_session")
     assert persist_url_session(st, store) == "s"
     assert store.get("s") == {"existing": "value"}
+    assert any("persist_url_session" in rec.message for rec in caplog.records)
+
+
+def test_persist_snapshot_logs_exception_when_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class _BadState:
+        def __iter__(self):
+            raise RuntimeError("bad state")
+
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    st = _FakeSt()
+    st.query_params["fluxlit_sid"] = "s"
+    st.session_state = _BadState()  # type: ignore[assignment]
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    caplog.set_level(logging.ERROR, logger="fluxlit.url_session")
+    assert persist_url_session(st, store) == "s"
+    assert any(rec.levelno == logging.ERROR for rec in caplog.records)
+
+
+def test_query_param_set_logs_on_assign_failure_with_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    class BoomParams(dict[str, str]):
+        def __setitem__(self, key: str, value: str) -> None:
+            raise RuntimeError("read-only")
+
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    st = _FakeSt()
+    st.query_params = BoomParams()
+    caplog.set_level(logging.DEBUG, logger="fluxlit.url_session")
+    assert _query_param_set(st, "fluxlit_sid", "z") is False
+    assert any("_query_param_set" in rec.message for rec in caplog.records)
 
 
 def test_persist_skips_dunder_keys() -> None:

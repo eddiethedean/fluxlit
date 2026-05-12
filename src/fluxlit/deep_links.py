@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from fluxlit.pages.records import PageRecord
 from fluxlit.pages.slug import page_slug
+
+_log = logging.getLogger(__name__)
+
+
+def _fluxlit_debug() -> bool:
+    return os.environ.get("FLUXLIT_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _scalar_query_value(raw: Any) -> str | None:
@@ -32,7 +40,11 @@ def query_params(st: Any) -> dict[str, str]:
     keys: list[str]
     try:
         keys = [str(k) for k in qp.keys()]
-    except Exception:  # noqa: BLE001 — best-effort for mocks / older Streamlit
+    except Exception as exc:  # noqa: BLE001 — best-effort for mocks / older Streamlit
+        if _fluxlit_debug():
+            _log.debug(
+                "query_params: could not list keys from st.query_params: %s", exc, exc_info=True
+            )
         if isinstance(qp, dict):
             keys = [str(k) for k in qp]
         else:
@@ -41,7 +53,14 @@ def query_params(st: Any) -> dict[str, str]:
     for k in keys:
         try:
             raw = qp.get(k) if hasattr(qp, "get") else qp[k]
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            if _fluxlit_debug():
+                _log.debug(
+                    "query_params: could not read key %r from st.query_params: %s",
+                    k,
+                    exc,
+                    exc_info=True,
+                )
             continue
         v = _scalar_query_value(raw)
         if v is not None:

@@ -6,6 +6,7 @@ import textwrap
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from starlette.requests import Request
 
 from fluxlit import FluxLit, FluxLitTestClient, match_nav_page, query_params
@@ -59,6 +60,38 @@ def test_query_params_keys_raises_falls_back_to_dict() -> None:
 
     st = SimpleNamespace(query_params=KeysRaise(x="1"))
     assert query_params(st) == {"x": "1"}
+
+
+def test_query_params_keys_raises_logs_when_debug(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class KeysRaise(dict[str, Any]):
+        def keys(self) -> Any:  # type: ignore[override]
+            raise RuntimeError("boom")
+
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    st = SimpleNamespace(query_params=KeysRaise(x="1"))
+    caplog.set_level(10, logger="fluxlit.deep_links")
+    assert query_params(st) == {"x": "1"}
+    assert any("query_params" in rec.message for rec in caplog.records)
+
+
+def test_query_params_get_failure_logs_when_debug(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    class BadQP:
+        def keys(self) -> list[str]:
+            return ["ok", "bad"]
+
+        def get(self, key: str) -> Any:
+            if key == "bad":
+                raise RuntimeError("no get")
+            return "v"
+
+    monkeypatch.setenv("FLUXLIT_DEBUG", "1")
+    caplog.set_level(10, logger="fluxlit.deep_links")
+    assert query_params(SimpleNamespace(query_params=BadQP())) == {"ok": "v"}
+    assert any("could not read key" in rec.message for rec in caplog.records)
 
 
 def test_query_params_non_dict_without_keys_returns_empty() -> None:

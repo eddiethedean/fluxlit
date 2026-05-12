@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
+
+_log = logging.getLogger(__name__)
+
+
+def _fluxlit_debug() -> bool:
+    return os.environ.get("FLUXLIT_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 class Query:
@@ -23,13 +31,26 @@ def _query_dict_from_st(st: Any) -> dict[str, Any]:
     out: dict[str, Any] = {}
     try:
         keys = list(qp.keys())
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        if _fluxlit_debug():
+            _log.debug(
+                "_query_dict_from_st: could not list keys from st.query_params: %s",
+                exc,
+                exc_info=True,
+            )
         return {}
     for k in keys:
         key = str(k)
         try:
             raw = qp.get(key) if hasattr(qp, "get") else qp[key]
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            if _fluxlit_debug():
+                _log.debug(
+                    "_query_dict_from_st: could not read key %r: %s",
+                    key,
+                    exc,
+                    exc_info=True,
+                )
             continue
         if isinstance(raw, list):
             out[key] = raw[0] if len(raw) == 1 else raw

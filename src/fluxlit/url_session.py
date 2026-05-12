@@ -14,6 +14,7 @@ and multipage patterns.
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 import time
@@ -26,6 +27,8 @@ from fluxlit.config import JsonValue
 from fluxlit.streamlit.facade import StreamlitSessionFacade
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
+
+_log = logging.getLogger("fluxlit.url_session")
 
 
 @runtime_checkable
@@ -156,7 +159,14 @@ def _query_param_set(st: StreamlitSessionFacade, param: str, value: str) -> bool
             setitem(param, value)
             return True
         return False
-    except Exception:
+    except Exception as exc:
+        if _truthy_env("FLUXLIT_DEBUG"):
+            _log.debug(
+                "_query_param_set: failed to set query param %r: %s",
+                param,
+                exc,
+                exc_info=True,
+            )
         return False
 
 
@@ -238,6 +248,10 @@ def persist_url_session(
 
     Values are copied best-effort; remote stores should JSON-encode—non-JSON-safe
     values may need app-side filtering before :meth:`SessionStore.set`.
+
+    If snapshotting ``session_state`` fails, the store is **not** updated but the
+    session id is still returned; a **warning** is logged (with traceback when
+    ``FLUXLIT_DEBUG=1``).
     """
     if _url_session_disabled():
         return None
@@ -256,7 +270,22 @@ def persist_url_session(
             if str(k).startswith("__"):
                 continue
             snap[str(k)] = cast(JsonValue, v)
-    except Exception:
+    except Exception as exc:
+        if _truthy_env("FLUXLIT_DEBUG"):
+            _log.exception(
+                "persist_url_session: failed to snapshot session_state for param=%r sid=%s; "
+                "store not updated",
+                param,
+                sid,
+            )
+        else:
+            _log.warning(
+                "persist_url_session: failed to snapshot session_state for param=%r sid=%s; "
+                "store not updated: %s (set FLUXLIT_DEBUG=1 for traceback)",
+                param,
+                sid,
+                exc,
+            )
         return sid
     store.set(sid, snap, ttl_seconds=ttl_seconds)
     return sid

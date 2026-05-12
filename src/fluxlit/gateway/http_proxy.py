@@ -4,11 +4,21 @@ Responses are read with ``stream=False`` and the full body buffered before retur
 to the client; very large upstream payloads can use significant memory. For limits on
 **request** bodies proxied to Streamlit, see ``gateway_max_proxy_request_body_bytes``.
 
-Browser request headers are **not** forwarded into the Streamlit script process **by
-default**. Optional allowlist :attr:`FluxlitSettings.gateway_forward_client_headers_to_streamlit`
-copies named headers onto the gateway → Streamlit **HTTP** hop so ``st.context.headers``
-and :class:`~fluxlit.pages.di.Header` can read them; see :doc:`configuration` and
-:doc:`streamlit-pages-typing`. For ad-hoc injection (tests or app code), use
+**Wire headers (HTTP hop):** Upstream headers start from the client ASGI scope after
+:func:`fluxlit.gateway.header_filter.filter_request_headers` (drops hop-by-hop lines,
+client ``Host``, and client ``X-Forwarded-*``). **Most remaining client headers are
+copied as-is** — including typical ``Cookie`` / ``Authorization`` lines — then FluxLit
+sets synthetic ``Host``, trusted forwarding lines, and ``X-Request-ID``.
+
+**Optional allowlist:** :attr:`FluxlitSettings.gateway_forward_client_headers_to_streamlit`
+does **not** replace that baseline;
+:func:`~fluxlit.gateway.forward_headers.merge_allowlisted_browser_headers` **merges**
+allowlisted names from the **raw** scope onto the ``httpx`` map (credential and
+hop-by-hop names are rejected from the allowlist itself). An empty allowlist skips
+only this merge step. What Streamlit exposes to Python (``st.context.headers``,
+:class:`~fluxlit.pages.di.Header`) may still differ from the raw wire; see :doc:`security`
+and :doc:`configuration`. **WebSockets** use :mod:`fluxlit.gateway.websocket_proxy` and
+do **not** use this allowlist. For ad-hoc injection (tests or app code), use
 :func:`fluxlit.pages.di.set_page_header_context`.
 """
 

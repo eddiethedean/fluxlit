@@ -208,10 +208,12 @@ class FluxlitSettings(BaseSettings):
     gateway_forward_client_headers_to_streamlit: list[str] = Field(
         default_factory=list,
         description=(
-            "Optional allowlist of HTTP header names (case-insensitive) copied from the "
-            "browser request onto the gateway → Streamlit **HTTP** hop so "
-            "``st.context.headers`` / :class:`~fluxlit.pages.di.Header` can read them. "
-            "Credential and hop-by-hop names are rejected. Empty keeps legacy behavior."
+            "Optional allowlist of HTTP header names (case-insensitive) **merged** from "
+            "the raw browser request onto the gateway → Streamlit **HTTP** hop (after "
+            "``filter_request_headers`` and synthetic forwarding headers). Does **not** "
+            "strip other client headers already copied by the proxy. Credential and "
+            "hop-by-hop names are rejected from the allowlist. Empty list skips this "
+            "merge only. WebSocket handshakes ignore this setting."
         ),
     )
 
