@@ -50,6 +50,7 @@ The working directory should be the project root so Python can import the module
 ## Common options (`dev` / `run`)
 
 - `--host`, `--port`, `--log-level`
+- `--debug` — sets ``FLUXLIT_DEBUG=1`` before loading the app (gateway access logs, API request logging, default log level ``debug`` when still ``info``, ``GET /__fluxlit/debug``, ``get_client`` request-id propagation); see {doc}`configuration` and {doc}`troubleshooting`
 - `--workbench` — Posit Workbench / Connect-style: enable Uvicorn ``proxy_headers`` and print loopback URL hints (see {doc}`platforms`)
 - `--proxy-headers`, `--forwarded-allow-ips` (Uvicorn / reverse proxy trust)
 - `--pidfile` / `--no-pidfile` — PID file path for **`fluxlit shutdown`** (default file or `FLUXLIT_PIDFILE`; skip with `--no-pidfile` or `FLUXLIT_NO_PIDFILE=1`)

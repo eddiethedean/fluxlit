@@ -1,6 +1,6 @@
 # Troubleshooting
 
-**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication) · {doc}`runbooks` · {doc}`production-tls` · {doc}`secrets`
+**Quick links:** [Doctor](#first-step-fluxlit-doctor) · [Import errors](#import-and-target-errors) · [Port in use](#port-already-in-use) · [503 on readyz](#readiness-returns-503) · [413 / 502 from gateway](#payload-too-large-or-bad-gateway-from-the-proxy) · [Streamlit ↔ API](#streamlit-cannot-reach-the-api) · [Debug mode](#debug-mode-streamlit-api-connectivity) · [Proxy / subpath](#subpath-static-assets-websockets) · [Auth](#authentication) · {doc}`runbooks` · {doc}`production-tls` · {doc}`secrets`
 
 ## First step: `fluxlit doctor`
 
@@ -63,6 +63,14 @@ In **unit tests** without `FLUXLIT_STREAMLIT_UPSTREAM`, `readyz` may return **20
 - If you override **`FLUXLIT_INTERNAL_API_BASE`** manually (unusual), it must be an absolute URL whose path matches `api_mount_path` (default `/api`). Doctor warns on mismatch.
 - In Pytest, prefer the patterns in {doc}`testing` so `FluxLitTestClient`,
   `AppTest`, `FLUXLIT_APP`, and the API prefix are configured consistently.
+
+## Debug mode (Streamlit ↔ API connectivity)
+
+Use **`FLUXLIT_DEBUG=1`** or **`fluxlit dev` / `run` / `workbench --debug`** for a single switch that tightens logging and surfaces a **redacted** snapshot at **`GET /__fluxlit/debug`** (effective gateway prefix, mount, settings summary, recent gateway dispatch rows). The parent process also prints **`[fluxlit-debug]`** to stderr with the derived internal API base and mount so you can confirm Streamlit and the gateway agree on URLs.
+
+- **`get_client()`** forwards **`X-Request-ID`** to `/api` when debug is on so API logs line up with the browser request (advanced correlation).
+- If **`api_mount_path`** equals **`/__fluxlit/debug`** or is a prefix of it, the debug HTTP route is **disabled** (returns 404) so your API keeps that path.
+- Turn debug off in production unless you intend the extra logs and the snapshot endpoint; treat **`/__fluxlit/debug`** like internal diagnostics (see {doc}`secrets`).
 
 ## Subpath / static assets / WebSockets
 

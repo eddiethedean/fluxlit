@@ -86,6 +86,13 @@ def run_unified(
     api_prefix = fl.settings.api_mount_path
     internal_api_base = internal_api_base_url(bind_host=host, port=port, api_mount_path=api_prefix)
     mount = normalize_root_mount(fl.settings.public_mount_path())
+    if fl.settings.debug:
+        sys.stderr.write(
+            f"[fluxlit-debug] internal_api_base={internal_api_base!r} api_prefix={api_prefix!r} "
+            f"public_mount={mount!r} proxy_headers={proxy_headers!r} "
+            f"trust_proxy={fl.settings.trust_proxy!r} workbench_mode={workbench_mode!r}\n"
+        )
+        sys.stderr.flush()
     use_proxy = proxy_headers or fl.settings.trust_proxy or workbench_mode
     allow_ips = forwarded_allow_ips
     if use_proxy and allow_ips is None:

@@ -52,7 +52,15 @@ def test_gateway_debug_log_extra_includes_redacted_query(
         proxy_settings=FluxlitSettings(url_session_query_param="fluxlit_sid"),
     )
     client.get("/api/healthz?fluxlit_sid=topsecret&other=ok")
-    rec = next(r for r in caplog.records if r.name == "fluxlit.gateway")
+    api_recs = [
+        r
+        for r in caplog.records
+        if r.name == "fluxlit.gateway"
+        and getattr(r, "fluxlit_dispatch", None) == "api"
+        and "/healthz" in getattr(r, "path", "")
+    ]
+    assert api_recs, "expected gateway access DEBUG record for API healthz"
+    rec = api_recs[0]
     q = getattr(rec, "query", "")
     assert "topsecret" not in q
     assert "redacted" in q.lower()

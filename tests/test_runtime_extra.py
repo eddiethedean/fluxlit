@@ -517,6 +517,81 @@ def test_run_unified_plain_configures_gateway_and_cleans_up(
     assert kwargs["forwarded_allow_ips"] == "127.0.0.1"
 
 
+def test_run_unified_debug_writes_fluxlit_debug_banner_to_stderr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    import fluxlit.runtime.uvicorn_runner as runner
+
+    (tmp_path / "dbg_run_app.py").write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(title='D', settings=FluxlitSettings(debug=True))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FLUXLIT_NO_PIDFILE", "1")
+    monkeypatch.setattr(runner, "find_free_port", lambda: 8765)
+    monkeypatch.setattr(runner, "_invoke_wait_for_tcp", lambda *a, **k: None)
+    captures: dict[str, object] = {"terminated": 0}
+
+    class Proc:
+        def wait(self) -> int:
+            return 0
+
+        def poll(self) -> None:
+            return None
+
+        def send_signal(self, sig: object) -> None:
+            return None
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            return None
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> Proc:
+        captures["cmd"] = cmd
+        captures["popen_kwargs"] = kwargs
+        return Proc()
+
+    class Config:
+        def __init__(self, app: object, **kwargs: object) -> None:
+            captures["config_app"] = app
+            captures["config_kwargs"] = kwargs
+
+    class Server:
+        def __init__(self, config: Config) -> None:
+            self.config = config
+            self.should_exit = False
+
+        def run(self) -> None:
+            captures["server_ran"] = True
+
+    class ImmediateThread:
+        def __init__(self, target, daemon: bool) -> None:
+            self.target = target
+
+        def start(self) -> None:
+            self.target()
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.uvicorn, "Config", Config)
+    monkeypatch.setattr(runner.uvicorn, "Server", Server)
+    monkeypatch.setattr(runner.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(
+        runner,
+        "_terminate_process",
+        lambda proc: captures.__setitem__("terminated", captures["terminated"] + 1),
+    )
+
+    run_unified("dbg_run_app:app", host="127.0.0.1", port=8002)
+    err = capfd.readouterr().err
+    assert "[fluxlit-debug]" in err
+    assert "internal_api_base" in err
+
+
 def test_run_unified_workbench_writes_banner_and_enables_proxy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
