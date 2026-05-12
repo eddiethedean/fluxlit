@@ -169,6 +169,18 @@ def test_forward_header_rejects_env_json_array(monkeypatch: pytest.MonkeyPatch) 
     assert s._rejected_forward_headers == ("cookie",)
 
 
+def test_rejected_forward_headers_from_constructor_lists_all_credential_names() -> None:
+    s = FluxlitSettings(
+        gateway_forward_client_headers_to_streamlit=[
+            "Authorization",
+            "Cookie",
+            "traceparent",
+        ]
+    )
+    assert s._rejected_forward_headers == ("authorization", "cookie")
+    assert s.gateway_forward_client_headers_to_streamlit == ["traceparent"]
+
+
 def test_forward_header_rejects_explicit_empty_skips_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(
         "FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT",

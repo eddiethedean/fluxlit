@@ -1449,6 +1449,30 @@ def test_gateway_prometheus_metric_contract_documents_stable_names_and_labels() 
     assert {item["stability"] for item in GATEWAY_PROMETHEUS_METRICS} == {"stable"}
 
 
+def test_get_gateway_prom_metrics_builds_once_and_reuses_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Counter:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+    class Histogram:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+    stub_pc = types.SimpleNamespace(Counter=Counter, Histogram=Histogram)
+    cached = metrics_module._gateway_prom_cached  # noqa: SLF001
+    metrics_module._gateway_prom_cached = None  # noqa: SLF001
+    try:
+        monkeypatch.setattr(metrics_module.importlib, "import_module", lambda _name: stub_pc)
+        first = metrics_module.get_gateway_prom_metrics()
+        second = metrics_module.get_gateway_prom_metrics()
+        assert first is not None
+        assert first is second
+    finally:
+        metrics_module._gateway_prom_cached = cached  # noqa: SLF001
+
+
 def test_gateway_prometheus_metrics_returns_none_when_dependency_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1525,7 +1549,7 @@ async def test_gateway_query_decode_failure_falls_back_empty_query() -> None:
 
 
 @pytest.mark.asyncio
-async def test_gateway_metrics_observe_errors_are_ignored() -> None:
+async def test_gateway_metrics_observe_errors_are_ignored(caplog: pytest.LogCaptureFixture) -> None:
     class Counter:
         def labels(self, **kwargs: object) -> Counter:
             return self
@@ -1565,8 +1589,13 @@ async def test_gateway_metrics_observe_errors_are_ignored() -> None:
     async def receive() -> dict[str, Any]:
         return {"type": "http.request", "body": b"", "more_body": False}
 
+    caplog.set_level("DEBUG", logger="fluxlit.gateway")
     await gw({"type": "http", "method": "GET", "path": "/api/x", "headers": []}, receive, send)
     assert sent[0]["status"] == 200
+    assert any(
+        "gateway_prometheus_observe_failed" in r.message and "dispatch=api" in r.message
+        for r in caplog.records
+    )
 
 
 @pytest.mark.asyncio
@@ -1616,6 +1645,55 @@ async def test_gateway_metrics_endpoint_accepts_bytes_content_type(
     await gw({"type": "http", "method": "GET", "path": "/metrics", "headers": []}, receive, send)
     assert sent[0]["headers"] == [(b"content-type", b"text/plain; version=0.0.4")]
     assert sent[1]["body"] == b"metrics"
+
+
+@pytest.mark.asyncio
+async def test_gateway_metrics_endpoint_encodes_str_content_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Counter:
+        def labels(self, **kwargs: object) -> Counter:
+            return self
+
+        def inc(self) -> None:
+            return None
+
+    class Histogram:
+        def labels(self, **kwargs: object) -> Histogram:
+            return self
+
+        def observe(self, value: float) -> None:
+            return None
+
+    fake_pc = types.SimpleNamespace(
+        generate_latest=lambda: b"metrics-body",
+        CONTENT_TYPE_LATEST="text/plain; version=0.0.4",
+    )
+    monkeypatch.setattr("fluxlit.gateway.dispatch.importlib.import_module", lambda name: fake_pc)
+    gw = make_gateway_app(
+        api_app=FastAPI(),
+        resolve_upstream=lambda: "http://127.0.0.1:9",
+        prefix="/api",
+        mount="",
+        opts=GatewayProxyOptions(),
+        upstream_sem=None,
+        shared_httpx_client=lambda: None,  # type: ignore[arg-type]
+        prom_metrics=(Counter(), Histogram()),
+        prom_path="/metrics",
+        access_log=False,
+        log_sensitive_query_keys=frozenset(),
+    )
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    await gw({"type": "http", "method": "GET", "path": "/metrics", "headers": []}, receive, send)
+    assert sent[0]["headers"] == [(b"content-type", b"text/plain; version=0.0.4")]
+    assert sent[1]["body"] == b"metrics-body"
 
 
 def _fluxlit_gateway_requests_total(text: str, *, dispatch: str, method_kind: str) -> float:

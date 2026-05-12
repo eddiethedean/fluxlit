@@ -28,6 +28,24 @@ def test_rejected_gateway_forward_lists_blocked_requested_names() -> None:
     assert rejected_gateway_forward_header_allowlist(["", "host"]) == ("host",)
 
 
+def test_rejected_gateway_forward_sorts_and_dedupes_multiple_blocklisted_names() -> None:
+    from fluxlit.gateway.forward_headers import rejected_gateway_forward_header_allowlist
+
+    out = rejected_gateway_forward_header_allowlist(
+        ["Set-Cookie", "authorization", "HOST", "Proxy-Authorization", "authorization"]
+    )
+    assert out == ("authorization", "host", "proxy-authorization", "set-cookie")
+
+
+def test_rejected_gateway_forward_ignores_non_blocklisted_invalid_shapes() -> None:
+    """Invalid header tokens are not listed as 'rejected' — they are dropped earlier."""
+    from fluxlit.gateway.forward_headers import rejected_gateway_forward_header_allowlist
+
+    assert rejected_gateway_forward_header_allowlist(["not-a token", "authorization"]) == (
+        "authorization",
+    )
+
+
 def test_merge_allowlisted_sets_matching_headers() -> None:
     h = httpx.Headers()
     raw = [
@@ -44,6 +62,17 @@ def test_merge_allowlisted_skips_blocklisted_even_if_allowlist_contains_it() -> 
     h = httpx.Headers()
     merge_allowlisted_browser_headers(h, [(b"Cookie", b"secret")], frozenset({"cookie"}))
     assert h.get("cookie") is None
+
+
+def test_merge_allowlisted_skips_x_forwarded_for_even_if_allowlisted() -> None:
+    """Defense in depth: forwarding headers stay out of the merged hop."""
+    h = httpx.Headers()
+    merge_allowlisted_browser_headers(
+        h,
+        [(b"X-Forwarded-For", b"203.0.113.1")],
+        frozenset({"x-forwarded-for"}),
+    )
+    assert h.get("x-forwarded-for") is None
 
 
 def test_normalize_dedupes_case_variants() -> None:

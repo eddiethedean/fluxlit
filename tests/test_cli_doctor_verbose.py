@@ -72,6 +72,39 @@ def test_verbose_gateway_proxy_reflects_forward_header_allowlist() -> None:
     assert "forward_client_headers_http=['traceparent', 'x-request-id']" in text
 
 
+def test_verbose_gateway_proxy_includes_nonzero_body_and_concurrency_limits() -> None:
+    from fluxlit.config import FluxlitSettings
+
+    base = FluxlitSettings()
+    s = base.model_copy(
+        update={
+            "gateway_max_proxy_request_body_bytes": 524288,
+            "gateway_max_concurrent_upstream_http": 64,
+            "gateway_upstream_connect_timeout_s": 7.5,
+        }
+    )
+    fl = FluxLit(settings=s)
+
+    def home(st, client) -> None:  # noqa: ARG001
+        pass
+
+    fl.page("/", title="Main")(home)
+    detail = build_doctor_verbose_detail(
+        fl,
+        resolved_target="lim:lim",
+        bind_host="127.0.0.1",
+        bind_port=8000,
+        pc=None,
+    )
+    gp = detail["gateway_proxy"]
+    assert gp["max_proxy_request_body_bytes"] == 524288
+    assert gp["max_concurrent_upstream_http"] == 64
+    assert gp["upstream_connect_timeout_s"] == 7.5
+    text = "\n".join(format_doctor_verbose_human(detail))
+    assert "max_proxy_body_bytes=524288" in text
+    assert "max_concurrent_upstream_http=64" in text
+
+
 def test_format_doctor_verbose_human_import_failed() -> None:
     lines = format_doctor_verbose_human({"resolved_target": "bad:app", "import_failed": True})
     assert "import_failed" in lines[0]

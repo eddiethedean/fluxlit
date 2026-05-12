@@ -123,7 +123,7 @@ The parent process sets variables for the Streamlit child and for gateway code t
 ### Single process (default)
 
 - **One Uvicorn worker** is the supported model: one gateway ASGI app and **one** Streamlit child share loopback and process-local state (upstream URL file, OIDC BFF in-memory stores, etc.).
-- **Uvicorn `--workers` > 1** is **not supported** for this unified stack in one OS process: extra workers would each try to own a Streamlit subprocess and shared resources would diverge. Do not enable multi-worker on one pod to “use all CPUs”; scale **out** instead (see below).
+- **Uvicorn `--workers` > 1** is **not supported** for this unified stack in one OS process: extra workers would each try to own a Streamlit subprocess and shared resources would diverge. Do not enable multi-worker on one pod to “use all CPUs”; scale **out** instead (see below). Starting with recent FluxLit releases, unified ASGI **lifespan startup fails fast** when Uvicorn’s `Config.workers` is greater than one (unless you set **`FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`**, which keeps the layout explicitly unsupported).
 
 ### Horizontal scale (multiple replicas)
 

@@ -123,6 +123,16 @@ Use your issue tracker or release milestones to burn these down; this list mirro
 - [ ] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs (and code comments where it prevents drift).
 - [ ] **DX / misconfiguration:** clearer startup or CLI errors for invalid combinations (`forwarded_allow_ips`, `public_base_url` / `root_path` mismatch, multi-worker unified mode).
 
+### Suggested PR slices (implementation tracking)
+
+Split Phase 2 work so each change stays reviewable and bisectable:
+
+- **Evidence / load:** extend [`scripts/soak_http.sh`](scripts/soak_http.sh), [`scripts/chaos_graceful_shutdown.sh`](scripts/chaos_graceful_shutdown.sh) / [`scripts/chaos_streamlit_kill.sh`](scripts/chaos_streamlit_kill.sh), and align expected signals with [docs/runbooks.md](docs/runbooks.md); optional CI or scheduled job that runs soak without the full unit-test matrix.
+- **Multi-replica:** deepen [docs/deployment.md](docs/deployment.md) and [examples/kubernetes/](examples/kubernetes/) with sticky-session and external `SessionStore` playbooks cross-linked from [docs/url-session.md](docs/url-session.md).
+- **Stability charter:** add explicit “stable vs experimental” tables (Prometheus names/labels, `manifest_version` 1 fields, log field keys) in [docs/support-matrix.md](docs/support-matrix.md) and/or [docs/observability.md](docs/observability.md); mirror summaries on `FluxlitSettings` experimental fields.
+- **DX / misconfiguration:** unified ASGI lifespan rejects Uvicorn `workers` > 1 unless `FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1` (see [docs/configuration.md](docs/configuration.md)); follow-ups: stricter checks for `forwarded_allow_ips` / `trust_proxy`, `public_base_url` vs `root_path`, and richer `fluxlit doctor` hints.
+- **Dependency hygiene:** when bumping **httpx**, re-audit private imports in [`src/fluxlit/client.py`](src/fluxlit/client.py) (`httpx._types`, `httpx._client`) against the release’s public typing surface.
+
 **Gaps vs “production”**
 
 - CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.

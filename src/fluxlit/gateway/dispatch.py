@@ -222,8 +222,13 @@ def make_gateway_app(
             ):
                 try:
                     prom_metrics[1].labels(dispatch=dispatch).observe(time.perf_counter() - t0)
-                except Exception:  # noqa: S110
-                    pass
+                except Exception as exc:
+                    gateway_log.debug(
+                        "gateway_prometheus_observe_failed dispatch=%s err=%s",
+                        dispatch,
+                        type(exc).__name__,
+                        exc_info=True,
+                    )
             reset_request_id(token)
 
     return app

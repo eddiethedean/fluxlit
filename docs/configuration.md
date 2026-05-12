@@ -56,6 +56,7 @@ log_level = "info"
 | Variable | Role |
 |----------|------|
 | `FLUXLIT_TITLE` | App title (FastAPI / UX default). |
+| `FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER` | When true, skip the unified-stack lifespan check that rejects Uvicorn ``workers`` > 1 (default off). Only for advanced/unsupported layouts; see {doc}`deployment`. |
 | `FLUXLIT_GATEWAY_HOST` / `FLUXLIT_GATEWAY_PORT` | Bind defaults (CLI still overrides for `dev` / `run`). |
 | `FLUXLIT_ROOT_PATH` | Public URL prefix when the app is mounted under a subpath (FastAPI/Uvicorn `root_path`, gateway routing, Streamlit `server.baseUrlPath`). Use the path users see in the browser (e.g. Posit Connect content URL path). |
 | `FLUXLIT_TRUST_PROXY` | If true, enable Uvicorn `proxy_headers` and trust `X-Forwarded-*` / client scheme (typical behind Posit Connect, nginx, or Traefik). You can also pass `fluxlit run --proxy-headers`. |

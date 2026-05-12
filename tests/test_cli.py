@@ -1350,9 +1350,33 @@ def test_doctor_warns_gateway_forward_rejected_sensitive_names(
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     rows = cli_module._doctor_checks("doc_fwd_reject:app")  # noqa: SLF001
-    assert any(
-        name == "gateway_forward_rejected_names" and status == "WARN" for name, status, _ in rows
+    row = next(
+        (name, status, detail)
+        for name, status, detail in rows
+        if name == "gateway_forward_rejected_names" and status == "WARN"
     )
+    assert "authorization" in row[2].lower()
+    assert "never forwarded" in row[2].lower()
+
+
+def test_doctor_gateway_forward_rejected_lists_multiple_names(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_fwd_reject_multi.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}, "
+        "gateway_forward_client_headers_to_streamlit=['Cookie', 'Authorization', 'x-foo']))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doc_fwd_reject_multi:app")  # noqa: SLF001
+    detail = next(d for n, _, d in rows if n == "gateway_forward_rejected_names")
+    assert "'authorization'" in detail or "authorization" in detail
+    assert "cookie" in detail.lower()
 
 
 def test_doctor_default_010_operational_rows_pass(

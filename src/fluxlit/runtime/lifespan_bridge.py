@@ -13,6 +13,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from fluxlit.asgi_types import ASGIMessage
 from fluxlit.runtime.constants import _STREAMLIT_TCP_WAIT_S
 from fluxlit.runtime.streamlit_proc import _StreamlitPopenKwargs, _terminate_process
+from fluxlit.runtime.uvicorn_multiworker import unified_multiworker_startup_error
 from fluxlit.runtime.wait_tcp import _invoke_wait_for_tcp
 
 if TYPE_CHECKING:
@@ -68,6 +69,10 @@ def build_unified_fluxlit_asgi_app(
                     if inner_task is not None:
                         await send({"type": "lifespan.startup.complete"})
                         continue
+                    mw_err = unified_multiworker_startup_error()
+                    if mw_err:
+                        await send({"type": "lifespan.startup.failed", "message": mw_err})
+                        return
                     try:
                         popen_kwargs: _StreamlitPopenKwargs = {"env": env}
                         if sys.platform.startswith("win"):

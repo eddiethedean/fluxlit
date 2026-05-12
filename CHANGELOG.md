@@ -3,6 +3,11 @@
 ## Unreleased
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
+
+- **Runtime:** unified ``FluxLit`` ASGI lifespan fails fast when Uvicorn runs with ``workers`` > 1 (detected via ``uvicorn.lifespan.on.LifespanOn``); set ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`` to override (unsupported). See {doc}`deployment` and {doc}`configuration`.
+- **Gateway:** log at **DEBUG** when Prometheus histogram observation raises instead of swallowing silently.
+- **Roadmap:** Phase 2 “suggested PR slices” subsection links scripts, docs, and follow-up DX work.
+
 ## 0.11.0 - 2026-05-12
 
 - **Proxy matrix:** Traefik **v3.2** strip-prefix smoke stack on port **8085** (`docker-compose.traefik.yml`, `traefik-dynamic.yml`); wired into `docker/proxy-deployment/run-all-proxy-smokes.sh` and the reverse-proxy matrix in {doc}`deployment`.

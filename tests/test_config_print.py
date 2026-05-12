@@ -218,6 +218,32 @@ def test_config_cli_strict_exits_on_warn(tmp_path: Path, monkeypatch: pytest.Mon
     assert any(w["code"] == "forwarded_allow_ips_broad" for w in payload["warnings"])
 
 
+def test_config_cli_strict_fails_on_combined_0_11_warnings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.syspath_prepend(str(tmp_path))
+    (tmp_path / "cfg_strict_011.py").write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings(\n"
+        "    trust_proxy=True,\n"
+        "    gateway_max_proxy_request_body_bytes=0,\n"
+        "    forwarded_allow_ips='*',\n"
+        "    gateway_forward_client_headers_to_streamlit=['Authorization'],\n"
+        "))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    res = runner.invoke(app, ["config", "cfg_strict_011:app", "--json", "--strict"])
+    assert res.exit_code == 1
+    payload = json.loads(res.stdout)
+    codes = {w["code"] for w in payload["warnings"]}
+    assert "forwarded_allow_ips_broad" in codes
+    assert "gateway_forward_blocked_names" in codes
+    assert "gateway_max_body_unlimited_trust_proxy" in codes
+
+
 def test_config_cli_human_shows_ambient_internal_api_base(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -293,3 +319,53 @@ def test_collect_warnings_gateway_max_body_unlimited_with_trust_proxy() -> None:
     fl = FluxLit(settings=FluxlitSettings(trust_proxy=True, gateway_max_proxy_request_body_bytes=0))
     w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
     assert any(x["code"] == "gateway_max_body_unlimited_trust_proxy" for x in w)
+
+
+def test_collect_warnings_multiple_rejected_forward_names_sorted_in_message() -> None:
+    fl = FluxLit(
+        settings=FluxlitSettings(
+            gateway_forward_client_headers_to_streamlit=[
+                "Cookie",
+                "Authorization",
+                "traceparent",
+            ]
+        )
+    )
+    w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
+    gw = next(x for x in w if x["code"] == "gateway_forward_blocked_names")
+    assert "authorization, cookie" in gw["message"]
+
+
+def test_collect_warnings_combined_0_11_gateway_forward_and_trust_proxy_body() -> None:
+    fl = FluxLit(
+        settings=FluxlitSettings(
+            trust_proxy=True,
+            gateway_max_proxy_request_body_bytes=0,
+            gateway_forward_client_headers_to_streamlit=["Authorization", "x-request-id"],
+        )
+    )
+    w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
+    codes = {x["code"] for x in w}
+    assert "gateway_forward_blocked_names" in codes
+    assert "gateway_max_body_unlimited_trust_proxy" in codes
+
+
+def test_collect_warnings_no_forward_blocked_when_allowlist_only_safe_names() -> None:
+    fl = FluxLit(
+        settings=FluxlitSettings(
+            gateway_forward_client_headers_to_streamlit=["traceparent", "x-request-id"]
+        )
+    )
+    w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
+    assert all(x["code"] != "gateway_forward_blocked_names" for x in w)
+
+
+def test_collect_warnings_no_unlimited_body_warn_when_limit_set_with_trust_proxy() -> None:
+    fl = FluxLit(
+        settings=FluxlitSettings(
+            trust_proxy=True,
+            gateway_max_proxy_request_body_bytes=1048576,
+        )
+    )
+    w = collect_configuration_warnings(fl=fl, bind_host="127.0.0.1", bind_port=8000)
+    assert all(x["code"] != "gateway_max_body_unlimited_trust_proxy" for x in w)
