@@ -34,9 +34,10 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
 
-**Next: 0.9+**
+**Next: 0.9**
 
-- Keep turning hardening into repeatable evidence: broader load/chaos coverage, more deployment recipes, deeper OpenTelemetry examples, compatibility signals, and any breaking-change cleanup needed before a future **1.0**.
+- **Typed Streamlit surface:** optional FastAPI-like patterns for `@app.page` — return types, `Annotated` / dependency injection, validated query and session models, structured multipage nav, and a machine-readable page manifest. See **Version 0.9 — Typed Streamlit pages & developer contracts** below.
+- **Ongoing hardening:** broader load/chaos coverage, more deployment recipes, deeper OpenTelemetry examples, compatibility signals, and any breaking-change cleanup needed before a future **1.0**.
 
 ---
 
@@ -207,6 +208,76 @@ repositories, especially monorepos and Streamlit AppTest suites.
 
 - Operators can dump effective FluxLit configuration without starting the full stack.
 - Production pinning guidance names core packages and upgrade expectations alongside the CI matrix.
+
+---
+
+## Version 0.9 — Typed Streamlit pages & developer contracts (planned)
+
+**Theme:** Bring **optional**, FastAPI-style **type annotations** and **Pydantic (or `TypedDict`) models** to Streamlit integrations so teams can express page metadata, inputs, and shared dependencies explicitly — without breaking existing `(st, client) -> None` handlers.
+
+### Page returns and layout metadata
+
+| Feature | Description |
+|---------|-------------|
+| **`Page` / `PageMeta` return types** | Handlers may return a small Pydantic model or `TypedDict` describing **title**, **icon**, **layout** (`wide` / `centered`), **order**, breadcrumbs, default query params, etc.; FluxLit applies it via `set_page_config` / nav builders in a generated wrapper (parallel to FastAPI `response_model` / response shaping). |
+| **`None` remains the default** | Untyped or `-> None` pages behave as today; returning metadata is strictly opt-in. |
+| **Optional setup/teardown** | Explore `yield` / context-manager patterns for one-time setup around a run where they align with Streamlit’s rerun model (document limitations clearly). |
+
+### Dependency injection (`Annotated` / `Depends`)
+
+| Feature | Description |
+|---------|-------------|
+| **`Depends` for pages** | Inspect page signatures beyond `(st, client)` to inject **`FluxlitSettings`**, **`FluxLitPublicUrls`**, **`FluxLit`**, **`ApiClient`**, **`SessionStore`**, OIDC/token factories, etc. — same mental model as FastAPI, all optional. |
+| **`Annotated[..., Header()]` / `Cookie()`** | Where meaningful for **internal** or forwarded context (e.g. correlation id via `ContextVar` from the gateway), mirror FastAPI parameter metadata for docs and tests. |
+| **Shared claims DTO** | Optional injection of a **validated user / claims** object (Pydantic or `TypedDict`) aligned with FastAPI route dependencies so UI code does not parse JWTs manually (extends **Version 0.3** “claims in page functions” intent). |
+
+### Query params, session state, and URL-session blobs
+
+| Feature | Description |
+|---------|-------------|
+| **`QueryModel(BaseModel)`** | Validate `st.query_params` into a model with field errors surfaced in the UI; helpers compose with **`match_nav_page`** / multipage deep links (`docs/deep-links.md`). |
+| **`Annotated[..., Query()]`** | Per-field defaults and descriptions for query binding (primarily for IDE/docs and test contracts). |
+| **`SessionModel` / typed `session_state`** | Optional `model_validate` / `model_dump` bridge for declared keys in `st.session_state` (strict vs permissive `extra` policy configurable). |
+| **Typed URL-session payloads** | Typed hydrate/persist for URL-bound session blobs instead of only `dict[str, JsonValue]`. |
+
+### Multipage navigation as data
+
+| Feature | Description |
+|---------|-------------|
+| **`PageSpec` / `NavigationModel`** | Declarative tree (path, title, children, sections) generated from registered handlers or declared once and wired to **`st.navigation`**. |
+| **Nav from return type** | Optional **`Page` with `children=[...]`** feeding the nav tree while bodies stay imperative. |
+
+### Tooling, testing, and static analysis
+
+| Feature | Description |
+|---------|-------------|
+| **Page manifest (machine-readable)** | Introspected JSON (or similar) listing paths, titles, parameter names/types (as strings), dependencies used — for **docs**, **admin indexes**, **link checkers**, and **codegen**; not required at runtime. |
+| **`@app.page` overloads / richer `Protocol`s** | Stronger static types for `PageFn`, multipage variants, and return-type unions so **mypy/pyright** catch drift (`Page` vs `None`, etc.). |
+| **`FluxLitTestClient` / AppTest** | Typed helpers for asserting structured return metadata, validated query models, and injected fakes for `Depends` in tests. |
+| **Strict registration mode** | Optional flag to **fail at import** on unknown parameter types or unsupported signatures for teams that want hard contracts. |
+| **Docstring → manifest summary** | Reuse function docstrings as short **descriptions** in the page manifest (FastAPI-style). |
+| **Tags / groups for pages** | Optional grouping in the manifest for large apps (parallel to OpenAPI tags). |
+
+### Settings and generics (advanced)
+
+| Feature | Description |
+|---------|-------------|
+| **`FluxLit[SettingsT]` (optional)** | Generic app type when authors subclass **`FluxlitSettings`** for stronger typing end-to-end. |
+| **Typed internal env contract** | Narrow or document `FLUXLIT_*` subsets relevant to pages (e.g. feature flags) as small read-only dataclasses where useful. |
+
+### Documentation & migration
+
+| Feature | Description |
+|---------|-------------|
+| **Guide: “FastAPI patterns in Streamlit pages”** | New doc bridging routes vs pages: return models, `Depends`, query validation, session typing, and when **not** to force typing (Streamlit rerun caveats). |
+| **`0.8 → 0.9` upgrade notes** | Changelog entries for any new optional defaults, deprecations, or manifest-related CLI flags. |
+
+### Success criteria (0.9)
+
+- Existing apps **require no code changes** unless they opt into new decorators / return types / `Depends`.
+- At least one **reference example** demonstrates **returned `Page` metadata**, one **`QueryModel`**, and one **`Depends`** injection alongside classic `(st, client)`.
+- **Mypy** (strict) remains clean for `src/fluxlit`; public typing helpers are covered by tests and documented in the support matrix.
+- **Page manifest** (if shipped) is versioned or clearly marked experimental so CI and external tools can rely on field stability.
 
 ---
 
