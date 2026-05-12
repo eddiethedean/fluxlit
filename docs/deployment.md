@@ -79,6 +79,27 @@ Do **not** run `fluxlit dev` with `--reload` in production images.
 
 For **TLS termination**, **HSTS**, **forwarded header trust**, and **CSP** guidance, see {doc}`production-tls`. For **secrets**, **logs**, and **JWT/OIDC rotation**, see {doc}`secrets`.
 
+(reverse-proxy-matrix)=
+## Reverse proxy compatibility matrix
+
+Runnable smoke stacks live under **`docker/proxy-deployment/`** in the repository (`run-all-proxy-smokes.sh` runs them sequentially in CI-like automation).
+
+| Stack | Public port | Path mode | Edge | WebSocket notes |
+|-------|-------------|-----------|------|-----------------|
+| nginx strip-prefix (default compose) | 8080 | `/myapp/` stripped before FluxLit | nginx 1.27 | `Upgrade` / `Connection` map; long `proxy_read_timeout` |
+| nginx root (full URL path) | 8082 | No strip; origin path matches app | nginx 1.27 | Same as strip-prefix |
+| nginx full-path | 8081 | Proxy passes full browser path | nginx 1.27 | Match `FLUXLIT_ROOT_PATH` / Streamlit `baseUrlPath` to proxy |
+| nginx `/apps/my-app` prefix | 8083 | Multi-segment prefix; see {ref}`path-prefix-apps` in {doc}`production-tls` | nginx 1.27 | Same Upgrade map |
+| HTTPS + nginx | 8444 | Strip-prefix with TLS | nginx + test certs | Use `CURL_INSECURE=1` for self-signed in smoke |
+| Caddy strip-prefix | 8084 | `handle_path /myapp/*` → upstream | Caddy 2.8 | Second engine for matrix diversity |
+
+Caddy uses **`docker-compose.caddy.yml`** merged with the base **`docker-compose.yml`** (FluxLit service unchanged). Run:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+PUBLIC_PREFIX=/myapp BASE_URL=http://127.0.0.1:8084 ./smoke-test.sh
+```
+
 ## Observability in production
 
 - Enable **`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`** only if your log pipeline can handle per-request volume; pair with filters and {mod}`fluxlit.logging.redact` where headers are copied into logs — {doc}`observability`.

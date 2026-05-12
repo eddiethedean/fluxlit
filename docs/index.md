@@ -21,6 +21,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Survive full page reload without cookies (URL + server store) | {doc}`url-session` · {doc}`url-session-token-security` |
 | Deep links, query params, and invite-style URLs to Streamlit | {doc}`deep-links` |
 | Test API routes, Streamlit pages, multipage nav, and query params in Pytest | {doc}`testing` |
+| Copy-paste deployment and header patterns | {doc}`cookbook` |
 | Call the FastAPI app from Streamlit pages (`client`, bearer, errors) | {doc}`streamlit-api-client` |
 | FastAPI-style typing, ``Depends``, query models, manifests | {doc}`streamlit-pages-typing` |
 | Fix imports, 503 readiness, WebSockets, or wrong API paths | {doc}`troubleshooting` · `fluxlit doctor` |
@@ -59,6 +60,7 @@ security
 url-session
 url-session-token-security
 deep-links
+cookbook
 streamlit-api-client
 streamlit-pages-typing
 migration-auth

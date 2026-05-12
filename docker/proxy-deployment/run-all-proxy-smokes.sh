@@ -10,6 +10,7 @@ if ! python3 -c "import websockets" 2>/dev/null; then
 fi
 
 cleanup() {
+  docker compose -f docker-compose.yml -f docker-compose.caddy.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml -f docker-compose.root.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml -f docker-compose.apps-prefix.yml down -v 2>/dev/null || true
@@ -27,6 +28,11 @@ echo "=== Strip-prefix proxy (8080) ==="
 docker compose -f docker-compose.yml up -d --build
 BASE_URL=http://127.0.0.1:8080 ./smoke-test.sh
 docker compose -f docker-compose.yml down -v
+
+echo "=== Caddy strip-prefix (8084) ==="
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+BASE_URL=http://127.0.0.1:8084 ./smoke-test.sh
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml down -v
 
 echo "=== Strip-prefix /apps/my-app (8083) ==="
 docker compose -f docker-compose.yml -f docker-compose.apps-prefix.yml up -d --build

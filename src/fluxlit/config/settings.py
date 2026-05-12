@@ -205,6 +205,38 @@ class FluxlitSettings(BaseSettings):
             "Optional ``max_size`` (bytes) for upstream WebSocket frames; ``None`` is unlimited."
         ),
     )
+    gateway_forward_client_headers_to_streamlit: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Optional allowlist of HTTP header names (case-insensitive) copied from the "
+            "browser request onto the gateway → Streamlit **HTTP** hop so "
+            "``st.context.headers`` / :class:`~fluxlit.pages.di.Header` can read them. "
+            "Credential and hop-by-hop names are rejected. Empty keeps legacy behavior."
+        ),
+    )
+
+    @field_validator("gateway_forward_client_headers_to_streamlit", mode="before")
+    @classmethod
+    def _coerce_forward_header_list(cls, v: object) -> list[str]:
+        if v is None or v == "":
+            return []
+        if isinstance(v, str):
+            return [p.strip() for p in v.split(",") if p.strip()]
+        if isinstance(v, list):
+            return [str(x).strip() for x in v if str(x).strip()]
+        return []
+
+    @field_validator("gateway_forward_client_headers_to_streamlit", mode="after")
+    @classmethod
+    def _validate_forward_header_list(cls, v: list[str]) -> list[str]:
+        from fluxlit.gateway.forward_headers import normalize_gateway_forward_header_allowlist
+
+        norm = normalize_gateway_forward_header_allowlist(v)
+        if len(norm) > 32:
+            msg = "gateway_forward_client_headers_to_streamlit supports at most 32 names"
+            raise ValueError(msg)
+        return sorted(norm)
+
     uvicorn_graceful_shutdown_timeout_s: float | None = Field(
         default=None,
         ge=0.0,

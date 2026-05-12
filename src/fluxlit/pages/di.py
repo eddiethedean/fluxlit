@@ -7,6 +7,7 @@ import contextvars
 import inspect
 import json
 import os
+import threading
 from collections.abc import Callable, Mapping
 from typing import Annotated, Any, ForwardRef, get_args, get_origin, get_type_hints
 
@@ -119,6 +120,29 @@ def _call_kw_for_fn(fn: Callable[..., Any], kw: dict[str, Any]) -> dict[str, Any
     return {k: v for k, v in kw.items() if k in sig.parameters}
 
 
+def _header_from_streamlit_context(st: Any, name_lc: str) -> str | None:
+    """Best-effort read from ``st.context.headers`` (Streamlit 1.30+)."""
+    try:
+        proxy = getattr(st, "context", None)
+        headers = getattr(proxy, "headers", None) if proxy is not None else None
+        if headers is None:
+            return None
+        get = getattr(headers, "get", None)
+        if get is None:
+            return None
+        v = get(name_lc)
+        if v is not None:
+            return str(v)
+        items = getattr(headers, "items", None)
+        if callable(items):
+            for k, val in items():
+                if str(k).lower() == name_lc:
+                    return str(val)
+    except Exception:
+        return None
+    return None
+
+
 def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> Any:
     allow_async = bool(getattr(app.settings, "async_page_depends", False))
 
@@ -130,6 +154,42 @@ def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> An
 
         return anyio.run(_await)
 
+    def _run_coro_isolated_thread(coro: Any) -> Any:
+        """Run *coro* on a fresh event loop in a short-lived daemon thread.
+
+        Avoids ``RuntimeError`` when Streamlit (or another caller) already has a running
+        loop on this thread while ``anyio.run`` / ``asyncio.run`` cannot nest.
+        """
+        result: list[Any] = []
+        error: list[BaseException] = []
+
+        def _worker() -> None:
+            try:
+
+                async def _await_one() -> Any:
+                    return await coro
+
+                result.append(asyncio.run(_await_one()))
+            except BaseException as exc:  # noqa: BLE001 — propagate dependency failures
+                error.append(exc)
+
+        th = threading.Thread(target=_worker, name="fluxlit-async-dep", daemon=True)
+        th.start()
+        th.join(timeout=300.0)
+        if th.is_alive():
+            msg = "async Depends resolution timed out"
+            raise TimeoutError(msg)
+        if error:
+            raise error[0]
+        return result[0]
+
+    def _await_async_dep(coro: Any) -> Any:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return _run_coro_no_loop(coro)
+        return _run_coro_isolated_thread(coro)
+
     if inspect.iscoroutinefunction(dependency):
         if not allow_async:
             msg = (
@@ -137,13 +197,7 @@ def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> An
                 "or use a synchronous callable."
             )
             raise TypeError(msg)
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return _run_coro_no_loop(dependency())
-        qual = getattr(dependency, "__qualname__", dependency)
-        msg = f"Async Depends({qual!r}) cannot be resolved under an active asyncio event loop."
-        raise TypeError(msg)
+        return _await_async_dep(dependency())
     out = dependency()
     if inspect.iscoroutine(out):
         if not allow_async:
@@ -152,15 +206,7 @@ def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> An
                 "or return a plain value from the dependency."
             )
             raise TypeError(msg)
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            return _run_coro_no_loop(out)
-        msg = (
-            "Depends(...) returned a coroutine under an active asyncio event loop; "
-            "use a synchronous dependency."
-        )
-        raise TypeError(msg)
+        return _await_async_dep(out)
     return out
 
 
@@ -191,7 +237,10 @@ def resolve_page_kwargs(
                 kwargs[name] = merged[name]
             else:
                 ctx = _header_context.get() or {}
-                kwargs[name] = ctx.get(hdr.name)
+                val = ctx.get(hdr.name)
+                if val is None:
+                    val = _header_from_streamlit_context(st, hdr.name)
+                kwargs[name] = val
             continue
         ck = _unwrap_cookie(param, hints, name)
         if ck is not None:

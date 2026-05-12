@@ -4,22 +4,28 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.9.x)
+## Current status (0.10.x)
 
-**Done (0.9.0+)**
+**Done (0.10.0)**
+
+- **Gateway header bridge:** optional ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` / :class:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit` allowlists browser header names onto the gateway → Streamlit **HTTP** hop (rejects credentials / hop-by-hop); :class:`~fluxlit.pages.di.Header` also reads ``st.context.headers`` after :func:`~fluxlit.pages.di.set_page_header_context`.
+- **Async Depends:** when ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` and an asyncio loop is already running, dependencies resolve on a **short-lived side thread** instead of raising ``TypeError``.
+- **Operational polish:** Caddy strip-prefix added to the Docker proxy smoke matrix; ``fluxlit doctor`` adds readiness/WebSocket/timeout/async/forward-header signals; ``fluxlit doctor --verbose`` includes a ``gateway_proxy`` block; new {doc}`cookbook` and deployment proxy compatibility table.
+
+**Previously (0.9.0+)**
 
 - **Typed Streamlit pages:** :class:`~fluxlit.pages.records.PageRecord` registry; :meth:`~fluxlit.app.FluxLit.page` with ``icon``, ``tags``, ``page_meta``; :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, :class:`~fluxlit.pages.di.Cookie`; optional :class:`~fluxlit.url_session.SessionStore` injection; strict registration via :class:`~fluxlit.config.FluxlitSettings.strict_page_signatures`.
 - **Navigation:** :meth:`~fluxlit.app.FluxLit.navigation` with :class:`~fluxlit.pages.navigation.NavigationModel` ordering; ``PageMeta.children`` merges display overrides and sidebar order in the Streamlit entrypoint; ``?page=`` deep links align with that order (see :doc:`deep-links`).
 - **Manifest / CLI:** :meth:`~fluxlit.app.FluxLit.build_page_manifest` (``manifest_version`` **1**, **stable**); ``fluxlit pages manifest`` and ``fluxlit pages validate`` for CI.
 - **Doctor / config:** ``fluxlit doctor --verbose`` snapshots; ``--check-pages`` runs validate-style checks; settings expose ``experimental_yield_pages`` and ``async_page_depends`` for env parity.
-- **Async Depends (optional):** ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` resolves async dependency callables when no asyncio loop is running (see :doc:`streamlit-pages-typing`).
+- **Async Depends (0.9 baseline):** ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` resolved async dependency callables with ``anyio.run`` when no asyncio loop is running (see :doc:`streamlit-pages-typing`).
 - **0.8.x foundation** (gateway, URL session, testing client, observability, docs) remains as documented in prior roadmap sections.
-- **Pins:** Optional env-driven features (async ``Depends``, experimental generator pages) and supported Python / Streamlit ranges are summarized in [docs/support-matrix.md](docs/support-matrix.md).
+- **Pins:** Optional env-driven features and supported Python / Streamlit ranges are summarized in [docs/support-matrix.md](docs/support-matrix.md).
 
-**Next: 0.9.1–0.10**
+**Next: 0.10.1+ polish**
 
-- **0.9.x polish:** Broader proxy matrices, richer doctor signals, and cookbook docs as usage grows.
-- **0.10 (tentative):** Deeper async integration with Streamlit’s threading model if needed; optional gateway auto-wiring for header context behind strict security review — prefer explicit ``set_page_header_context`` until then.
+- Broader proxy matrices and cookbook growth as usage expands.
+- Deeper observability and ecosystem recipes remain ongoing (see **Gaps vs “production”** below).
 
 **Gaps vs “production”**
 

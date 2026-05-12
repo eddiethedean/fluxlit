@@ -41,6 +41,8 @@ def test_build_doctor_verbose_detail_includes_pages_openapi_and_redacted_setting
     assert detail["openapi"]["docs_url"] == "/docs"
     assert detail["settings_redacted"]["jwt_hs256_secret"] == "[REDACTED]"
     assert "internal_api_base_derived" in detail["effective"]
+    assert "gateway_proxy" in detail
+    assert detail["gateway_proxy"]["upstream_read_timeout_s"] == 120.0
 
 
 def test_format_doctor_verbose_human_import_failed() -> None:
@@ -68,6 +70,7 @@ def test_format_doctor_verbose_human_full_detail() -> None:
     assert "Hints:" in text
     assert "public_mount_path" in text
     assert "path='/'" in text
+    assert "gateway_proxy:" in text
 
 
 def test_streamlit_apptest_version_ok_handles_bad_version(monkeypatch: pytest.MonkeyPatch) -> None:

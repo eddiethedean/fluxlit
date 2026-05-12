@@ -4,10 +4,12 @@ Responses are read with ``stream=False`` and the full body buffered before retur
 to the client; very large upstream payloads can use significant memory. For limits on
 **request** bodies proxied to Streamlit, see ``gateway_max_proxy_request_body_bytes``.
 
-Browser request headers are **not** forwarded into the Streamlit script process. For
-``fluxlit.pages.di.Header`` / ``Cookie`` injection in pages, see
-:func:`fluxlit.pages.di.set_page_header_context` and :doc:`streamlit-pages-typing`
-(gateway bridge notes).
+Browser request headers are **not** forwarded into the Streamlit script process **by
+default**. Optional allowlist :attr:`FluxlitSettings.gateway_forward_client_headers_to_streamlit`
+copies named headers onto the gateway → Streamlit **HTTP** hop so ``st.context.headers``
+and :class:`~fluxlit.pages.di.Header` can read them; see :doc:`configuration` and
+:doc:`streamlit-pages-typing`. For ad-hoc injection (tests or app code), use
+:func:`fluxlit.pages.di.set_page_header_context`.
 """
 
 from __future__ import annotations
@@ -19,6 +21,7 @@ import httpx
 from starlette.types import Receive, Scope, Send
 
 from fluxlit.gateway._log import gateway_log
+from fluxlit.gateway.forward_headers import merge_allowlisted_browser_headers
 from fluxlit.gateway.header_filter import filter_request_headers
 from fluxlit.gateway.options import GatewayProxyOptions
 from fluxlit.gateway.responses import respond_413_payload_too_large
@@ -96,6 +99,11 @@ async def proxy_http_inner(
         scope, public_host, forwarded_prefix=forwarded_prefix
     ):
         headers[hk] = hv
+    merge_allowlisted_browser_headers(
+        headers,
+        list(raw_headers),
+        proxy_options.forward_client_headers_http,
+    )
     headers[REQUEST_ID_HEADER] = request_id
 
     max_body = proxy_options.max_proxy_body_bytes

@@ -1280,6 +1280,61 @@ def test_doctor_checks_upstream_state_file_and_env(
     assert ("streamlit_upstream", "PASS", "http://127.0.0.1:9 ok") in rows
 
 
+def test_doctor_warns_gateway_upstream_read_timeout_when_low(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_low_gateway_read.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}, "
+        "gateway_upstream_read_timeout_s=1.0))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doc_low_gateway_read:app")  # noqa: SLF001
+    assert any(name == "gateway_upstream_timeouts" and status == "WARN" for name, status, _ in rows)
+
+
+def test_doctor_warns_async_depends_when_enabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_async_dep.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}, async_page_depends=True))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doc_async_dep:app")  # noqa: SLF001
+    assert any(name == "async_depends_streamlit" and status == "WARN" for name, status, _ in rows)
+
+
+def test_doctor_warns_gateway_forward_headers_when_configured(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_fwd_hdr.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}, "
+        "gateway_forward_client_headers_to_streamlit=['traceparent']))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doc_fwd_hdr:app")  # noqa: SLF001
+    assert any(
+        name == "gateway_forward_client_headers" and status == "WARN" for name, status, _ in rows
+    )
+
+
 def test_main_invokes_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:
     called: list[bool] = []
     monkeypatch.setattr(cli_module, "app", lambda: called.append(True))

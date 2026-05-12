@@ -417,7 +417,7 @@ def test_resolve_page_kwargs_async_depends_without_flag_errors() -> None:
 
 
 @pytest.mark.asyncio
-async def test_resolve_page_kwargs_async_dep_inside_running_loop_errors(
+async def test_resolve_page_kwargs_async_dep_inside_running_loop_resolves(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
@@ -426,8 +426,28 @@ async def test_resolve_page_kwargs_async_dep_inside_running_loop_errors(
     def fn(st, client, x: int = Depends(_async_dep)):  # noqa: B008
         del st, client, x
 
-    with pytest.raises(TypeError, match="active asyncio"):
-        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["x"] == 7
+
+
+@pytest.mark.asyncio
+async def test_resolve_page_kwargs_sync_dep_returns_coro_in_loop_resolves(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def dep() -> Any:
+        async def inner() -> int:
+            return 1
+
+        return inner()
+
+    def fn(st, client, x: int = Depends(dep)):  # noqa: B008
+        del st, client, x
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["x"] == 1
 
 
 def test_validate_fluxlit_pages_manifest_not_json_serializable(
@@ -527,6 +547,7 @@ def test_fluxlit_pages_subpackage_getattr_unknown_raises() -> None:
         _ = pages.not_a_fluxlit_export
 
 
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
 def test_resolve_page_kwargs_sync_dep_returns_coro_without_flag_errors() -> None:
     app = FluxLit()
 
@@ -544,26 +565,7 @@ def test_resolve_page_kwargs_sync_dep_returns_coro_without_flag_errors() -> None
 
 
 @pytest.mark.asyncio
-async def test_resolve_page_kwargs_sync_dep_returns_coro_in_loop_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
-    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
-
-    def dep() -> Any:
-        async def inner() -> int:
-            return 1
-
-        return inner()
-
-    def fn(st, client, x: int = Depends(dep)):  # noqa: B008
-        del st, client, x
-
-    with pytest.raises(TypeError, match="active asyncio"):
-        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
-
-
-def test_resolve_page_kwargs_sync_dep_returns_coro_resolved_with_flag(
+async def test_resolve_page_kwargs_sync_dep_returns_coro_resolved_with_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
@@ -580,3 +582,54 @@ def test_resolve_page_kwargs_sync_dep_returns_coro_resolved_with_flag(
 
     kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
     assert kw["x"] == 99
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+async def test_resolve_async_dep_times_out_when_worker_thread_stays_alive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fluxlit.pages.di as di
+
+    class _FakeThread:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def join(self, timeout: float | None = None) -> None:
+            pass
+
+        def is_alive(self) -> bool:
+            return True
+
+    monkeypatch.setattr(di.threading, "Thread", _FakeThread)
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def fn(st, client, x: int = Depends(_async_dep)):  # noqa: B008
+        del st, client, x
+
+    with pytest.raises(TimeoutError, match="async Depends resolution timed out"):
+        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_async_dep_propagates_worker_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fluxlit.pages.di as di
+
+    def _boom(_coro: object) -> None:
+        raise ValueError("worker-fail")
+
+    monkeypatch.setattr(di.asyncio, "run", _boom)
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def fn(st, client, x: int = Depends(_async_dep)):  # noqa: B008
+        del st, client, x
+
+    with pytest.raises(ValueError, match="worker-fail"):
+        resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)

@@ -45,21 +45,43 @@ Import {class}`~fluxlit.pages.di.Depends`, {class}`~fluxlit.pages.di.Header`, an
 - **Session store:** pass ``session_store=...`` to {class}`~fluxlit.app.FluxLit` and annotate a parameter
   with {class}`~fluxlit.url_session.SessionStore` to receive the same instance.
 - **Depends:** ``def page(st, client, user: Annotated[User, Depends(load_user)]): ...`` where
-  ``load_user()`` returns the dependency value (async callables are supported when
-  ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` is set; otherwise use sync callables only).
-- **Header / Cookie:** resolved from test overrides or a header map set with
-  {func}`~fluxlit.pages.di.set_page_header_context`. Streamlit children do **not** see
-  browser HTTP headers unless your deployment sets this context from a gateway hook.
+  ``load_user()`` returns the dependency value. Async callables and awaitable returns are
+  supported when ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` / {attr}`~fluxlit.config.FluxlitSettings.async_page_depends`
+  is on: if Streamlit (or another caller) already has an **asyncio** loop on the current thread,
+  FluxLit runs the coroutine on a **short-lived side thread** with its own loop (avoiding
+  nested-loop errors). Keep async deps **fast** and **thread-safe**; do not assume you are on
+  Streamlit’s main thread.
+- **Header / Cookie:** resolved in order: (1) ``FLUXLIT_TEST_PAGE_OVERRIDES`` / test kwargs,
+  (2) the map from {func}`~fluxlit.pages.di.set_page_header_context`, (3) when present,
+  ``st.context.headers`` from Streamlit (HTTP requests only). The gateway does **not** put
+  browser headers into the Streamlit process by default.
 
-  **Gateway bridge:** the FluxLit gateway proxies HTTP to Streamlit in a **separate**
-  process, so browser headers are not automatically visible inside ``@app.page`` handlers.
-  Map trusted forwarded headers into ``set_page_header_context`` from code that runs in
-  the Streamlit process (for example a small bootstrap before ``run_streamlit_entrypoint``),
+  **Optional HTTP forwarding:** set ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT``
+  to a comma-separated or JSON list of **lowercase** header names (for example ``traceparent``).
+  FluxLit copies **only** those names from the browser onto the gateway → Streamlit **HTTP**
+  hop so ``st.context.headers`` and ``Header()`` can read them. ``authorization``, ``cookie``,
+  and hop-by-hop / ``X-Forwarded-*`` names are **rejected**. WebSocket requests already forward
+  most browser headers on a curated path—see :mod:`fluxlit.gateway.websocket_proxy`.
+
+  **Explicit bridge:** for sensitive forward-auth patterns, prefer mapping trusted headers into
+  {func}`~fluxlit.pages.di.set_page_header_context` from code that runs in the Streamlit process,
   with strict allowlists and redaction—never log raw ``Authorization`` or session cookies.
 
 **Claims-style models:** use ``Depends`` with a callable that returns a Pydantic model;
 pair with your FastAPI JWT stack on the API side—FluxLit does not parse JWTs in Streamlit
 unless you supply the callable.
+
+### Async ``Depends`` and header resolution (0.10)
+
+| Situation | Behaviour |
+|-----------|-----------|
+| Sync ``Depends`` callable | Invoked normally; return value injected. |
+| Async / awaitable deps, flag **off** | ``TypeError`` with guidance to set ``FLUXLIT_ASYNC_PAGE_DEPENDS=1``. |
+| Async / awaitable deps, flag **on**, **no** running asyncio loop on thread | Resolved via ``anyio.run`` (same as earlier 0.9 behaviour). |
+| Async / awaitable deps, flag **on**, **running** loop on thread | Resolved on a **short-lived daemon thread** with its own ``asyncio.run`` so nested-loop errors are avoided. |
+
+Keep async deps idempotent and fast; they must not rely on thread-local state tied to
+Streamlit’s main script thread.
 
 ## Query and session state
 

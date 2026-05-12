@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fluxlit.config import FluxlitSettings
+from fluxlit.gateway.forward_headers import normalize_gateway_forward_header_allowlist
 
 
 @dataclass(frozen=True)
@@ -25,12 +26,16 @@ class GatewayProxyOptions:
     ws_ping_timeout_s: float | None = None
     ws_close_timeout_s: float | None = None
     ws_max_message_bytes: int | None = None
+    forward_client_headers_http: frozenset[str] = frozenset()
 
 
 def gateway_opts(fluxlit_settings: FluxlitSettings | None) -> GatewayProxyOptions:
     if fluxlit_settings is None:
         return GatewayProxyOptions()
     fs = fluxlit_settings
+    fwd = normalize_gateway_forward_header_allowlist(
+        getattr(fs, "gateway_forward_client_headers_to_streamlit", []) or []
+    )
     return GatewayProxyOptions(
         connect_timeout=fs.gateway_upstream_connect_timeout_s,
         read_timeout=fs.gateway_upstream_read_timeout_s,
@@ -43,4 +48,5 @@ def gateway_opts(fluxlit_settings: FluxlitSettings | None) -> GatewayProxyOption
         ws_ping_timeout_s=fs.gateway_ws_ping_timeout_s,
         ws_close_timeout_s=fs.gateway_ws_close_timeout_s,
         ws_max_message_bytes=fs.gateway_ws_max_message_bytes,
+        forward_client_headers_http=fwd,
     )

@@ -79,6 +79,7 @@ log_level = "info"
 | `FLUXLIT_GATEWAY_WS_PING_TIMEOUT_S` | Optional upstream `ping_timeout`. |
 | `FLUXLIT_GATEWAY_WS_CLOSE_TIMEOUT_S` | Optional upstream `close_timeout`. |
 | `FLUXLIT_GATEWAY_WS_MAX_MESSAGE_BYTES` | Optional upstream `max_size` (bytes) for frames; omit or unset for unlimited. |
+| `FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT` | JSON list of header names (e.g. `["traceparent","x-request-id"]`) copied from the browser onto the gateway → Streamlit **HTTP** hop (so `st.context.headers` / {class}`~fluxlit.pages.di.Header` can read them). Credential and hop-by-hop names are rejected; empty keeps legacy behavior. WebSockets already forward most browser headers. See {doc}`streamlit-pages-typing`. |
 | `FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S` | If set, passed to Uvicorn `timeout_graceful_shutdown` for `fluxlit dev` / `fluxlit run` (align with Kubernetes `terminationGracePeriodSeconds`). See {doc}`deployment`. |
 | `FLUXLIT_ENABLE_SECURITY_HEADERS` | If true, add baseline security headers on the FastAPI app (HSTS when HTTPS, `X-Content-Type-Options`, etc.). |
 | `FLUXLIT_CORS_ALLOW_ORIGINS` | JSON list of allowed origins (e.g. `["http://localhost:3000"]`). Empty list disables CORS middleware. |

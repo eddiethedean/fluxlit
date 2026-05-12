@@ -1,6 +1,6 @@
 # Docker: emulated reverse-proxy deployment
 
-Four nginx shapes are supported. Subpath scenarios use **`FLUXLIT_ROOT_PATH=/myapp`** and **`FLUXLIT_TRUST_PROXY=1`** in the FluxLit image; the root scenario overrides the root path to empty. The sample **FluxLit image** uses a **digest-pinned** Python base and runs as a **non-root** user (see `Dockerfile` in this directory). The FluxLit gateway forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets so you can correlate nginx, gateway, and sidecar logs when clients send that header (or the gateway generates one).
+Five nginx shapes plus **Caddy** strip-prefix are supported. Subpath scenarios use **`FLUXLIT_ROOT_PATH=/myapp`** and **`FLUXLIT_TRUST_PROXY=1`** in the FluxLit image; the root scenario overrides the root path to empty. The sample **FluxLit image** uses a **digest-pinned** Python base and runs as a **non-root** user (see `Dockerfile` in this directory). The FluxLit gateway forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets so you can correlate nginx, gateway, and sidecar logs when clients send that header (or the gateway generates one).
 
 Operator docs for TLS, HSTS, and **`forwarded_allow_ips`**: [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html).
 
@@ -9,6 +9,7 @@ Operator docs for TLS, HSTS, and **`forwarded_allow_ips`**: [Production TLS](htt
 |----------|---------|------------|----------------|
 | **Root path** | `+ docker-compose.root.yml` | `http://127.0.0.1:8082/` | Forwards `/api/...`, `/_stcore/...`, and `/` at origin root. |
 | **Strip prefix** (default) | `docker-compose.yml` | `http://127.0.0.1:8080/myapp/` | Forwards `/api/...`, `/_stcore/...` to FluxLit (prefix stripped). |
+| **Strip prefix** (Caddy) | `+ docker-compose.caddy.yml` | `http://127.0.0.1:8084/myapp/` | Second engine; `handle_path /myapp/*` → FluxLit. |
 | **Strip prefix** (multi-segment) | `+ docker-compose.apps-prefix.yml` | `http://127.0.0.1:8083/apps/my-app/` | Same as strip-prefix; public path `/apps/my-app/` matches `FLUXLIT_ROOT_PATH=/apps/my-app`. |
 | **Full path** | `+ docker-compose.fullpath.yml` | `http://127.0.0.1:8081/myapp/` | Forwards full URI `/myapp/...` to FluxLit (Connect-style). |
 | **HTTPS** | `+ docker-compose.https.yml` | `https://127.0.0.1:8444/myapp/` | TLS at nginx; `X-Forwarded-Proto: https`. Dev certs via `generate-test-certs.sh`. |
@@ -58,7 +59,14 @@ docker compose -f docker/proxy-deployment/docker-compose.yml -f docker/proxy-dep
 CURL_INSECURE=1 BASE_URL=https://127.0.0.1:8444 ./docker/proxy-deployment/smoke-test.sh
 ```
 
-## Run all three locally
+## Caddy strip-prefix (port 8084)
+
+```bash
+docker compose -f docker/proxy-deployment/docker-compose.yml -f docker/proxy-deployment/docker-compose.caddy.yml up --build
+BASE_URL=http://127.0.0.1:8084 ./docker/proxy-deployment/smoke-test.sh
+```
+
+## Run all proxy smokes locally
 
 ```bash
 ./docker/proxy-deployment/run-all-proxy-smokes.sh

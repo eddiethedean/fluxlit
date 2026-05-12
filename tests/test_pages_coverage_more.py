@@ -148,6 +148,95 @@ def test_resolve_page_kwargs_header_from_context() -> None:
         reset_page_header_context(tok)
 
 
+def test_resolve_page_kwargs_header_from_streamlit_context_fallback() -> None:
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    headers_obj = SimpleNamespace(
+        get=lambda name, default=None: "tp" if str(name).lower() == "x-trace" else default,
+        items=lambda: [("x-trace", "tp")],
+    )
+    st = SimpleNamespace(context=SimpleNamespace(headers=headers_obj))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["h"] == "tp"
+
+
+def test_resolve_page_kwargs_header_streamlit_items_when_get_misses() -> None:
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    class _Hdr:
+        def get(self, name: str, default: object = None) -> object:
+            return default
+
+        def items(self) -> list[tuple[str, str]]:
+            return [("X-Trace", "from-items")]
+
+    st = SimpleNamespace(context=SimpleNamespace(headers=_Hdr()))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["h"] == "from-items"
+
+
+def test_resolve_page_kwargs_header_streamlit_context_exception_returns_none() -> None:
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    class _Ctx:
+        @property
+        def headers(self) -> object:
+            raise RuntimeError("no headers")
+
+    st = SimpleNamespace(context=_Ctx())
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["h"] is None
+
+
+def test_resolve_page_kwargs_header_context_without_headers_attr() -> None:
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    st = SimpleNamespace(context=SimpleNamespace(headers=None))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["h"] is None
+
+
+def test_resolve_page_kwargs_header_object_without_get() -> None:
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    st = SimpleNamespace(context=SimpleNamespace(headers=object()))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["h"] is None
+
+
+def test_resolve_page_kwargs_header_items_empty_no_match() -> None:
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    class _Hdr:
+        def get(self, name: str, default: object = None) -> object:
+            return default
+
+        def items(self) -> list[tuple[str, str]]:
+            return []
+
+    st = SimpleNamespace(context=SimpleNamespace(headers=_Hdr()))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["h"] is None
+
+
 def test_resolve_page_kwargs_fluxlit_feature_flags() -> None:
     app = FluxLit()
 

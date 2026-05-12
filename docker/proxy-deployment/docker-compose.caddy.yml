@@ -1,0 +1,15 @@
+# Caddy strip-prefix smoke (port 8084). Compose with base file:
+#   docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+#   PUBLIC_PREFIX=/myapp BASE_URL=http://127.0.0.1:8084 ./smoke-test.sh
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    ports:
+      - "8084:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      fluxlit:
+        condition: service_healthy
+    restart: unless-stopped

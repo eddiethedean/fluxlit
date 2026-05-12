@@ -97,7 +97,7 @@ def _dockerfile_body(target: str) -> str:
         f"# python:3.12-slim @ {_py_slim_digest}\n"
         f"FROM python@{_py_slim_digest}\n"
         "WORKDIR /app\n"
-        'RUN pip install --no-cache-dir "fluxlit>=0.9,<1.0"\n'
+        'RUN pip install --no-cache-dir "fluxlit>=0.10,<1.0"\n'
         "COPY . .\n"
         "RUN useradd --create-home --uid 1000 appuser \\\n"
         "    && chown -R appuser:appuser /app\n"
@@ -806,6 +806,77 @@ def _doctor_collect(
             rows.append(("public_base_url", "FAIL", "not a valid absolute URL"))
         else:
             rows.append(("public_base_url", "PASS", fl.settings.public_base_url.strip()))
+
+    if fl is not None:
+        api_ready = f"{fl.settings.api_mount_path.rstrip('/')}/readyz"
+        rows.append(
+            (
+                "readiness_route",
+                "PASS",
+                f"Streamlit readiness probe: GET {api_ready} (hidden from OpenAPI)",
+            )
+        )
+        rows.append(
+            (
+                "l7_websocket",
+                "PASS",
+                "Ensure L7 proxies allow Upgrade/WebSocket for /_stcore/* (see docs/runbooks.md)",
+            )
+        )
+        if fl.settings.gateway_upstream_read_timeout_s < 5.0:
+            rows.append(
+                (
+                    "gateway_upstream_timeouts",
+                    "WARN",
+                    "gateway_upstream_read_timeout_s is very low; "
+                    "long Streamlit responses may fail",
+                )
+            )
+        else:
+            rows.append(
+                (
+                    "gateway_upstream_timeouts",
+                    "PASS",
+                    f"HTTP read timeout={fl.settings.gateway_upstream_read_timeout_s}s; "
+                    f"ws_open={fl.settings.gateway_ws_open_timeout_s}s",
+                )
+            )
+        if fl.settings.async_page_depends:
+            rows.append(
+                (
+                    "async_depends_streamlit",
+                    "WARN",
+                    "Async Depends enabled — deps may run on an isolated thread loop; avoid "
+                    "thread-unsafe globals (docs/streamlit-pages-typing.html)",
+                )
+            )
+        else:
+            rows.append(
+                (
+                    "async_depends_streamlit",
+                    "PASS",
+                    "async page Depends disabled (FLUXLIT_ASYNC_PAGE_DEPENDS unset)",
+                )
+            )
+        fwd_n = len(fl.settings.gateway_forward_client_headers_to_streamlit or [])
+        if fwd_n:
+            rows.append(
+                (
+                    "gateway_forward_client_headers",
+                    "WARN",
+                    f"{fwd_n} header name(s) forwarded to Streamlit HTTP — allowlist only "
+                    "non-secrets; see docs/configuration.html",
+                )
+            )
+        else:
+            rows.append(
+                (
+                    "gateway_forward_client_headers",
+                    "PASS",
+                    "no browser→Streamlit HTTP header forwarding (default); "
+                    "set_page_header_context for explicit injection",
+                )
+            )
 
     upstream_file = os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM_FILE", "").strip()
     upstream_env = os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM", "").strip()

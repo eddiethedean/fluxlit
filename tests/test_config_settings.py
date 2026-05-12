@@ -99,3 +99,47 @@ def test_api_mount_path_normalized_from_env(monkeypatch: pytest.MonkeyPatch) -> 
 def test_api_mount_path_normalized_constructor() -> None:
     assert FluxlitSettings(api_mount_path="v1").api_mount_path == "/v1"
     assert FluxlitSettings(api_mount_path="/x/").api_mount_path == "/x"
+
+
+def test_gateway_forward_headers_json_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    monkeypatch.setenv(
+        "FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT",
+        json.dumps(["traceparent", "X-Request-ID", "cookie"]),
+    )
+    s = FluxlitSettings()
+    assert s.gateway_forward_client_headers_to_streamlit == ["traceparent", "x-request-id"]
+
+
+def test_gateway_forward_headers_rejects_too_many(monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    names = [f"h{i}" for i in range(40)]
+    monkeypatch.setenv("FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT", json.dumps(names))
+    with pytest.raises(ValidationError, match="at most 32"):
+        FluxlitSettings()
+
+
+def test_gateway_forward_headers_model_validate_none_and_empty_string() -> None:
+    s = FluxlitSettings.model_validate({"gateway_forward_client_headers_to_streamlit": None})
+    assert s.gateway_forward_client_headers_to_streamlit == []
+    s2 = FluxlitSettings.model_validate({"gateway_forward_client_headers_to_streamlit": ""})
+    assert s2.gateway_forward_client_headers_to_streamlit == []
+
+
+def test_gateway_forward_headers_csv_string_splits_and_trims() -> None:
+    s = FluxlitSettings.model_validate(
+        {"gateway_forward_client_headers_to_streamlit": "  a  , , b "}
+    )
+    assert s.gateway_forward_client_headers_to_streamlit == ["a", "b"]
+
+
+def test_gateway_forward_headers_unknown_sequence_type_returns_empty() -> None:
+    s = FluxlitSettings.model_validate({"gateway_forward_client_headers_to_streamlit": (1, 2)})
+    assert s.gateway_forward_client_headers_to_streamlit == []
+
+
+def test_gateway_forward_headers_constructor_coerces_int_to_empty() -> None:
+    s = FluxlitSettings(gateway_forward_client_headers_to_streamlit=9)  # type: ignore[arg-type]
+    assert s.gateway_forward_client_headers_to_streamlit == []

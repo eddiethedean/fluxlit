@@ -4,6 +4,16 @@
 
 Nothing unreleased yet.
 
+## 0.10.0 - 2026-05-12
+
+- **Gateway:** optional ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` / :attr:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit` copies an allowlist of browser header names onto the gateway → Streamlit **HTTP** hop (``st.context.headers`` / :class:`~fluxlit.pages.di.Header`); credential and hop-by-hop names are rejected. See :mod:`fluxlit.gateway.forward_headers` and {doc}`configuration`.
+- **Pages:** async :class:`~fluxlit.pages.di.Depends` callables and awaitable returns resolve when an asyncio loop is already running by using a short-lived side thread (0.9 raised ``TypeError`` in that case). :class:`~fluxlit.pages.di.Header` falls back to ``st.context.headers`` after ``set_page_header_context``.
+- **Doctor / verbose:** new checks for readiness path hints, WebSocket proxy documentation pointers, upstream timeout sanity, async-depends warning, forwarded-header warning; ``gateway_proxy`` block in ``fluxlit doctor --verbose`` / ``--json``.
+- **Proxy matrix:** Caddy strip-prefix smoke on port **8084** (``docker-compose.caddy.yml``); ``run-all-proxy-smokes.sh`` runs it; {doc}`deployment` compatibility table updated.
+- **Docs:** new {doc}`cookbook` (recipes); expanded {doc}`streamlit-pages-typing` for async deps and header forwarding.
+
+**Upgrading from 0.9.x:** Bump pins to ``fluxlit>=0.10,<1.0``. If you use ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` under asyncio-heavy hosts, re-test async ``Depends`` (resolution now uses a side thread when a loop is active). Optional header forwarding is off by default.
+
 ## 0.9.0 - 2026-05-12
 
 - **Streamlit pages (0.9):** :class:`~fluxlit.pages.records.PageRecord` registry with :attr:`~fluxlit.app.FluxLit.page_records`; :meth:`~fluxlit.app.FluxLit.page` accepts ``icon``, ``tags``, and static ``page_meta``; handlers may return :class:`~fluxlit.pages.meta.PageMeta` for breadcrumbs and similar post-run UI. :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, and :class:`~fluxlit.pages.di.Cookie` resolve extra parameters beside ``(st, client)`` (see {doc}`streamlit-pages-typing`). Optional :class:`~fluxlit.url_session.SessionStore` on :class:`~fluxlit.app.FluxLit` enables ``SessionStore`` injection.

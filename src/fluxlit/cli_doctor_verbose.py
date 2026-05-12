@@ -94,6 +94,14 @@ def build_doctor_verbose_detail(
             ),
             "upstream_url_set": bool(os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM", "").strip()),
         },
+        "gateway_proxy": {
+            "upstream_connect_timeout_s": s.gateway_upstream_connect_timeout_s,
+            "upstream_read_timeout_s": s.gateway_upstream_read_timeout_s,
+            "ws_open_timeout_s": s.gateway_ws_open_timeout_s,
+            "forward_client_headers_http": list(
+                getattr(s, "gateway_forward_client_headers_to_streamlit", []) or []
+            ),
+        },
         "project_defaults": project_file_snapshot(pc),
     }
 
@@ -142,6 +150,14 @@ def format_doctor_verbose_human(detail: dict[str, Any]) -> list[str]:
         f"managed_by_fluxlit_cli={sc['fluxlit_managed_runtime']}; "
         f"FLUXLIT_STREAMLIT_UPSTREAM_FILE set={sc['upstream_file_set']}; "
         f"FLUXLIT_STREAMLIT_UPSTREAM set={sc['upstream_url_set']}"
+    )
+    gp = detail["gateway_proxy"]
+    lines.append(
+        "gateway_proxy: "
+        f"connect_timeout_s={gp['upstream_connect_timeout_s']}; "
+        f"read_timeout_s={gp['upstream_read_timeout_s']}; "
+        f"ws_open_timeout_s={gp['ws_open_timeout_s']}; "
+        f"forward_client_headers_http={gp['forward_client_headers_http']!r}"
     )
     pd = detail.get("project_defaults")
     lines.append(f"project_defaults (fluxlit.toml/pyproject): {pd!r}")

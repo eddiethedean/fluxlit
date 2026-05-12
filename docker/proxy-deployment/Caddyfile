@@ -1,0 +1,15 @@
+# Strip-prefix reverse proxy (same public shape as nginx.conf): /myapp/ → upstream /.
+# Used by docker-compose.caddy.yml for a second-engine smoke on port 8084.
+
+:80 {
+	redir /myapp /myapp/ permanent
+	handle_path /myapp/* {
+		reverse_proxy http://fluxlit:8000 {
+			header_up Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+	respond "not found" 404
+}
