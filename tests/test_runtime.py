@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +56,23 @@ def test_load_fluxlit_from_explicit_file_target_reuses_loaded_module(
     second = load_fluxlit("./file_app.py:app")
     assert first is second
     assert first.settings.title == "file-target"
+
+
+def test_load_fluxlit_explicit_file_target_supports_sibling_imports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app_dir = tmp_path / "project"
+    app_dir.mkdir()
+    (app_dir / "settings.py").write_text('TITLE = "from-sibling"\n', encoding="utf-8")
+    (app_dir / "main.py").write_text(
+        "from fluxlit import FluxLit\nfrom settings import TITLE\napp = FluxLit(title=TITLE)\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    fl = load_fluxlit("./project/main.py:app")
+    assert fl.settings.title == "from-sibling"
+    assert sys.path[0] == str(app_dir)
 
 
 def test_import_target_module_reuse_ignores_modules_without_file(
@@ -194,6 +212,21 @@ def test_load_fluxlit_prefers_local_app_py_over_polluted_syspath(
     monkeypatch.chdir(tmp_path)
     fl = load_fluxlit("app:app")
     assert fl.settings.title == "from_local_app_py"
+
+
+def test_load_fluxlit_local_module_supports_sibling_imports(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "paths.py").write_text('TITLE = "local-sibling"\n', encoding="utf-8")
+    (tmp_path / "main.py").write_text(
+        "from fluxlit import FluxLit\nfrom paths import TITLE\napp = FluxLit(title=TITLE)\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(tmp_path)
+    fl = load_fluxlit("main:app")
+    assert fl.settings.title == "local-sibling"
+    assert sys.path[0] == str(tmp_path)
 
 
 def test_internal_api_base_url_maps_inaddr_any_to_loopback() -> None:

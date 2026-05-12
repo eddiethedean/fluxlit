@@ -65,6 +65,12 @@ def _fluxlit_import_hint(target: str, mod_name: str) -> str:
     )
 
 
+def _prepend_module_dir(path: Path) -> None:
+    module_dir = str(path.parent.resolve())
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
+
+
 def _import_target_module(mod_name: str) -> object:
     """Import a target module, preferring local ``<cwd>/<mod_name>.py`` when present.
 
@@ -103,6 +109,7 @@ def _import_target_module(mod_name: str) -> object:
         module = importlib.util.module_from_spec(spec)
         # Ensure future imports of the stem see this module.
         sys.modules[stem] = module
+        _prepend_module_dir(path)
         spec.loader.exec_module(module)
         return module
 
@@ -118,6 +125,7 @@ def _import_target_module(mod_name: str) -> object:
             raise ModuleNotFoundError(mod_name)
         module = importlib.util.module_from_spec(spec)
         sys.modules[mod_name] = module
+        _prepend_module_dir(local)
         spec.loader.exec_module(module)
         return module
 
