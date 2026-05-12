@@ -139,6 +139,14 @@ switch pages after the first `.run()`. For now:
 - Add one `AppTest` smoke per important page, then use browser E2E for end-to-end
   navigation when the widget tree is unstable.
 
+## Deep links and query parameters
+
+Invite links and password-reset flows often land on the Streamlit shell with
+`?token=...` (and optionally `?page=...`). Use {doc}`deep-links` for building
+`page_url` / `for_page` links from FastAPI, {func}`fluxlit.query_params` in pages,
+and `AppTest.query_params[...]` before `.run()` to assert prefilled widgets.
+Repository tests live in `tests/test_deep_links.py`.
+
 ## Markers
 
 | Marker | Meaning |

@@ -19,6 +19,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Operate the app with logs, metrics, probes, and runbooks | {doc}`observability` · {doc}`runbooks` |
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` |
 | Survive full page reload without cookies (URL + server store) | {doc}`url-session` |
+| Deep links, query params, and invite-style URLs to Streamlit | {doc}`deep-links` |
 | Test API routes and Streamlit pages in Pytest | {doc}`testing` |
 | Fix imports, 503 readiness, WebSockets, or wrong API paths | {doc}`troubleshooting` · `fluxlit doctor` |
 | Browse API reference, support policy, or release history | {doc}`api/index` · {doc}`support-matrix` · {doc}`changelog` |
@@ -54,6 +55,7 @@ observability
 rate-limiting
 security
 url-session
+deep-links
 migration-auth
 auth-recipes
 troubleshooting
