@@ -122,3 +122,52 @@ def test_streamlit_main_with_pages_runs_navigation(
     importlib.import_module("fluxlit.streamlit.main")
     fake_streamlit.navigation.assert_called_once()
     fake_streamlit.title.assert_called_once_with("page ran")
+
+
+def test_streamlit_main_query_page_triggers_switch_page(
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise ``match_nav_page`` + ``st.switch_page`` before ``navigation().run()``."""
+    (tmp_path / "sm_nav.py").write_text(
+        "from fluxlit import FluxLit\n"
+        "app = FluxLit(title='Nav')\n"
+        "@app.page('/', title='Home')\n"
+        "def home(st, client):\n"
+        "    st.title('home')\n"
+        "@app.page('/admin', title='Admin')\n"
+        "def admin(st, client):\n"
+        "    st.title('admin')\n",
+        encoding="utf-8",
+    )
+
+    switched: list[Any] = []
+
+    def switch_page(pg: Any) -> None:
+        switched.append(pg)
+
+    fake_streamlit.query_params = {"page": "Admin"}
+    fake_streamlit.switch_page = switch_page
+
+    class Navigation:
+        def __init__(self, pages: list[Any]) -> None:
+            self.pages = pages
+
+        def run(self) -> None:
+            return None
+
+    fake_streamlit.Page = mock.Mock(
+        side_effect=lambda fn, **kwargs: types.SimpleNamespace(
+            fn=fn,
+            title=kwargs.get("title"),
+            url_path=kwargs.get("url_path"),
+        )
+    )
+    fake_streamlit.navigation = mock.Mock(side_effect=lambda pages: Navigation(pages))
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("FLUXLIT_APP", "sm_nav:app")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+    importlib.import_module("fluxlit.streamlit.main")
+
+    assert len(switched) == 1
+    assert switched[0].url_path == "admin"
+    fake_streamlit.navigation.assert_called_once()

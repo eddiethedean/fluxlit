@@ -13,7 +13,7 @@
 - **API:** mounted under `/api` by default, with OpenAPI at `/api/docs`.
 - **Routing:** `/api/*` goes to FastAPI; everything else, including Streamlit WebSockets, is proxied to Streamlit.
 
-**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md) (PyPI **0.8.0**; **Unreleased** on `main` lists docs and features staged for the next tag)
+**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md) (current release **0.8.0**; **Unreleased** is for work after that tag)
 
 ---
 
