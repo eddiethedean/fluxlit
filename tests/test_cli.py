@@ -816,14 +816,7 @@ def test_doctor_checks_metrics_extra_missing(
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
-    real_import = __import__
-
-    def fake_import(name: str, *args: object, **kwargs: object):
-        if name == "prometheus_client":
-            raise ImportError("no prometheus")
-        return real_import(name, *args, **kwargs)
-
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    monkeypatch.setattr(cli_module, "find_spec", lambda name: None)
     rows = cli_module._doctor_checks("doctor_metrics_app:app")  # noqa: SLF001
     assert any(
         name == "fluxlit_metrics_extra" and status == "FAIL" and "fluxlit[metrics]" in detail

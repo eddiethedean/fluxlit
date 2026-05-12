@@ -11,6 +11,7 @@ import os
 import platform
 import socket
 import sys
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlparse
@@ -495,9 +496,7 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
             rows.append(("fluxlit_auth_extra", "PASS", "PyJWT importable (fluxlit[auth])"))
 
     if fl is not None and fl.settings.enable_gateway_prometheus_metrics:
-        try:
-            import prometheus_client  # noqa: F401
-        except ImportError:
+        if find_spec("prometheus_client") is None:
             rows.append(
                 (
                     "fluxlit_metrics_extra",
