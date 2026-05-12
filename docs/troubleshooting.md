@@ -4,7 +4,7 @@
 
 ## First step: `fluxlit doctor`
 
-Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports **PASS**, **WARN**, or **FAIL** for imports, dependencies, gateway bind, `FLUXLIT_INTERNAL_API_BASE`, Streamlit version, JWT/OIDC env vs PyJWT, and subpath/proxy hints.
+Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports **PASS**, **WARN**, or **FAIL** for imports, dependencies, gateway bind, `FLUXLIT_INTERNAL_API_BASE`, Streamlit version, JWT/OIDC env vs PyJWT, subpath/proxy hints, readiness/WebSocket expectations, gateway timeout posture, async page `Depends`, and optional gateway header-forwarding settings.
 
 - **Exit code 1** if any row is **FAIL** (unless `--warnings-only`).
 - **WARN** rows are advisory (e.g. old Streamlit, subpath without `trust_proxy`, CORS without security headers).

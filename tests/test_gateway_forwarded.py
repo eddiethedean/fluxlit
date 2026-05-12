@@ -213,3 +213,139 @@ async def test_proxy_http_forwards_allowlisted_browser_headers() -> None:
 
     assert captured["headers"].get("traceparent") == "00-ab-cd-01"
     assert captured["headers"].get("x-request-id") == "rid-tp"
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_forwards_only_allowlisted_browser_headers() -> None:
+    """Client ``x-forwarded-for`` must not appear upstream unless explicitly allowlisted."""
+    captured: dict[str, Any] = {}
+
+    class _FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        def build_request(
+            self,
+            method: str,
+            url: str,
+            headers: httpx.Headers | None = None,
+        ) -> object:
+            captured["headers"] = dict(headers) if headers is not None else {}
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> httpx.Response:
+            return httpx.Response(200, content=b"ok")
+
+    fake = cast(httpx.AsyncClient, _FakeAsyncClient())
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        _ = msg
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/",
+        "headers": [
+            (b"host", b"public.example"),
+            (b"x-forwarded-for", b"6.6.6.6"),
+            (b"traceparent", b"00-aaa-bbb-01"),
+        ],
+        "query_string": b"",
+        "scheme": "http",
+        "client": ("198.51.100.9", 1234),
+    }
+    opts = GatewayProxyOptions(forward_client_headers_http=frozenset({"traceparent"}))
+    await _proxy_http(
+        scope,
+        receive,
+        send_asgi,
+        "http://127.0.0.1:8501",
+        "/",
+        request_id="rid-filter",
+        proxy_options=opts,
+        httpx_client_getter=_httpx_getter(fake),
+        upstream_sem=None,
+    )
+
+    h = captured["headers"]
+    assert h.get("traceparent") == "00-aaa-bbb-01"
+    assert h.get("x-forwarded-for") == "198.51.100.9"
+    assert "6.6.6.6" not in str(h.get("x-forwarded-for"))
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_forwards_multiple_allowlisted_headers() -> None:
+    captured: dict[str, Any] = {}
+
+    class _FakeAsyncClient:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        def build_request(
+            self,
+            method: str,
+            url: str,
+            headers: httpx.Headers | None = None,
+        ) -> object:
+            captured["headers"] = dict(headers) if headers is not None else {}
+            return object()
+
+        async def send(self, *args: object, **kwargs: object) -> httpx.Response:
+            return httpx.Response(200, content=b"ok")
+
+    fake = cast(httpx.AsyncClient, _FakeAsyncClient())
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        _ = msg
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    scope: dict[str, Any] = {
+        "type": "http",
+        "method": "GET",
+        "path": "/stream",
+        "headers": [
+            (b"host", b"edge"),
+            (b"traceparent", b"00-tp-01"),
+            (b"x-remote-user", b"ada"),
+        ],
+        "query_string": b"",
+        "scheme": "https",
+        "client": ("10.0.0.1", 80),
+    }
+    opts = GatewayProxyOptions(
+        forward_client_headers_http=frozenset({"traceparent", "x-remote-user"})
+    )
+    await _proxy_http(
+        scope,
+        receive,
+        send_asgi,
+        "http://127.0.0.1:8501",
+        "/stream",
+        forwarded_prefix="/app",
+        request_id="rid-multi",
+        proxy_options=opts,
+        httpx_client_getter=_httpx_getter(fake),
+        upstream_sem=None,
+    )
+
+    h = captured["headers"]
+    assert h.get("traceparent") == "00-tp-01"
+    assert h.get("x-remote-user") == "ada"
+    assert h.get("x-request-id") == "rid-multi"

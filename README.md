@@ -57,7 +57,7 @@ def home(st: Any, client: ApiClient) -> None:
     st.write(client.get("/users").json())
 ```
 
-Optional **0.9+** patterns (`Depends`, `parse_query_params`, `PageMeta`, manifests): see [Streamlit pages: typing](https://fluxlit.readthedocs.io/en/stable/streamlit-pages-typing.html) and [`examples/roadmap_09/`](examples/roadmap_09/).
+Optional typed-page patterns (**0.9+**): `Depends`, `parse_query_params`, `PageMeta`, manifests — see [Streamlit pages: typing](https://fluxlit.readthedocs.io/en/stable/streamlit-pages-typing.html) and [`examples/roadmap_09/`](examples/roadmap_09/). **0.10** adds async `Depends` when an asyncio loop is already running, an **opt-in** allowlist for forwarding selected browser headers on the gateway → Streamlit HTTP hop, and a [cookbook](https://fluxlit.readthedocs.io/en/stable/cookbook.html) of copy-paste recipes.
 
 ```bash
 fluxlit dev    # default target app:app; or fluxlit dev your.module:app
@@ -71,15 +71,15 @@ In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Sec
 
 ## What Ships
 
-- **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages (optional **0.9+** typing: `Depends`, `Annotated`, query/session models, `PageMeta`, `fluxlit pages manifest`).
+- **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages (optional **0.9+** typing: `Depends`, `Annotated`, query/session models, `PageMeta`, `fluxlit pages manifest`; **0.10** improves async `Depends` under Streamlit’s execution model and optional gateway header forwarding — see [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html) and [Security](https://fluxlit.readthedocs.io/en/stable/security.html)).
 - **Gateway runtime:** `fluxlit dev` and `fluxlit run` start Uvicorn plus a managed Streamlit subprocess.
 - **Operational defaults:** health/readiness probes, request IDs, optional JSON logs, configurable gateway timeouts, body limits, concurrency, and graceful shutdown.
 - **Quality gate:** package tests enforce **100% line coverage** for `src/fluxlit` in CI; a single internal import guard in the test helpers uses `# pragma: no cover` for an unreachable defensive branch.
-- **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests (strip-prefix, full-path, root, HTTPS, and **`/apps/my-app`**), and production TLS/proxy guidance.
+- **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests (nginx, Traefik, **Caddy** strip-prefix, full-path, root, HTTPS, and **`/apps/my-app`**), and production TLS/proxy guidance.
 - **Optional auth:** JWT validation, OIDC/BFF helpers, Streamlit-safe API clients, and security docs via `fluxlit[auth]`.
-- **Testing and diagnostics:** `FluxLitTestClient`, `streamlit_main_path()`, AppTest recipes (including **`apptest_select_page`** / **`apptest_assert_no_errors`** for multipage and query params), URL-session test-mode defaults, optional **`?page=`** deep links before `st.navigation` with multipage apps, and expanded `fluxlit doctor` diagnostics for imports, proxy/config state, and optional extras.
+- **Testing and diagnostics:** `FluxLitTestClient`, `streamlit_main_path()`, AppTest recipes (including **`apptest_select_page`** / **`apptest_assert_no_errors`** for multipage and query params), URL-session test-mode defaults, optional **`?page=`** deep links before `st.navigation` with multipage apps, and expanded `fluxlit doctor` diagnostics (readiness route, WebSocket expectations, gateway timeouts, async deps, optional header-forwarding hints).
 
-Start with the [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html), then see [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html), [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html), [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html), and [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html).
+Start with the [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html), then see [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html), [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html), [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html), [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html), and the [Cookbook](https://fluxlit.readthedocs.io/en/stable/cookbook.html).
 
 ---
 
@@ -96,7 +96,7 @@ gateway_port = 8000
 
 Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html).
 
-**Gateway → Streamlit (optional env):** tune upstream HTTP timeouts, max proxied request body (returns **413** when exceeded), concurrent upstream HTTP cap, `httpx` connection limits, WebSocket open/ping/close timeouts, and optional frame size — see the **Gateway proxy** rows in [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html#environment-variables). **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** maps to Uvicorn’s graceful drain window when set (`fluxlit dev` / `fluxlit run`).
+**Gateway → Streamlit (optional env):** tune upstream HTTP timeouts, max proxied request body (returns **413** when exceeded), concurrent upstream HTTP cap, `httpx` connection limits, WebSocket open/ping/close timeouts, and optional frame size — see the **Gateway proxy** rows in [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html#environment-variables). **`FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`** (JSON list, **default off**) allowlists non-credential header names onto the HTTP hop to Streamlit; read [Security](https://fluxlit.readthedocs.io/en/stable/security.html) before enabling. **`FLUXLIT_UVICORN_GRACEFUL_SHUTDOWN_TIMEOUT_S`** maps to Uvicorn’s graceful drain window when set (`fluxlit dev` / `fluxlit run`).
 
 **Logs:** enable structured gateway lines with **`FLUXLIT_ENABLE_GATEWAY_ACCESS_LOG=1`**; for one JSON object per line in log aggregators, use **`fluxlit.logging.JsonLogFormatter`** (examples in [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html)). Avoid logging secrets—see [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html).
 
@@ -106,11 +106,12 @@ Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/con
 
 ## Production References
 
-- [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html): containers, probes, scaling, and Kubernetes graceful shutdown.
+- [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html): containers, probes, scaling, Kubernetes graceful shutdown, and a reverse-proxy compatibility matrix (nginx, Traefik, Caddy).
+- [Cookbook](https://fluxlit.readthedocs.io/en/stable/cookbook.html): copy-paste patterns (headers, multipage, tests, pins).
 - [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html): request correlation, JSON logs, Prometheus metrics, SLO notes, and runbooks.
 - [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html), [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html), and [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html): auth boundaries, proxy trust, key rotation, and log hygiene.
 - [Support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html): Python and dependency versions tested in CI, pinning guidance (`uv` / `pip-tools` / constraints), and upgrade notes for `FluxLitTestClient` and Streamlit `AppTest`.
-- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), [`examples/path_prefixed_proxy/`](examples/path_prefixed_proxy/), [`examples/multipage_apptest/`](examples/multipage_apptest/), [`examples/roadmap_09/`](examples/roadmap_09/) (0.9 page typing), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns. Runnable nginx + FluxLit smoke stacks (including **`/apps/my-app`**) live under [`docker/proxy-deployment/`](docker/proxy-deployment/).
+- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), [`examples/path_prefixed_proxy/`](examples/path_prefixed_proxy/), [`examples/multipage_apptest/`](examples/multipage_apptest/), [`examples/roadmap_09/`](examples/roadmap_09/) (typed Streamlit pages), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns. Runnable nginx, Traefik, and Caddy + FluxLit smoke stacks (including **`/apps/my-app`**) live under [`docker/proxy-deployment/`](docker/proxy-deployment/).
 
 ---
 
@@ -142,7 +143,7 @@ python -m pytest -n auto --cov=fluxlit --cov-report=term-missing --cov-fail-unde
 
 ## Status
 
-FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, optional **0.9+** Streamlit page typing (`Depends`, query models, `PageMeta`, manifests), health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and smoke coverage, deployment runbooks, and a 100% package line-coverage gate for `src/fluxlit` in CI.
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, optional Streamlit page typing (`Depends`, query models, `PageMeta`, manifests), **0.10**-era async `Depends` handling when an event loop is already active, default-off **allowlisted** gateway → Streamlit HTTP header forwarding, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded `fluxlit doctor` signals, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and multi-engine smoke coverage, deployment runbooks, a [cookbook](https://fluxlit.readthedocs.io/en/stable/cookbook.html), and a 100% package line-coverage gate for `src/fluxlit` in CI.
 
 See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 

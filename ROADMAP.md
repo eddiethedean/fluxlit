@@ -206,7 +206,9 @@ repositories, especially monorepos and Streamlit AppTest suites.
 
 ---
 
-## Version 0.9 — Typed Streamlit pages & developer contracts (planned)
+## Version 0.9 — Typed Streamlit pages & developer contracts (released)
+
+**Status:** Shipped on PyPI as **0.9.0**. Follow-on work (async `Depends` when an asyncio loop is already running, optional allowlisted gateway → Streamlit **HTTP** headers, richer `fluxlit doctor` / cookbook docs) is in **0.10.0** — see **Current status (0.10.x)** above.
 
 **Theme:** Bring **optional**, FastAPI-style **type annotations** and **Pydantic (or `TypedDict`) models** to Streamlit integrations so teams can express page metadata, inputs, and shared dependencies explicitly — without breaking existing `(st, client) -> None` handlers.
 

@@ -20,6 +20,15 @@ Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recip
 | **CSRF** | If you add **cookie-based** sessions, use SameSite and anti-CSRF patterns; document that Streamlit’s model is not a generic SPA. Prefer bearer tokens from server-side exchange for API calls. |
 | **Spoofed forward-auth headers** | Use {class}`~fluxlit.auth.TrustedProxyUser` only when the network path guarantees clients cannot reach the app with forged `X-Remote-User`-style headers (e.g. app listens on loopback behind nginx that strips identity headers from untrusted clients). |
 | **Clock skew** | JWT `exp` / `nbf` validation is sensitive to time; run NTP on production hosts. `fluxlit doctor` reminds you of this when tightening operations. |
+| **Credential leakage via header forwarding** | ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` (and :attr:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit`) is **off by default**. When enabled, only **explicitly allowlisted** header **names** are copied from the browser request onto the gateway’s **HTTP** upstream to Streamlit; **Authorization**, **Cookie**, and other sensitive / hop-by-hop names are **rejected**. Misconfiguration can still expose PII in logs or ``st.context``; prefer {func}`~fluxlit.pages.di.set_page_header_context` from app-owned middleware after validating a trusted proxy path. See {doc}`configuration` and {doc}`cookbook`. |
+
+## Gateway → Streamlit HTTP header forwarding (opt-in)
+
+FluxLit’s gateway normally does **not** treat the browser’s request headers as authoritative context inside the Streamlit script process. **0.10** adds an **optional** path to merge a **small allowlist** of header names (for example ``traceparent`` or operator-chosen forward-auth tokens) onto the **HTTP** proxy hop to Streamlit so ``st.context.headers`` / :class:`~fluxlit.pages.di.Header` can observe them.
+
+- **Default:** forwarding list is **empty** — behavior matches earlier releases.
+- **Threats:** header smuggling, accidental logging of sensitive values, cache poisoning if names overlap with cache semantics — treat the allowlist like firewall policy.
+- **Recommendation:** keep allowlists minimal; never forward session or credential headers; validate edge trust (``FLUXLIT_FORWARDED_ALLOW_IPS``, ``trust_proxy``) as documented in {doc}`production-tls`.
 
 ## Where tokens should live
 
@@ -99,4 +108,4 @@ Run with `fluxlit dev app:app`. The browser calls **`/api/me`** with `Authorizat
 - {doc}`production-tls` — HSTS, proxy trust, CSP notes, TLS validation.
 - {doc}`migration-auth` — incremental adoption of JWT and OIDC.
 - {doc}`auth-recipes` — full examples: JWKS, OIDC BFF, forward-auth, API keys, CORS.
-- {doc}`configuration` — `FLUXLIT_ENABLE_SECURITY_HEADERS`, CORS, `FLUXLIT_PUBLIC_BASE_URL`.
+- {doc}`configuration` — `FLUXLIT_ENABLE_SECURITY_HEADERS`, CORS, `FLUXLIT_PUBLIC_BASE_URL`, `FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`.

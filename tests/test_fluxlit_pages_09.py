@@ -395,6 +395,17 @@ async def _async_dep() -> int:
     return 7
 
 
+async def _async_dep_secondary_for_loop_tests() -> int:
+    return 3
+
+
+async def _async_dep_with_sleep() -> int:
+    import asyncio
+
+    await asyncio.sleep(0)
+    return 11
+
+
 def test_resolve_page_kwargs_async_depends_with_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
     app = FluxLit()
@@ -633,3 +644,37 @@ async def test_resolve_async_dep_propagates_worker_exception(
 
     with pytest.raises(ValueError, match="worker-fail"):
         resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+
+
+@pytest.mark.asyncio
+async def test_resolve_page_kwargs_two_async_deps_inside_running_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def fn(
+        st,
+        client,
+        a: Annotated[int, Depends(_async_dep)],  # noqa: B008
+        b: Annotated[int, Depends(_async_dep_secondary_for_loop_tests)],  # noqa: B008
+    ) -> None:
+        del st, client, a, b
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["a"] == 7 and kw["b"] == 3
+
+
+@pytest.mark.asyncio
+@pytest.mark.filterwarnings("ignore::RuntimeWarning")
+async def test_resolve_page_kwargs_async_dep_with_await_inside_running_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_ASYNC_PAGE_DEPENDS", "1")
+    app = FluxLit(settings=FluxlitSettings(async_page_depends=True))
+
+    def fn(st, client, x: Annotated[int, Depends(_async_dep_with_sleep)]) -> None:  # noqa: B008
+        del st, client, x
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["x"] == 11

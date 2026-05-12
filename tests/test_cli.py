@@ -1335,6 +1335,32 @@ def test_doctor_warns_gateway_forward_headers_when_configured(
     )
 
 
+def test_doctor_default_010_operational_rows_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default app: readiness hint, WebSocket note, timeouts OK, no async deps, no header bridge."""
+    port = find_free_port()
+    module_path = tmp_path / "doc_default_010.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    rows = cli_module._doctor_checks("doc_default_010:app")  # noqa: SLF001
+    by_name = {name: (status, detail) for name, status, detail in rows}
+    assert by_name["readiness_route"][0] == "PASS"
+    assert "/readyz" in by_name["readiness_route"][1]
+    assert by_name["l7_websocket"][0] == "PASS"
+    assert by_name["gateway_upstream_timeouts"][0] == "PASS"
+    assert by_name["async_depends_streamlit"][0] == "PASS"
+    assert "disabled" in by_name["async_depends_streamlit"][1]
+    assert by_name["gateway_forward_client_headers"][0] == "PASS"
+    assert "default" in by_name["gateway_forward_client_headers"][1]
+
+
 def test_main_invokes_typer_app(monkeypatch: pytest.MonkeyPatch) -> None:
     called: list[bool] = []
     monkeypatch.setattr(cli_module, "app", lambda: called.append(True))

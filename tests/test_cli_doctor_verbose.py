@@ -45,6 +45,31 @@ def test_build_doctor_verbose_detail_includes_pages_openapi_and_redacted_setting
     assert detail["gateway_proxy"]["upstream_read_timeout_s"] == 120.0
 
 
+def test_verbose_gateway_proxy_reflects_forward_header_allowlist() -> None:
+    from fluxlit.config import FluxlitSettings
+
+    fl = FluxLit(
+        settings=FluxlitSettings(
+            gateway_forward_client_headers_to_streamlit=["traceparent", "x-request-id"]
+        )
+    )
+
+    def home(st, client) -> None:  # noqa: ARG001
+        pass
+
+    fl.page("/", title="Main")(home)
+    detail = build_doctor_verbose_detail(
+        fl,
+        resolved_target="fwd:fwd",
+        bind_host="127.0.0.1",
+        bind_port=8000,
+        pc=None,
+    )
+    assert detail["gateway_proxy"]["forward_client_headers_http"] == ["traceparent", "x-request-id"]
+    text = "\n".join(format_doctor_verbose_human(detail))
+    assert "forward_client_headers_http=['traceparent', 'x-request-id']" in text
+
+
 def test_format_doctor_verbose_human_import_failed() -> None:
     lines = format_doctor_verbose_human({"resolved_target": "bad:app", "import_failed": True})
     assert "import_failed" in lines[0]

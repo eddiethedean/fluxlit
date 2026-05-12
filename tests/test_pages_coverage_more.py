@@ -197,6 +197,26 @@ def test_resolve_page_kwargs_header_streamlit_context_exception_returns_none() -
     assert kw["h"] is None
 
 
+def test_resolve_page_kwargs_header_context_var_beats_streamlit_context() -> None:
+    """``set_page_header_context`` wins over ``st.context.headers`` (explicit trusted path)."""
+    app = FluxLit()
+
+    def fn(st, client, h: Annotated[str | None, Header("x-trace")]) -> None:
+        del st, client, h
+
+    headers_obj = SimpleNamespace(
+        get=lambda name, default=None: "from-st" if str(name).lower() == "x-trace" else default,
+        items=lambda: [],
+    )
+    st = SimpleNamespace(context=SimpleNamespace(headers=headers_obj))
+    tok = set_page_header_context({"x-trace": "from-ctxvar"})
+    try:
+        kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+        assert kw["h"] == "from-ctxvar"
+    finally:
+        reset_page_header_context(tok)
+
+
 def test_resolve_page_kwargs_header_context_without_headers_attr() -> None:
     app = FluxLit()
 

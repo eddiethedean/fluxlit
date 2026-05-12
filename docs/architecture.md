@@ -47,7 +47,7 @@ These routes are registered with **`include_in_schema=False`** so they do not ap
 ## Principles
 
 - **Pythonic:** explicit, typed surface; ordinary FastAPI and Streamlit in user code.
-- **Production-minded:** proxy-friendly (`root_path`, forwarded headers where configured), observable hooks (request ids forwarded to Streamlit on proxied HTTP/WebSocket, optional API and **gateway** access logging, readiness via `/api/readyz`), and tunable gateway timeouts, body limits, and upstream `httpx` pool behavior via {class}`~fluxlit.config.FluxlitSettings` / `FLUXLIT_*` (see {doc}`configuration`).
+- **Production-minded:** proxy-friendly (`root_path`, forwarded headers where configured), observable hooks (request ids forwarded to Streamlit on proxied HTTP/WebSocket, optional API and **gateway** access logging, readiness via `/api/readyz`), optional **0.10** allowlisted merge of selected **browser** header names onto the **HTTP** hop to Streamlit (default off; see {doc}`security`), and tunable gateway timeouts, body limits, and upstream `httpx` pool behavior via {class}`~fluxlit.config.FluxlitSettings` / `FLUXLIT_*` (see {doc}`configuration`).
 - **Honest about Streamlit:** subprocess + WebSocket proxy until a native single-process model is proven.
 
 ## Stable extension points

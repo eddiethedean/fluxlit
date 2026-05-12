@@ -62,6 +62,9 @@ def home(st: Any, client: ApiClient) -> None:
 **0.9+:** optional FastAPI-style page parameters (`Depends`, `Annotated`), typed query
 strings with {func}`~fluxlit.pages.query.parse_query_params`, and per-run
 {class}`~fluxlit.pages.meta.PageMeta` returns are documented in {doc}`streamlit-pages-typing`.
+**0.10** improves async ``Depends`` when Streamlit already has an asyncio loop running, and adds
+an **opt-in** gateway setting to forward an **allowlist** of browser header names on the HTTP hop
+to Streamlit (see {doc}`configuration` and {doc}`security`). Copy-paste recipes: {doc}`cookbook`.
 Runnable sample: ``examples/roadmap_09/`` in the repository.
 ```
 
