@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 from fluxlit.pages.records import PageRecord
 
@@ -75,8 +75,8 @@ def match_nav_page(
         if isinstance(row, PageRecord):
             path, title = row.path, row.title
         elif hasattr(row, "path") and hasattr(row, "title"):
-            path = str(getattr(row, "path"))
-            title = str(getattr(row, "title"))
+            duck = cast(Any, row)
+            path, title = str(duck.path), str(duck.title)
         else:
             path, title = row[0], row[1]
         slug = _url_path_slug(path)

@@ -228,6 +228,8 @@ client (same base URL and options) or construct :meth:`fluxlit.client.ApiClient.
 See {doc}`streamlit-api-client` for when to prefer each and for error-handling examples.
 
 ```python
+from typing import Any
+
 from fluxlit.client import ApiClient
 
 # Option A: new client (common in snippets)
@@ -235,7 +237,7 @@ client = ApiClient.for_fluxlit(bearer_token=st.session_state["access_token"])
 profile = client.get("/users/me").json()
 
 # Option B: from the injected page client
-def my_page(st, client, /) -> None:
+def my_page(st: Any, client: ApiClient, /) -> None:
     with client.with_bearer(st.session_state["access_token"]) as api:
         profile = api.get("/users/me").json()
 ```

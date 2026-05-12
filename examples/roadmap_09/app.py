@@ -1,12 +1,16 @@
-"""Example FluxLit 0.9 app: PageMeta, Depends, query model, manifest (see docs/streamlit-pages-typing.md)."""
+"""Example FluxLit 0.9 app: PageMeta, Depends, query model, manifest.
+
+See docs/streamlit-pages-typing.md.
+"""
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from pydantic import BaseModel, Field
 
 from fluxlit import Depends, FluxLit, NavigationModel, PageMeta, parse_query_params
+from fluxlit.client import ApiClient
 
 
 class Q(BaseModel):
@@ -29,10 +33,10 @@ def ping():
 
 @app.page("/", tags=("demo",), page_meta=PageMeta(page_icon="🚀"))
 def home(
-    st,
-    client,
+    st: Any,
+    client: ApiClient,
     label: Annotated[str, Depends(get_tab_label)],
-):
+) -> None:
     st.title("Roadmap 0.9 example")
     st.caption(label)
     q = parse_query_params(st, Q)
@@ -41,7 +45,7 @@ def home(
 
 
 @app.page("/about")
-def about(st, client):
+def about(st: Any, _client: ApiClient) -> PageMeta:
     return PageMeta(breadcrumb="About", description="About this demo")
 
 

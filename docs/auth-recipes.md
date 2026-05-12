@@ -30,13 +30,12 @@ def me(claims: Annotated[StandardClaims, Depends(_bearer)]):
     return {"sub": claims.sub}
 ```
 
-**OIDC login:** configure a {class}`~fluxlit.oidc.GenericOIDCClient`, call `load_discovery_sync()`, then one line on your `FluxLit` instance (uses `FLUXLIT_PUBLIC_BASE_URL` and `FLUXLIT_OIDC_BFF_SECRET` by default):
+**OIDC login:** configure a {class}`~fluxlit.auth.oidc.GenericOIDCClient`, call `load_discovery_sync()`, then one line on your `FluxLit` instance (uses `FLUXLIT_PUBLIC_BASE_URL` and `FLUXLIT_OIDC_BFF_SECRET` by default):
 
 ```python
 import os
-from fluxlit import FluxLit
+from fluxlit import FluxLit, GenericOIDCClient, GenericOIDCClientConfig
 from fluxlit.config import FluxlitSettings
-from fluxlit.oidc import GenericOIDCClient, GenericOIDCClientConfig
 
 settings = FluxlitSettings()  # FLUXLIT_PUBLIC_BASE_URL, FLUXLIT_OIDC_BFF_SECRET, …
 app = FluxLit(settings=settings)
@@ -55,10 +54,13 @@ app.attach_oidc_login(oidc)
 **Streamlit:** one client for both the auth-code exchange and authenticated API calls:
 
 ```python
-from fluxlit import prepare_streamlit_api_client
+from typing import Any
+
+from fluxlit import FluxLit, prepare_streamlit_api_client
+from fluxlit.client import ApiClient
 
 @app.page("/")
-def home(st, client):
+def home(st: Any, client: ApiClient) -> None:
     _ = client
     api = prepare_streamlit_api_client(st)
     r = api.get("/me")
@@ -177,12 +179,14 @@ def admin_purge(claims: Annotated[StandardClaims, Depends(_need_admin)]):
 Prefer **server-side** headers — do not paste tokens into `st.text_input` in production.
 
 ```python
+from typing import Any
+
 from fluxlit.client import ApiClient
-from fluxlit.streamlit_auth import bearer_headers_from_session
+from fluxlit import bearer_headers_from_session
 
 
 @app.page("/dashboard")
-def dashboard(st, client: ApiClient) -> None:
+def dashboard(st: Any, client: ApiClient) -> None:
     _ = client  # default client is unauthenticated
     token = st.session_state.get("access_token")
     if not token:
@@ -215,17 +219,18 @@ Wire discovery, register routes on **`app.api`**, set a public base URL behind p
 
 ```python
 import os
+from typing import Any
 
-from fluxlit import FluxLit
-from fluxlit.client import ApiClient
-from fluxlit.config import FluxlitSettings
-from fluxlit.oidc import (
+from fluxlit import (
+    FluxLit,
     GenericOIDCClient,
     GenericOIDCClientConfig,
     OIDCBFFConfig,
+    exchange_auth_code_from_query,
     register_oidc_bff_routes,
 )
-from fluxlit.streamlit_auth import exchange_auth_code_from_query
+from fluxlit.client import ApiClient
+from fluxlit.config import FluxlitSettings
 
 oidc = GenericOIDCClient(
     GenericOIDCClientConfig(
@@ -258,7 +263,7 @@ register_oidc_bff_routes(
 
 
 @app.page("/")
-def home(st, client: ApiClient) -> None:
+def home(st: Any, client: ApiClient) -> None:
     # Swap ?auth_code=... for a bearer token (server-side POST /api/auth/exchange)
     exchange_auth_code_from_query(st, client, exchange_path="/auth/exchange")
     if "fluxlit_access_token" not in st.session_state:
@@ -273,7 +278,7 @@ Browser flow:
 2. IdP redirects to `GET /api/auth/callback` → redirect to `/?auth_code=...`.
 3. Streamlit runs `exchange_auth_code_from_query` → `POST /api/auth/exchange` → stores `fluxlit_access_token`.
 
-**Production notes:** With {class}`~fluxlit.oidc.GenericOIDCClient`, the callback validates the IdP ``id_token`` via **JWKS**. The PKCE ``state`` and one-time ``auth_code`` stores are **in-memory**—run **one API worker** or use a single replica until you add an external session store (see {doc}`security`).
+**Production notes:** With {class}`~fluxlit.auth.oidc.GenericOIDCClient`, the callback validates the IdP ``id_token`` via **JWKS**. The PKCE ``state`` and one-time ``auth_code`` stores are **in-memory**—run **one API worker** or use a single replica until you add an external session store (see {doc}`security`).
 
 ---
 

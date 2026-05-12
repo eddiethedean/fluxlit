@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 from fluxlit import FluxLit, set_trace_hook
+from fluxlit.client import ApiClient
 from fluxlit.tracing import TraceAttributes
 
 try:
@@ -43,6 +45,6 @@ def hello() -> dict[str, str]:
 
 
 @app.page("/", title="Tracing")
-def home(st, client) -> None:
+def home(st: Any, client: ApiClient) -> None:
     st.title("FluxLit OpenTelemetry Demo")
     st.write(client.get("/hello").json())

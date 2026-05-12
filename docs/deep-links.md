@@ -39,12 +39,18 @@ configured public mount and percent-encode query values.
 using the **first** value when Streamlit exposes a list (multiple values for one key):
 
 ```python
+from typing import Any
+
 import streamlit as st
 from fluxlit import query_params
 
-params = query_params(st)
-token = params.get("token", "")
+def show_token(st: Any) -> None:
+    params = query_params(st)
+    token = params.get("token", "")
 ```
+
+For **Pydantic-validated** query models (single keys, defaults, coercion), use
+{func}`~fluxlit.pages.query.parse_query_params` — see {doc}`streamlit-pages-typing`.
 
 ## Optional `?page=` routing
 
@@ -59,13 +65,20 @@ You can still call {func}`fluxlit.match_nav_page` yourself when you need custom 
 beyond navigation:
 
 ```python
-from fluxlit import match_nav_page, query_params
+from typing import Any
 
-params = query_params(st)
-hit = match_nav_page(params, app.pages, page_key="page")
-if hit:
-    path, title = hit
-    # drive your own UI (e.g. default widget values) from path/title
+from fluxlit import match_nav_page, query_params
+from fluxlit.app import FluxLit
+from fluxlit.client import ApiClient
+
+
+def apply_deep_link(st: Any, client: ApiClient, fl: FluxLit) -> None:
+    _ = client
+    params = query_params(st)
+    hit = match_nav_page(params, fl.pages, page_key="page")
+    if hit:
+        path, title = hit
+        # drive your own UI (e.g. default widget values) from path/title
 ```
 
 Matching order: exact **title**, exact **path**, Streamlit-style **slug** (``"/"`` →

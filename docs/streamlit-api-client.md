@@ -17,7 +17,11 @@ All of these resolve paths **relative to the API mount** (for example `"/users"`
 **Public**
 
 ```python
-def home(st, client, /) -> None:
+from typing import Any
+
+from fluxlit.client import ApiClient
+
+def home(st: Any, client: ApiClient, /) -> None:
     r = client.get("/healthz")
     r.raise_for_status()
 ```
@@ -25,9 +29,11 @@ def home(st, client, /) -> None:
 **Authenticated (Bearer in session)**
 
 ```python
+from typing import Any
+
 from fluxlit.client import ApiClient
 
-def dashboard(st, client, /) -> None:
+def dashboard(st: Any, client: ApiClient, /) -> None:
     token = st.session_state.get("access_token")
     if not token:
         st.warning("Sign in first.")
@@ -80,6 +86,7 @@ Use {class}`~fluxlit.testing.FluxLitTestClient` for gateway-aware API tests, the
 
 ## See also
 
+- {doc}`streamlit-pages-typing` — typed page handlers, ``Depends``, query models
 - {doc}`troubleshooting` — wrong paths, `FLUXLIT_INTERNAL_API_BASE`, proxy prefixes
 - {doc}`auth-recipes` — OIDC BFF, refresh, `prepare_streamlit_api_client`
 - {doc}`url-session-token-security` — query tokens, email links, and logging

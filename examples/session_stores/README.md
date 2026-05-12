@@ -9,7 +9,9 @@ fluxlit run examples.session_stores.app:app --no-pidfile
 ```
 
 The page writes refresh-continuity state into `fluxlit-sessions.sqlite3` by
-default. Override with:
+default. It uses {func}`fluxlit.url_session.hydrate_url_session_typed` with a
+small Pydantic model (`UrlSessionPayload`) so the store blob is validated like
+other **0.9+** typed helpers. Override with:
 
 ```bash
 FLUXLIT_SESSION_SQLITE_PATH=/tmp/fluxlit-sessions.sqlite3 \

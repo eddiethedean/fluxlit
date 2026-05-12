@@ -39,7 +39,10 @@ cd my-app
 Create `app.py`:
 
 ```python
+from typing import Any
+
 from fluxlit import FluxLit
+from fluxlit.client import ApiClient
 
 app = FluxLit(title="Admin Portal")
 
@@ -50,9 +53,16 @@ def users():
 
 
 @app.page("/")
-def home(st, client):
+def home(st: Any, client: ApiClient) -> None:
     st.title("Dashboard")
     st.write(client.get("/users").json())
+```
+
+```{tip}
+**0.9+:** optional FastAPI-style page parameters (`Depends`, `Annotated`), typed query
+strings with {func}`~fluxlit.pages.query.parse_query_params`, and per-run
+{class}`~fluxlit.pages.meta.PageMeta` returns are documented in {doc}`streamlit-pages-typing`.
+Runnable sample: ``examples/roadmap_09/`` in the repository.
 ```
 
 ## Run
@@ -102,10 +112,12 @@ For Pydantic-validated JSON, use {meth}`~fluxlit.client.ApiClient.get_model` and
 The `client` injected into `@app.page` handlers has **no** `Authorization` header. Use it for public endpoints or for logging in; for routes protected with {class}`~fluxlit.auth.jwt.JWTBearer` (or your own dependency), create a client that adds the bearer on every request:
 
 ```python
+from typing import Any
+
 from fluxlit.client import ApiClient
 
 @app.page("/account")
-def account(st, client):
+def account(st: Any, client: ApiClient) -> None:
     token = st.session_state.get("access_token")
     if not token:
         st.info("Sign in first.")
@@ -142,5 +154,6 @@ See {doc}`configuration` and {doc}`cli` for flags, env vars, and commands.
 | Secrets in logs, secret stores, key rotation | {doc}`secrets` |
 | Structured logs, JSON formatters, correlation, SLO notes, readiness details | {doc}`observability` |
 | JWT / OIDC / Streamlit callers | {doc}`auth-recipes`, {doc}`security` |
+| Typed Streamlit pages (`Depends`, query models, manifests) | {doc}`streamlit-pages-typing` |
 | Markers, E2E, proxy smoke, `pip-audit` / SBOM CI | {doc}`testing` |
 | Import errors, 503 readyz, API paths from Streamlit | {doc}`troubleshooting` |

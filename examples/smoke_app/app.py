@@ -1,10 +1,11 @@
 """Canonical FluxLit smoke app used by E2E, proxy, and release checks."""
 
-from __future__ import annotations
+from typing import Any
 
 from fastapi import Request
 
 from fluxlit import FluxLit
+from fluxlit.client import ApiClient
 
 app = FluxLit(title="FluxLit Smoke")
 
@@ -20,7 +21,7 @@ def request_id(request: Request) -> dict[str, str | None]:
 
 
 @app.page("/", title="Home")
-def home(st, client) -> None:
+def home(st: Any, client: ApiClient) -> None:
     st.title("FluxLit Smoke")
     st.write("fluxlit_smoke_ok")
     st.write(client.get("/smoke").json())

@@ -85,15 +85,17 @@ Expose **`GET /me`** (or similar) using the **same** `Depends(_bearer)` as your 
 
 ### 3b. ApiClient with a token from session
 
-**One call:** {func}`fluxlit.streamlit_auth.prepare_streamlit_api_client` runs the BFF `auth_code` exchange when the URL contains it, then returns an {class}`~fluxlit.client.ApiClient` that already sends `Authorization: Bearer …` if a token is in `st.session_state` (default key `fluxlit_access_token`).
+**One call:** {func}`fluxlit.auth.streamlit.prepare_streamlit_api_client` runs the BFF `auth_code` exchange when the URL contains it, then returns an {class}`~fluxlit.client.ApiClient` that already sends `Authorization: Bearer …` if a token is in `st.session_state` (default key `fluxlit_access_token`).
 
 ```python
+from typing import Any
+
+from fluxlit import prepare_streamlit_api_client
 from fluxlit.client import ApiClient
-from fluxlit.streamlit_auth import prepare_streamlit_api_client
 
 
 @app.page("/")
-def home(st, client: ApiClient) -> None:
+def home(st: Any, client: ApiClient) -> None:
     _ = client
     api = prepare_streamlit_api_client(st)
     r = api.get("/me")
@@ -106,12 +108,14 @@ def home(st, client: ApiClient) -> None:
 **Manual:** after login or token exchange, store only a **short-lived** access token in `st.session_state` and bind headers per request:
 
 ```python
+from typing import Any
+
+from fluxlit import bearer_headers_from_session
 from fluxlit.client import ApiClient
-from fluxlit.streamlit_auth import bearer_headers_from_session
 
 
 @app.page("/alt")
-def home_alt(st, client: ApiClient) -> None:
+def home_alt(st: Any, client: ApiClient) -> None:
     _ = client
     if "access_token" not in st.session_state:
         st.warning("Not signed in.")
@@ -144,11 +148,8 @@ so internal calls forward `X-Request-ID`. In a plain Streamlit script this is us
 ```python
 import os
 
-from fluxlit import FluxLit
+from fluxlit import FluxLit, GenericOIDCClient, GenericOIDCClientConfig
 from fluxlit.config import FluxlitSettings
-from fluxlit.oidc import GenericOIDCClient, GenericOIDCClientConfig
-
-settings = FluxlitSettings()
 app = FluxLit(title="OIDC", settings=settings)
 
 oidc = GenericOIDCClient(
@@ -162,7 +163,7 @@ oidc.load_discovery_sync()
 app.attach_oidc_login(oidc)
 ```
 
-**Manual:** same as above but call {func}`fluxlit.oidc.register_oidc_bff_routes` yourself with {class}`~fluxlit.oidc.OIDCBFFConfig` if you need full control.
+**Manual:** same as above but call {func}`fluxlit.auth.oidc.register_oidc_bff_routes` yourself with {class}`~fluxlit.auth.oidc.OIDCBFFConfig` if you need full control.
 
 Register the **callback URL** with your IdP:  
 `{FLUXLIT_PUBLIC_BASE_URL}/api/auth/callback` (default callback path; adjust if you change `callback_path`).
@@ -172,11 +173,14 @@ Register the **callback URL** with your IdP:
 At the top of your main page:
 
 ```python
-from fluxlit.streamlit_auth import exchange_auth_code_from_query
+from typing import Any
+
+from fluxlit import exchange_auth_code_from_query
+from fluxlit.client import ApiClient
 
 
 @app.page("/")
-def home(st, client: ApiClient) -> None:
+def home(st: Any, client: ApiClient) -> None:
     exchange_auth_code_from_query(st, client, exchange_path="/auth/exchange")
     ...
 ```
@@ -203,6 +207,11 @@ See {doc}`security` for threats and token placement, {doc}`secrets` for rotation
 
 ## FluxLit 0.8.1 (auth and internal client)
 
-- **OIDC BFF (custom provider):** If you call {func}`fluxlit.oidc.register_oidc_bff_routes` with a custom {class}`~fluxlit.oidc.OIDCProvider` (anything other than {class}`~fluxlit.oidc.GenericOIDCClient`), set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` only when that provider already verified ``id_token`` or for tests. Prefer ``GenericOIDCClient`` in production so the BFF validates with JWKS.
+- **OIDC BFF (custom provider):** If you call {func}`fluxlit.auth.oidc.register_oidc_bff_routes` with a custom {class}`~fluxlit.auth.oidc.OIDCProvider` (anything other than {class}`~fluxlit.auth.oidc.GenericOIDCClient`), set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` only when that provider already verified ``id_token`` or for tests. Prefer ``GenericOIDCClient`` in production so the BFF validates with JWKS.
 - **`ApiClient`:** Paths passed to ``get`` / ``post`` / ``request`` must be **relative** to the API base; absolute or scheme-relative URL strings raise ``ValueError``.
 - **`public_base_url`:** Leave unset only for local experiments; production should set ``FLUXLIT_PUBLIC_BASE_URL`` (or ``OIDCBFFConfig.public_base_url``) so OAuth redirect URIs are stable behind proxies. An empty value now triggers a ``UserWarning`` when routes are registered.
+
+## FluxLit 0.9.0 (Streamlit page typing)
+
+- **Imports:** Streamlit helpers live under ``fluxlit.auth.streamlit``; the package root re-exports ``prepare_streamlit_api_client``, ``bearer_headers_from_session``, and ``exchange_auth_code_from_query`` from ``fluxlit``.
+- **Page handlers:** Optional {class}`typing.Annotated` + {class}`~fluxlit.pages.di.Depends`, {func}`~fluxlit.pages.query.parse_query_params`, {class}`~fluxlit.pages.meta.PageMeta` returns, and ``fluxlit pages manifest`` — see {doc}`streamlit-pages-typing`.

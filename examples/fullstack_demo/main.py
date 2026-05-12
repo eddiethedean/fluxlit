@@ -15,7 +15,7 @@ Run from this directory::
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import httpx
 from database import get_db
@@ -114,7 +114,7 @@ async def health_db(
     return {"database": "ok"}
 
 
-def _inject_modern_style(st: object) -> None:
+def _inject_modern_style(st: Any) -> None:
     st_mod = st
     st_mod.markdown(
         """
@@ -139,7 +139,7 @@ def _inject_modern_style(st: object) -> None:
 
 
 @app.page("/")
-def home(st: object, client: ApiClient) -> None:
+def home(st: Any, client: ApiClient) -> None:
     _inject_modern_style(st)
     if "access_token" not in st.session_state:
         st.session_state["access_token"] = None

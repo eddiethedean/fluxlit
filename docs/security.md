@@ -9,7 +9,7 @@ Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recip
 ## OIDC BFF: production constraints
 
 - **Process memory only:** Login ``state`` and one-time ``auth_code`` values live in in-memory dicts on the BFF config. Use **a single API worker process** (or a single replica) unless you replace this with a shared store. Multiple Uvicorn workers or horizontally scaled replicas will see **broken or flaky logins** unless state is externalized.
-- **``id_token`` validation:** When you use {class}`~fluxlit.oidc.GenericOIDCClient`, the BFF validates the IdP ``id_token`` with **JWKS** (signature, ``iss``, ``aud``, ``exp``) before minting the first-party access token. For a **custom** :class:`~fluxlit.oidc.OIDCProvider`, parse-only ``sub`` extraction is **disabled by default**; set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` only when your provider already verified the token or for controlled tests (see {doc}`security`).
+- **``id_token`` validation:** When you use {class}`~fluxlit.auth.oidc.GenericOIDCClient`, the BFF validates the IdP ``id_token`` with **JWKS** (signature, ``iss``, ``aud``, ``exp``) before minting the first-party access token. For a **custom** :class:`~fluxlit.auth.oidc.OIDCProvider`, parse-only ``sub`` extraction is **disabled by default**; set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` only when your provider already verified the token or for controlled tests (see {doc}`security`).
 
 ## Threat model (high level)
 
@@ -35,14 +35,13 @@ This ties together the gateway split: browser hits **one host**; APIs live under
 from __future__ import annotations
 
 import os
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
-from fluxlit import FluxLit
+from fluxlit import FluxLit, bearer_headers_from_session
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
 from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
-from fluxlit.streamlit_auth import bearer_headers_from_session
 
 settings = FluxlitSettings(
     enable_security_headers=True,
@@ -81,7 +80,7 @@ def login_dev() -> dict[str, str]:
 
 
 @app.page("/")
-def home(st, client: ApiClient) -> None:
+def home(st: Any, client: ApiClient) -> None:
     _ = client
     if "access_token" not in st.session_state:
         st.info("POST /api/login/dev or your IdP flow, then store access_token in session.")

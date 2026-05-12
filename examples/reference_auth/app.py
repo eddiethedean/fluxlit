@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 import httpx
 from fastapi import Depends
@@ -59,7 +59,7 @@ def me(claims: Annotated[StandardClaims, Depends(_bearer)]) -> MeResponse:
 
 
 @app.page("/")
-def home(st, client: ApiClient) -> None:
+def home(st: Any, client: ApiClient) -> None:
     st.title("Reference auth")
     if "access_token" not in st.session_state:
         st.session_state["access_token"] = None

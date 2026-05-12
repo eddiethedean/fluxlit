@@ -13,7 +13,7 @@
 - **API:** mounted under `/api` by default, with OpenAPI at `/api/docs`.
 - **Routing:** `/api/*` goes to FastAPI; everything else, including Streamlit WebSockets, is proxied to Streamlit.
 
-**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md) (current release **0.8.1**; **Unreleased** is for work after that tag)
+**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md) (current release **0.9.0**; **Unreleased** is for work after that tag)
 
 ---
 
@@ -40,7 +40,10 @@ fluxlit new my-app && cd my-app   # optional
 `app.py`:
 
 ```python
+from typing import Any
+
 from fluxlit import FluxLit
+from fluxlit.client import ApiClient
 
 app = FluxLit(title="Admin Portal")
 
@@ -49,10 +52,12 @@ def users():
     return [{"name": "Ada"}]
 
 @app.page("/")
-def home(st, client):
+def home(st: Any, client: ApiClient) -> None:
     st.title("Dashboard")
     st.write(client.get("/users").json())
 ```
+
+Optional **0.9+** patterns (`Depends`, `parse_query_params`, `PageMeta`, manifests): see [Streamlit pages: typing](https://fluxlit.readthedocs.io/en/stable/streamlit-pages-typing.html) and [`examples/roadmap_09/`](examples/roadmap_09/).
 
 ```bash
 fluxlit dev    # default target app:app; or fluxlit dev your.module:app
@@ -66,7 +71,7 @@ In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Sec
 
 ## What Ships
 
-- **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages.
+- **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages (optional **0.9+** typing: `Depends`, `Annotated`, query/session models, `PageMeta`, `fluxlit pages manifest`).
 - **Gateway runtime:** `fluxlit dev` and `fluxlit run` start Uvicorn plus a managed Streamlit subprocess.
 - **Operational defaults:** health/readiness probes, request IDs, optional JSON logs, configurable gateway timeouts, body limits, concurrency, and graceful shutdown.
 - **Quality gate:** package tests enforce **100% line coverage** for `src/fluxlit` in CI; a single internal import guard in the test helpers uses `# pragma: no cover` for an unreachable defensive branch.
@@ -105,7 +110,7 @@ Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/con
 - [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html): request correlation, JSON logs, Prometheus metrics, SLO notes, and runbooks.
 - [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html), [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html), and [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html): auth boundaries, proxy trust, key rotation, and log hygiene.
 - [Support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html): Python and dependency versions tested in CI, pinning guidance (`uv` / `pip-tools` / constraints), and upgrade notes for `FluxLitTestClient` and Streamlit `AppTest`.
-- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), [`examples/path_prefixed_proxy/`](examples/path_prefixed_proxy/), [`examples/multipage_apptest/`](examples/multipage_apptest/), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns. Runnable nginx + FluxLit smoke stacks (including **`/apps/my-app`**) live under [`docker/proxy-deployment/`](docker/proxy-deployment/).
+- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), [`examples/path_prefixed_proxy/`](examples/path_prefixed_proxy/), [`examples/multipage_apptest/`](examples/multipage_apptest/), [`examples/roadmap_09/`](examples/roadmap_09/) (0.9 page typing), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns. Runnable nginx + FluxLit smoke stacks (including **`/apps/my-app`**) live under [`docker/proxy-deployment/`](docker/proxy-deployment/).
 
 ---
 
@@ -137,7 +142,7 @@ python -m pytest -n auto --cov=fluxlit --cov-report=term-missing --cov-fail-unde
 
 ## Status
 
-FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and smoke coverage, deployment runbooks, and a 100% package line-coverage gate for `src/fluxlit` in CI.
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, optional **0.9+** Streamlit page typing (`Depends`, query models, `PageMeta`, manifests), health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and smoke coverage, deployment runbooks, and a 100% package line-coverage gate for `src/fluxlit` in CI.
 
 See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 

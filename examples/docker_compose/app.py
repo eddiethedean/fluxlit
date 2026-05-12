@@ -1,10 +1,9 @@
 """Minimal FluxLit app for the Docker Compose example."""
 
-from __future__ import annotations
-
 from typing import Any
 
 from fluxlit import FluxLit
+from fluxlit.client import ApiClient
 
 app = FluxLit(title="Docker Compose demo")
 
@@ -15,6 +14,6 @@ def hello() -> dict[str, str]:
 
 
 @app.page("/", title="Home")
-def home(st: Any, client: Any) -> None:
+def home(st: Any, client: ApiClient) -> None:
     st.title("Docker Compose demo")
     st.write(client.get("/hello").json())
