@@ -20,8 +20,8 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` |
 | Survive full page reload without cookies (URL + server store) | {doc}`url-session` · {doc}`url-session-token-security` |
 | Deep links, query params, and invite-style URLs to Streamlit | {doc}`deep-links` |
+| Test API routes, Streamlit pages, multipage nav, and query params in Pytest | {doc}`testing` |
 | Call the FastAPI app from Streamlit pages (`client`, bearer, errors) | {doc}`streamlit-api-client` |
-| Test API routes and Streamlit pages in Pytest | {doc}`testing` |
 | Fix imports, 503 readiness, WebSockets, or wrong API paths | {doc}`troubleshooting` · `fluxlit doctor` |
 | Browse API reference, support policy, or release history | {doc}`api/index` · {doc}`support-matrix` · {doc}`changelog` |
 
@@ -33,7 +33,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 - **Secured routes:** the default page `client` has **no** `Authorization` header unless you add it per request or use `with_bearer` / `for_fluxlit`.
 - **Health:** `GET /api/healthz` checks the API. `GET /api/readyz` checks the Streamlit sidecar when the gateway is managing one.
 - **Operations:** request IDs, structured logs, Prometheus metrics, gateway limits, graceful shutdown, and Kubernetes guidance are documented in {doc}`observability` and {doc}`deployment`.
-- **Tests:** use `FluxLitTestClient` for gateway-aware API tests and `streamlit_main_path()` / AppTest for thin Streamlit smoke tests; see {doc}`testing`.
+- **Tests:** use `FluxLitTestClient` for gateway-aware API tests and `streamlit_main_path()` / AppTest for thin Streamlit smoke tests; helpers like `apptest_select_page` help exercise multipage `st.navigation` and query params. See {doc}`testing` and {doc}`deep-links`.
 
 ```{note}
 Contributors: the default test command and CI matrix are in {doc}`testing`. Repository guidelines: {doc}`contributing`.

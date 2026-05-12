@@ -13,7 +13,7 @@
 - **API:** mounted under `/api` by default, with OpenAPI at `/api/docs`.
 - **Routing:** `/api/*` goes to FastAPI; everything else, including Streamlit WebSockets, is proxied to Streamlit.
 
-**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md) (current line **0.8.x**)
+**Docs:** [fluxlit.readthedocs.io](https://fluxlit.readthedocs.io/en/stable/) · **Security:** [SECURITY.md](SECURITY.md) · **Roadmap:** [ROADMAP.md](ROADMAP.md) · **Changelog:** [CHANGELOG.md](CHANGELOG.md) (PyPI **0.8.0**; **Unreleased** on `main` lists docs and features staged for the next tag)
 
 ---
 
@@ -70,9 +70,9 @@ In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Sec
 - **Gateway runtime:** `fluxlit dev` and `fluxlit run` start Uvicorn plus a managed Streamlit subprocess.
 - **Operational defaults:** health/readiness probes, request IDs, optional JSON logs, configurable gateway timeouts, body limits, concurrency, and graceful shutdown.
 - **Quality gate:** package tests enforce **100% coverage** for `src/fluxlit` without coverage pragmas.
-- **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests, and production TLS/proxy guidance.
+- **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests (strip-prefix, full-path, root, HTTPS, and **`/apps/my-app`**), and production TLS/proxy guidance.
 - **Optional auth:** JWT validation, OIDC/BFF helpers, Streamlit-safe API clients, and security docs via `fluxlit[auth]`.
-- **Testing and diagnostics:** `FluxLitTestClient`, `streamlit_main_path()`, AppTest recipes, URL-session test-mode defaults, and expanded `fluxlit doctor` diagnostics for imports, proxy/config state, and optional extras.
+- **Testing and diagnostics:** `FluxLitTestClient`, `streamlit_main_path()`, AppTest recipes (including **`apptest_select_page`** / **`apptest_assert_no_errors`** for multipage and query params), URL-session test-mode defaults, optional **`?page=`** deep links before `st.navigation` with multipage apps, and expanded `fluxlit doctor` diagnostics for imports, proxy/config state, and optional extras.
 
 Start with the [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html), then see [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html), [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html), [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html), and [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html).
 
@@ -105,7 +105,7 @@ Variable reference: [Configuration](https://fluxlit.readthedocs.io/en/stable/con
 - [Observability](https://fluxlit.readthedocs.io/en/stable/observability.html): request correlation, JSON logs, Prometheus metrics, SLO notes, and runbooks.
 - [Security architecture](https://fluxlit.readthedocs.io/en/stable/security.html), [Production TLS](https://fluxlit.readthedocs.io/en/stable/production-tls.html), and [Secrets](https://fluxlit.readthedocs.io/en/stable/secrets.html): auth boundaries, proxy trust, key rotation, and log hygiene.
 - [Support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html): Python and dependency versions tested in CI, pinning guidance (`uv` / `pip-tools` / constraints), and upgrade notes for `FluxLitTestClient` and Streamlit `AppTest`.
-- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), [`examples/path_prefixed_proxy/`](examples/path_prefixed_proxy/), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns. Runnable nginx + FluxLit smoke stacks (including **`/apps/my-app`**) live under [`docker/proxy-deployment/`](docker/proxy-deployment/).
+- [`examples/kubernetes/`](examples/kubernetes/), [`examples/docker_compose/`](examples/docker_compose/), [`examples/path_prefixed_proxy/`](examples/path_prefixed_proxy/), [`examples/multipage_apptest/`](examples/multipage_apptest/), and [`examples/fullstack_demo/`](examples/fullstack_demo/): reference deployment and application patterns. Runnable nginx + FluxLit smoke stacks (including **`/apps/my-app`**) live under [`docker/proxy-deployment/`](docker/proxy-deployment/).
 
 ---
 
@@ -137,7 +137,7 @@ python -m pytest -n auto --cov=fluxlit --cov-report=term-missing --cov-fail-unde
 
 ## Status
 
-FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly testing helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, deployment runbooks, and a 100% package coverage gate for `src/fluxlit`.
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and smoke coverage, deployment runbooks, and a 100% package coverage gate for `src/fluxlit`.
 
 See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 

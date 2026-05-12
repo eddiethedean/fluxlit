@@ -2,14 +2,13 @@
 
 ## Unreleased
 
+- **Testing, deep links, and multipage Streamlit:** ``FluxLitTestClient`` supports ``root_mount`` / ``with_root_path``, per-call ``root_path`` on ``api_get`` / ``api_post``, ``streamlit(..., query_params=...)``, and ``assert_docs_available()``; AppTest helpers ``apptest_assert_no_errors``, ``apptest_select_page``, and ``assert_no_streamlit_exception``; ``query_params``, ``match_nav_page``, and ``FluxLitPublicUrls.page_url`` for query and page URLs. The Streamlit entrypoint applies ``match_nav_page`` before ``st.navigation`` when using multipage ``nav_pages`` so ``?page=`` deep links resolve. See ``docs/testing.md`` and ``docs/deep-links.md``. Closes #31.
 - **Docs / proxy smoke:** Path-prefixed reverse-proxy guide for **`/apps/my-app`** in {doc}`production-tls`; Docker Compose + nginx under **`docker/proxy-deployment/`** (including CI **`run-all-proxy-smokes.sh`**); **`smoke-test.sh`** now asserts **`/api/docs`**. Closes #33.
 - **Docs:** New guide {doc}`url-session-token-security` on URL-session ids vs auth tokens, email/invite links, JWTs in URLs, Referrer-Policy, and how logging/debug redaction applies. Cross-links from url-session, deep-links, secrets, security, and index. Closes #30.
 - **Streamlit → API client:** `ApiClient.with_bearer` for bearer auth on top of the injected page client; new guide `docs/streamlit-api-client.md` (when to use injected `client` vs `for_fluxlit`, errors, shared internal base). Closes #28.
 - **Debug mode:** ``FLUXLIT_DEBUG=1`` or ``fluxlit dev`` / ``run`` / ``workbench`` with ``--debug`` turns on gateway access logs, API request logging, bumps the default log level to ``debug`` when it was still ``info``, serves a redacted ``GET /__fluxlit/debug`` snapshot (unless ``api_mount_path`` would shadow it), records recent dispatches in-process, prints a ``[fluxlit-debug]`` banner to stderr at unified startup, and makes :meth:`fluxlit.app.FluxLit.get_client` propagate ``X-Request-ID`` to the API. See ``docs/configuration.md``, ``docs/cli.md``, ``docs/troubleshooting.md``, and ``docs/observability.md``.
 - **Workbench / Posit:** ``fluxlit workbench`` and ``--workbench`` on ``dev`` / ``run`` enable Uvicorn proxy headers and print a loopback browser URL hint; see platforms and CLI docs for Posit Connect / Workbench-style ``FLUXLIT_ROOT_PATH`` deployments.
 - **Doctor:** ``fluxlit doctor --verbose`` / ``-v`` prints a redacted effective-configuration snapshot (pages, derived internal API base, OpenAPI URLs, proxy/session extras); ``--json --verbose`` adds a ``verbose`` object to the payload.
-- **Deep links:** ``fluxlit.query_params`` and ``fluxlit.match_nav_page`` for Streamlit query parsing and optional ``?page=`` routing; ``FluxLitPublicUrls.page_url`` as an alias for ``for_page``. See ``docs/deep-links.md``.
-- **Testing:** ``FluxLitTestClient`` supports ``root_mount`` / ``with_root_path``, per-call ``root_path`` on ``api_get`` / ``api_post``, ``streamlit(..., query_params=...)``, and ``assert_docs_available()``; see ``docs/testing.md``.
 
 ## 0.8.0 - 2026-05-12
 

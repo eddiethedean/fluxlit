@@ -13,7 +13,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Gateway:** configurable API prefix (default `/api`); path prefix stripped for the inner FastAPI app; HTTP + WebSocket proxy to Streamlit for all other paths.
 - **App model:** `FluxLit` holds `FastAPI` on `.api`, `@app.page` registers Streamlit pages; `ApiClient` for server-side calls with `FLUXLIT_INTERNAL_API_BASE`.
 - **Scaffold:** `fluxlit new <name>` minimal app.
-- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client, `streamlit_main_path()` helper, multipage AppTest smoke example, and URL-session test-mode defaults.
+- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client, `streamlit_main_path()` helper, multipage AppTest smoke example, AppTest navigation/query-param helpers (`apptest_select_page`, `apptest_assert_no_errors`), and URL-session test-mode defaults.
 - **Readiness:** `GET /api/readyz` probes the Streamlit upstream when `FLUXLIT_STREAMLIT_UPSTREAM` is set (Kubernetes-style readiness; hidden from OpenAPI).
 - **Dev reload:** `--reload-scope=gateway` (default) vs `--reload-scope=full` (Uvicorn reload plus Streamlit restart via `watchfiles`); invalid scope fails before spawning Streamlit.
 - **Observability (baseline):** optional structured gateway access logs (`enable_gateway_access_log`); log redaction helpers for sensitive headers; temp-file upstream state so reload workers and Streamlit restarts stay aligned.
@@ -21,8 +21,11 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Unified ASGI:** `FluxLit` as a normal ASGI entrypoint (`uvicorn app:app`); lifespan bridged to the inner FastAPI app; regression suite in `tests/test_asgi_unified.py` (lifespan + concurrent HTTP, streaming body, sidecar failure) — foundation for **Version 0.5** soak/chaos work.
 - **Production hardening:** JSON log formatter, request-id correlation to Streamlit HTTP/WebSocket hops, configurable gateway limits/timeouts, optional Prometheus metrics, Docker/Kubernetes references, runbooks, support matrix, security audit, and CycloneDX SBOM workflow.
 - **URL session continuity:** `fluxlit.url_session` helpers, `SessionStore` protocol, in-memory implementation, docs, tests, and gateway query redaction for `fluxlit_sid`.
-- **Developer diagnostics:** `fluxlit doctor` reports import shadowing candidates, loaded module files, `sys.path` summary, URL-session state, proxy/public-base-url configuration, and optional extras guidance.
+- **Developer diagnostics:** `fluxlit doctor` reports import shadowing candidates, loaded module files, `sys.path` summary, URL-session state, proxy/public-base-url configuration, optional extras guidance, and optional `--verbose` / `--json` effective-config snapshots.
 - **Configuration clarity:** `FLUXLIT_PUBLIC_BASE_URL` is the preferred namespaced OAuth public URL; `PUBLIC_BASE_URL` is a documented fallback with doctor warnings/failures for conflicting values.
+- **CLI / public URLs (0.8.0):** `fluxlit config` (resolved binding, redacted settings, `--json` / `--strict`); `FluxLit.urls` for browser-visible bases, docs, health, readiness, and page links under `FLUXLIT_ROOT_PATH`.
+- **Deep links:** `fluxlit.query_params` / `fluxlit.match_nav_page` and optional `?page=` routing with `st.navigation` multipage apps (see `docs/deep-links.md`).
+- **Proxy / TLS docs:** path-prefixed mount guide (`/apps/my-app`), nginx + Compose smoke on port **8083**, and `/api/docs` checks in `docker/proxy-deployment/smoke-test.sh` (see `docs/production-tls.md`).
 
 **Gaps vs “production”**
 
@@ -31,9 +34,9 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
 
-**Next: Version 0.8**
+**Next: 0.9+**
 
-- Version 0.8 should keep turning hardening into repeatable evidence: broader load/chaos coverage, more deployment recipes, deeper OpenTelemetry examples, compatibility signals, and any breaking-change cleanup needed before a future 1.0.
+- Keep turning hardening into repeatable evidence: broader load/chaos coverage, more deployment recipes, deeper OpenTelemetry examples, compatibility signals, and any breaking-change cleanup needed before a future **1.0**.
 
 ---
 

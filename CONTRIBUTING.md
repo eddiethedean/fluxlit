@@ -32,7 +32,7 @@ Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. S
 
 ## Documentation (Sphinx)
 
-Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository. User-facing guides include **[docs/deployment.md](docs/deployment.md)** (containers, probes, scaling), **[docs/troubleshooting.md](docs/troubleshooting.md)**, **[docs/production-tls.md](docs/production-tls.md)** (TLS, HSTS, `forwarded_allow_ips`, CSP notes), and **[docs/secrets.md](docs/secrets.md)** (logs, secret stores, JWT/OIDC rotation).
+Hosted on [Read the Docs](https://fluxlit.readthedocs.io/en/stable/) once the project is connected to this repository. User-facing guides include **[docs/deployment.md](docs/deployment.md)** (containers, probes, scaling), **[docs/troubleshooting.md](docs/troubleshooting.md)**, **[docs/production-tls.md](docs/production-tls.md)** (TLS, HSTS, `forwarded_allow_ips`, CSP notes, path-prefixed mounts such as **`/apps/my-app`**), **[docs/secrets.md](docs/secrets.md)** (logs, secret stores, JWT/OIDC rotation), and runnable nginx + FluxLit stacks under **[docker/proxy-deployment/](docker/proxy-deployment/)** (validated by **`run-all-proxy-smokes.sh`** in CI).
 
 Build locally:
 

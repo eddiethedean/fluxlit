@@ -22,8 +22,9 @@ pip install -e ".[dev]"
 
 ```{note}
 Testing your app: start with `FluxLitTestClient` for API routes and Streamlit
-`AppTest` for thin UI smoke checks. See {doc}`testing` for a copy-paste Pytest
-recipe.
+`AppTest` for thin UI smoke checks. For multipage `st.navigation`, query params,
+and ``apptest_select_page`` / ``apptest_assert_no_errors``, see {doc}`testing` and
+{doc}`deep-links` (includes a copy-paste Pytest recipe).
 ```
 
 ## Scaffold (optional)
