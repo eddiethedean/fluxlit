@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+## 0.8.1 - 2026-05-13
+
 - **Gateway / settings:** ``normalize_api_mount_path`` in ``fluxlit.api_mount`` aligns gateway dispatch with ``internal_api_base_url`` and ``FluxLitPublicUrls`` when ``api_mount_path`` / ``FLUXLIT_API_MOUNT_PATH`` omits a leading slash (e.g. ``api`` → ``/api``); :class:`~fluxlit.config.FluxlitSettings` validates ``api_mount_path``; ``create_gateway_app`` normalizes ``FLUXLIT_API_PREFIX`` the same way.
+- **Docs:** README coverage wording matches CI (100% line coverage; one test-helper ``pragma: no cover``); historical CHANGELOG CI note uses ``--cov-fail-under=100``; ``docs/testing.md`` documents ``ty-check`` as a required workflow job.
+- **CI:** ``ty-check`` no longer uses ``continue-on-error``.
+
+**Upgrading from 0.8.0:** No breaking API changes. If you pin FluxLit with an exact version (for example ``fluxlit==0.8.0`` in Compose lockfiles), bump to ``0.8.1``.
 
 ## 0.8.0 - 2026-05-12
 
