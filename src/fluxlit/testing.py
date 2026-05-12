@@ -81,7 +81,8 @@ class FluxLitTestClient:
         """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit.main`.
 
         Requires Streamlit >= 1.30 for ``AppTest``. Patches ``FLUXLIT_APP``,
-        ``FLUXLIT_INTERNAL_API_BASE``, and ``FLUXLIT_API_PREFIX`` for the duration of the run.
+        ``FLUXLIT_INTERNAL_API_BASE``, ``FLUXLIT_API_PREFIX``, and ``FLUXLIT_TESTS`` for
+        the duration of the run.
 
         Args:
             target: Import path ``module:FluxLit`` (same as CLI).
@@ -108,6 +109,7 @@ class FluxLitTestClient:
                     "FLUXLIT_APP": target,
                     "FLUXLIT_INTERNAL_API_BASE": internal,
                     "FLUXLIT_API_PREFIX": self.api_prefix,
+                    "FLUXLIT_TESTS": "1",
                 }
             ),
             _maybe_syspath(extra_sys_path),

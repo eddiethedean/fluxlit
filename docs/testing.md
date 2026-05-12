@@ -110,9 +110,27 @@ internal package layout.
 
 ## Multipage and menu-heavy UIs
 
-Streamlit `AppTest` is strongest when a test starts on one page and checks simple
-widget state. It can be awkward for sidebar radios, `st.navigation`, fragment reruns,
-or tests that switch pages after the first `.run()`. For now:
+FluxLit's Streamlit bootstrap uses `st.navigation(...)`, which `AppTest` can smoke-test
+when the test starts on the default page. A minimal example lives in
+`examples/multipage_apptest/`.
+
+```python
+from my_app import app
+from fluxlit import FluxLitTestClient
+
+
+def test_multipage_home(tmp_path):
+    # Put your project root on sys.path, then point target at your FluxLit app.
+    at = FluxLitTestClient(app).streamlit(target="my_app:app", extra_sys_path=tmp_path)
+    assert at.title and at.title[0].value == "Home Page"
+```
+
+`FluxLitTestClient.streamlit()` sets `FLUXLIT_TESTS=1` during the run, so URL-session
+helpers no-op by default unless you set `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1`.
+
+Streamlit `AppTest` is still strongest when a test starts on one page and checks simple
+widget state. It can be awkward for sidebar radios, fragment reruns, or tests that
+switch pages after the first `.run()`. For now:
 
 - Keep page-selection state behind app-level keys that tests can seed before `.run()`.
 - Give important widgets stable `key=` values.
