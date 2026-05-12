@@ -20,5 +20,6 @@
 │            deployment.                                                       │
 │ new        Create ``<name>/app.py`` with a sample API route and Streamlit    │
 │            home page.                                                        │
+│ pages      Streamlit page tooling.                                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
