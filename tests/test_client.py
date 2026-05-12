@@ -4,7 +4,9 @@ import httpx
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from fluxlit import FluxLit
 from fluxlit.client import ApiClient
+from fluxlit.config import FluxlitSettings
 
 
 class _User(BaseModel):
@@ -254,3 +256,75 @@ def test_post_model_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> Non
         client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
         with pytest.raises(httpx.HTTPStatusError):
             client.post_model("/users", _User, body={})
+
+
+def test_api_client_with_bearer_adds_authorization(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(dict(request.headers))
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        scoped = client.with_bearer("tok99")
+        scoped._client = httpx.Client(base_url=scoped._client.base_url, transport=transport)
+        scoped.get("/z")
+        scoped.close()
+    assert captured.get("authorization") == "Bearer tok99"
+
+
+def test_api_client_with_bearer_composes_existing_auth_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update({k.lower(): v for k, v in request.headers.items()})
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+
+    def tenant() -> dict[str, str]:
+        return {"X-Tenant": "acme"}
+
+    with ApiClient(base_url="http://127.0.0.1:8000/api", auth_header_factory=tenant) as client:
+        scoped = client.with_bearer("inner")
+        scoped._client = httpx.Client(base_url=scoped._client.base_url, transport=transport)
+        scoped.get("/q")
+        scoped.close()
+    assert captured.get("authorization") == "Bearer inner"
+    assert captured.get("x-tenant") == "acme"
+
+
+def test_api_client_with_bearer_copies_propagate_and_default_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    parent = ApiClient(
+        base_url="http://127.0.0.1:8000/api",
+        default_headers={"X-App": "1"},
+        propagate_request_id=True,
+    )
+    child = parent.with_bearer("t")
+    assert child._propagate_request_id is True
+    assert child._default_headers.get("X-App") == "1"
+    parent.close()
+    child.close()
+
+
+def test_fluxlit_get_client_and_for_fluxlit_share_httpx_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    internal = "http://127.0.0.1:60111/content/demo/api"
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", internal)
+    fl = FluxLit(title="sync", settings=FluxlitSettings(root_path="/content/demo"))
+    injected = fl.get_client()
+    auth = ApiClient.for_fluxlit(bearer_token="jwt")
+    try:
+        assert injected._client.base_url == auth._client.base_url
+    finally:
+        injected.close()
+        auth.close()

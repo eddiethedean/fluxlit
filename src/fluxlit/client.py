@@ -36,6 +36,8 @@ class ApiClient:
     Paths are relative to the API base (including the ``/api`` prefix in the base URL).
     For example use ``client.get("/users")``, not ``client.get("/api/users")``.
 
+    Use :meth:`for_fluxlit` or :meth:`with_bearer` when routes require ``Authorization``.
+
     The runtime sets ``FLUXLIT_INTERNAL_API_BASE`` (e.g. ``http://127.0.0.1:8000/api``)
     for Streamlit subprocesses so defaults work without passing ``base_url``.
     """
@@ -63,6 +65,8 @@ class ApiClient:
         """
         env_base = os.environ.get("FLUXLIT_INTERNAL_API_BASE", "").rstrip("/")
         resolved = (base_url or env_base or "http://127.0.0.1:8000/api").rstrip("/")
+        self._resolved_base = resolved
+        self._timeout = timeout
         self._default_headers = dict(default_headers) if default_headers else {}
         self._auth_header_factory = auth_header_factory
         self._propagate_request_id = propagate_request_id
@@ -96,6 +100,33 @@ class ApiClient:
             default_headers=default_headers,
             auth_header_factory=factory,
             propagate_request_id=propagate_request_id,
+        )
+
+    def with_bearer(self, bearer_token: str) -> ApiClient:
+        """Return a new client with the same base URL and options plus ``Authorization: Bearer``.
+
+        Use on the **injected page client** (no auth by default) when you already have a
+        token in ``st.session_state`` and want the same :class:`ApiClient` surface without
+        calling :meth:`for_fluxlit`. If this client already has an ``auth_header_factory``,
+        the new factory merges those headers first, then sets ``Authorization`` to this
+        bearer (call-time headers still win on key clash).
+
+        The returned client owns a separate ``httpx`` connection pool; close it when done
+        or use a ``with`` block.
+        """
+        parent_factory = self._auth_header_factory
+
+        def factory() -> Mapping[str, str]:
+            merged: dict[str, str] = dict(parent_factory()) if parent_factory else {}
+            merged["Authorization"] = f"Bearer {bearer_token}"
+            return merged
+
+        return ApiClient(
+            self._resolved_base,
+            timeout=self._timeout,
+            default_headers=dict(self._default_headers),
+            auth_header_factory=factory,
+            propagate_request_id=self._propagate_request_id,
         )
 
     def _build_request_headers(self, headers: HeaderTypes | None) -> HeaderTypes:

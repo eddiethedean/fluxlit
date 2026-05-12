@@ -20,6 +20,7 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 | Add JWT, OIDC, or call secured APIs from Streamlit | {doc}`security` · {doc}`auth-recipes` |
 | Survive full page reload without cookies (URL + server store) | {doc}`url-session` |
 | Deep links, query params, and invite-style URLs to Streamlit | {doc}`deep-links` |
+| Call the FastAPI app from Streamlit pages (`client`, bearer, errors) | {doc}`streamlit-api-client` |
 | Test API routes and Streamlit pages in Pytest | {doc}`testing` |
 | Fix imports, 503 readiness, WebSockets, or wrong API paths | {doc}`troubleshooting` · `fluxlit doctor` |
 | Browse API reference, support policy, or release history | {doc}`api/index` · {doc}`support-matrix` · {doc}`changelog` |
@@ -28,8 +29,8 @@ New here? Follow {doc}`quickstart` first. You should have a working app at `http
 
 - **Gateway:** Uvicorn serves the public URL; Streamlit runs in a child process on an internal port.
 - **Routing:** `/api/*` goes to FastAPI. Everything else, including `/_stcore/...` WebSockets, is proxied to Streamlit.
-- **From Streamlit, call the API** with the injected `client` using paths like `"/users"`, not `"/api/users"`. The runtime sets the base URL for you.
-- **Secured routes:** the default page `client` has **no** `Authorization` header. Use {meth}`~fluxlit.client.ApiClient.for_fluxlit` or the patterns in {doc}`auth-recipes`.
+- **From Streamlit, call the API** with the injected `client` using paths like `"/users"`, not `"/api/users"`. The runtime sets the base URL for you. For bearer auth, use {meth}`~fluxlit.client.ApiClient.with_bearer` or {meth}`~fluxlit.client.ApiClient.for_fluxlit`; see {doc}`streamlit-api-client` and {doc}`auth-recipes`.
+- **Secured routes:** the default page `client` has **no** `Authorization` header unless you add it per request or use `with_bearer` / `for_fluxlit`.
 - **Health:** `GET /api/healthz` checks the API. `GET /api/readyz` checks the Streamlit sidecar when the gateway is managing one.
 - **Operations:** request IDs, structured logs, Prometheus metrics, gateway limits, graceful shutdown, and Kubernetes guidance are documented in {doc}`observability` and {doc}`deployment`.
 - **Tests:** use `FluxLitTestClient` for gateway-aware API tests and `streamlit_main_path()` / AppTest for thin Streamlit smoke tests; see {doc}`testing`.
@@ -56,6 +57,7 @@ rate-limiting
 security
 url-session
 deep-links
+streamlit-api-client
 migration-auth
 auth-recipes
 troubleshooting

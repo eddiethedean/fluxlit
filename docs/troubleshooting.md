@@ -103,7 +103,7 @@ See {doc}`configuration` (reverse proxies) and {doc}`production-tls` (forwarded 
 
 **401 / 403 from API while developing**
 
-- The default **`client`** injected into pages does not send **Authorization**. Use {meth}`~fluxlit.client.ApiClient.for_fluxlit`, an `auth_header_factory`, or {func}`~fluxlit.streamlit_auth.prepare_streamlit_api_client` after OIDC — {doc}`auth-recipes`.
+- The default **`client`** injected into pages does not send **Authorization**. Use :meth:`fluxlit.client.ApiClient.with_bearer`, :meth:`fluxlit.client.ApiClient.for_fluxlit`, an `auth_header_factory`, or {func}`~fluxlit.streamlit_auth.prepare_streamlit_api_client` after OIDC — {doc}`auth-recipes` and {doc}`streamlit-api-client`.
 
 ## Development reload confusion
 
