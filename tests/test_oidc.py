@@ -4,6 +4,7 @@ import base64
 import json
 from urllib.parse import parse_qs, urlparse
 
+import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
@@ -120,3 +121,16 @@ def test_oidc_bff_exchange_rejects_reuse() -> None:
     auth_code = parse_qs(urlparse(r2.headers["location"]).query)["auth_code"][0]
     assert client.post("/auth/exchange", json={"code": auth_code}).status_code == 200
     assert client.post("/auth/exchange", json={"code": auth_code}).status_code == 401
+
+
+def test_register_oidc_bff_warns_when_public_base_url_empty() -> None:
+    """Empty public_base_url triggers a UserWarning at route registration."""
+    app = FastAPI()
+    cfg = OIDCBFFConfig(
+        oidc=_StubOIDC(),
+        first_party_secret="bff-first-party-secret-32bytes-x",
+        public_base_url="",
+        allow_unverified_id_token_for_custom_oidc=True,
+    )
+    with pytest.warns(UserWarning, match="public_base_url is empty"):
+        register_oidc_bff_routes(app, cfg)
