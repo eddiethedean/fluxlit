@@ -73,6 +73,7 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
                 "app": os.environ["FLUXLIT_APP"],
                 "base": os.environ["FLUXLIT_INTERNAL_API_BASE"],
                 "prefix": os.environ["FLUXLIT_API_PREFIX"],
+                "tests": os.environ["FLUXLIT_TESTS"],
                 "syspath0": sys.path[0],
             }
 
@@ -89,6 +90,7 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
     assert result["app"] == "demo:app"
     assert result["base"] == "http://test/api"
     assert result["prefix"] == "/v1"
+    assert result["tests"] == "1"
     assert result["syspath0"] == str(tmp_path)
     assert FakeAppTest.captured_path == str(streamlit_main_path())
 

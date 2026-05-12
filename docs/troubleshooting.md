@@ -48,6 +48,8 @@ In **unit tests** without `FLUXLIT_STREAMLIT_UPSTREAM`, `readyz` may return **20
 
 - Use paths **without** duplicating the API prefix: `client.get("/users")`, not `client.get("/api/users")`. The runtime sets `FLUXLIT_INTERNAL_API_BASE` to include `/api`.
 - If you override **`FLUXLIT_INTERNAL_API_BASE`** manually (unusual), it must be an absolute URL whose path matches `api_mount_path` (default `/api`). Doctor warns on mismatch.
+- In Pytest, prefer the patterns in {doc}`testing` so `FluxLitTestClient`,
+  `AppTest`, `FLUXLIT_APP`, and the API prefix are configured consistently.
 
 ## Subpath / static assets / WebSockets
 

@@ -21,7 +21,9 @@ pip install -e ".[dev]"
 ```
 
 ```{note}
-Contributor tests: `python -m pytest -n auto -m "not slow"`. More in {doc}`testing`.
+Testing your app: start with `FluxLitTestClient` for API routes and Streamlit
+`AppTest` for thin UI smoke checks. See {doc}`testing` for a copy-paste Pytest
+recipe.
 ```
 
 ## Scaffold (optional)

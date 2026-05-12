@@ -160,6 +160,43 @@ def test_hydrate_replace_mode_overwrites_existing_state() -> None:
     assert st.session_state["a"] == 1
 
 
+def test_url_session_helpers_disable_in_test_mode(monkeypatch) -> None:
+    monkeypatch.setenv("FLUXLIT_TESTS", "1")
+    st = _FakeSt()
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("sid", {"a": 1})
+    st.query_params["fluxlit_sid"] = "sid"
+
+    assert hydrate_url_session(st, store) is None
+    assert ensure_url_session(st, store, initial={"b": 2}) == "sid"
+    st.session_state["a"] = 99
+    assert persist_url_session(st, store) is None
+    assert st.session_state == {"a": 99}
+    assert store.get("sid") == {"a": 1}
+
+
+def test_url_session_helpers_can_force_enable_in_test_mode(monkeypatch) -> None:
+    monkeypatch.setenv("FLUXLIT_TESTS", "1")
+    monkeypatch.setenv("FLUXLIT_FORCE_URL_SESSION_IN_TESTS", "1")
+    st = _FakeSt()
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("sid", {"a": 1})
+    st.query_params["fluxlit_sid"] = "sid"
+
+    assert hydrate_url_session(st, store) == "sid"
+    assert st.session_state["a"] == 1
+
+
+def test_url_session_helpers_disable_with_explicit_env(monkeypatch) -> None:
+    monkeypatch.setenv("FLUXLIT_DISABLE_URL_SESSION", "true")
+    monkeypatch.setenv("FLUXLIT_FORCE_URL_SESSION_IN_TESTS", "1")
+    st = _FakeSt()
+    store = InMemorySessionStore(default_ttl_seconds=None)
+
+    assert ensure_url_session(st, store, initial={"n": 1}) == ""
+    assert st.query_params == {}
+
+
 def test_ensure_mints_and_sets_query_param() -> None:
     st = _FakeSt()
     store = InMemorySessionStore(default_ttl_seconds=None)
