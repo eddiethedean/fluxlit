@@ -100,6 +100,16 @@ Gateway proxy fields also exist on {class}`~fluxlit.config.FluxlitSettings` as `
 
 See the {mod}`fluxlit.config` API reference for the full settings model.
 
+### Public URL helpers
+
+Use {attr}`fluxlit.app.FluxLit.urls` when you need **browser-visible** links (Streamlit `st.markdown`, emails, OIDC redirects beyond the built-in BFF):
+
+- **`urls.app_base(request)`** — origin plus the public mount (`FLUXLIT_ROOT_PATH` / `FLUXLIT_STREAMLIT_PUBLIC_PATH`): where Streamlit pages live.
+- **`urls.api_base(request)`** — app base plus `FLUXLIT_API_MOUNT_PATH` (default `/api`): where `GET /healthz`, `GET /readyz`, OpenAPI, and Swagger UI are served on the gateway.
+- **`urls.for_page(request, path, query=...)`** — deep links under the app base (not under `/api`).
+
+When **`FLUXLIT_PUBLIC_BASE_URL`** is an absolute URL with a **path**, that value is used as the app base (for CDNs or fixed public entrypoints). When it is origin-only (e.g. `https://app.example.com`), the configured public mount is appended. If it is unset or not a usable absolute URL, the current request’s scheme and host are used (respecting `X-Forwarded-*` when proxy trust is enabled).
+
 ### Auth dependencies
 
 Install JWT/OIDC helpers with:

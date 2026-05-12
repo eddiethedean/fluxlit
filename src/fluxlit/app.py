@@ -11,6 +11,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from fluxlit.application.api_bootstrap import wire_fluxlit_api
 from fluxlit.application.auth_attachment import AuthAttachment
 from fluxlit.application.page_registry import discover_streamlit_pages, register_streamlit_page
+from fluxlit.application.public_urls import FluxLitPublicUrls
 from fluxlit.auth.jwt import JWTBearer
 from fluxlit.auth.oidc import GenericOIDCClient
 from fluxlit.client import ApiClient
@@ -22,6 +23,7 @@ class FluxLit:
 
     Use :attr:`api` for HTTP routes, dependencies, and OpenAPI (mounted under
     :attr:`~fluxlit.config.FluxlitSettings.api_mount_path` on the public gateway).
+    Use :attr:`urls` for browser-visible links (app root vs API prefix, health, docs).
     Use :meth:`page` or :meth:`discover_pages` to register Streamlit UI; the runtime
     builds ``st.navigation`` from registered pages.
 
@@ -91,6 +93,7 @@ class FluxLit:
         self._pages: list[tuple[str, str, Callable[..., None]]] = []
         self._oidc_bff_attached: bool = False
         self._auth = AuthAttachment(self)
+        self._urls = FluxLitPublicUrls(self)
         wire_fluxlit_api(self.api, self.settings)
 
     def __setattr__(self, name: str, value: object) -> None:
@@ -165,6 +168,11 @@ class FluxLit:
         """
 
         return register_streamlit_page(self, path, title=title)
+
+    @property
+    def urls(self) -> FluxLitPublicUrls:
+        """Browser-visible URL helpers for this app (app root vs ``api_mount_path``)."""
+        return self._urls
 
     def get_client(self) -> ApiClient:
         """Return an :class:`~fluxlit.client.ApiClient` for server-side API calls.
