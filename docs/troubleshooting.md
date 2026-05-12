@@ -15,6 +15,19 @@ Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports 
 
 - Check the **`target`** string (`app:app`): module must be importable from the current working directory (`PYTHONPATH` / `pip install -e .`).
 - Run from the project root where `fluxlit.toml` or your package lives.
+- In monorepos, avoid putting sibling services with top-level `app` or `main` packages
+  on `PYTHONPATH` at the same time. `fluxlit doctor` warns when multiple importable
+  candidates are visible for the same top-level target.
+
+**Multiple `app` / `main` candidates**
+
+- Prefer an explicit package target such as `my_service.main:app`, or run tests with
+  only the intended project root prepended to `sys.path`.
+- If your entrypoint is a top-level file, FluxLit prefers `./main.py` or `./app.py`
+  from the current working directory and prepends that file's directory before
+  executing it, so sibling imports work without a global `PYTHONPATH`.
+- For Pytest, clear stale modules only when you intentionally swap project roots in
+  one process; most suites should use one project root per test session.
 
 **`ValueError` / `reload_scope`**
 
@@ -64,6 +77,19 @@ See {doc}`configuration` (reverse proxies) and {doc}`production-tls` (forwarded 
 **`fluxlit_auth_extra` FAIL** with JWT-related env set
 
 - Install **`pip install "fluxlit[auth]"`** so PyJWT is available.
+
+**`fluxlit_metrics_extra` FAIL** with gateway metrics enabled
+
+- Install **`pip install "fluxlit[metrics]"`** so `prometheus-client` is available, or
+  unset `FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS`.
+
+**`public_base_url_precedence` WARN / FAIL**
+
+- Prefer `FLUXLIT_PUBLIC_BASE_URL` for FluxLit OAuth redirects. `PUBLIC_BASE_URL` is
+  only a fallback for platforms that already provide it.
+- If both are set differently, FluxLit uses `FLUXLIT_PUBLIC_BASE_URL`. Set
+  `FLUXLIT_STRICT_PUBLIC_BASE_URL=1` in deployment checks when a mismatch should fail
+  `fluxlit doctor`.
 
 **401 / 403 from API while developing**
 

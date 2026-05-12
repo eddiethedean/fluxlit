@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from typing import Any
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -240,6 +243,13 @@ class FluxlitSettings(BaseSettings):
             "If empty, derive from request.url_for / X-Forwarded-* in route handlers."
         ),
     )
+    strict_public_base_url: bool = Field(
+        default=False,
+        description=(
+            "If True, deployment diagnostics should fail when PUBLIC_BASE_URL and "
+            "FLUXLIT_PUBLIC_BASE_URL are both set to different values."
+        ),
+    )
     jwt_issuer: str = Field(
         default="",
         description=(
@@ -271,6 +281,13 @@ class FluxlitSettings(BaseSettings):
             "used by ``FluxLit.attach_oidc_login``."
         ),
     )
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
+        legacy = os.environ.get("PUBLIC_BASE_URL", "").strip()
+        namespaced = os.environ.get("FLUXLIT_PUBLIC_BASE_URL", "").strip()
+        if legacy and not namespaced and not self.public_base_url.strip():
+            self.public_base_url = legacy
 
     def public_mount_path(self) -> str:
         """Browser-visible path prefix (``root_path``, else ``streamlit_public_path``)."""

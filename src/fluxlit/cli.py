@@ -10,6 +10,7 @@ import json
 import os
 import platform
 import socket
+import sys
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlparse
@@ -341,15 +342,41 @@ def run_cmd(
 def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
     """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``."""
     from fluxlit.runtime import load_fluxlit
+    from fluxlit.runtime.import_target import import_target_candidates
 
     rows: list[tuple[str, CheckStatus, str]] = []
 
     rows.append(("python_version", "PASS", platform.python_version()))
+    sys_path_head = ", ".join((p or ".") for p in sys.path[:3])
+    rows.append(("sys_path_head", "PASS", sys_path_head or "(empty)"))
 
     fl = None
+    mod_name = target.partition(":")[0]
+    candidates = import_target_candidates(mod_name)
+    if len(candidates) > 1:
+        shown = ", ".join(str(p) for p in candidates[:4])
+        more = f" (+{len(candidates) - 4} more)" if len(candidates) > 4 else ""
+        rows.append(
+            (
+                "import_shadowing",
+                "WARN",
+                f"multiple import candidates for {mod_name!r}: {shown}{more}; "
+                "run from the intended project root or trim PYTHONPATH",
+            )
+        )
+    elif candidates:
+        rows.append(("import_shadowing", "PASS", f"{mod_name!r} resolves from {candidates[0]}"))
+    else:
+        rows.append(
+            ("import_shadowing", "PASS", f"no top-level file/package candidates for {mod_name!r}")
+        )
+
     try:
         fl = load_fluxlit(target)
         rows.append(("import_target", "PASS", target))
+        module_key = Path(mod_name).stem if Path(mod_name).suffix == ".py" else mod_name
+        module_file = getattr(sys.modules.get(module_key), "__file__", "")
+        rows.append(("import_module_file", "PASS", str(module_file or "(not available)")))
     except Exception as e:
         rows.append(("import_target", "FAIL", str(e)))
 
@@ -466,6 +493,59 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
             )
         else:
             rows.append(("fluxlit_auth_extra", "PASS", "PyJWT importable (fluxlit[auth])"))
+
+    if fl is not None and fl.settings.enable_gateway_prometheus_metrics:
+        try:
+            import prometheus_client  # noqa: F401
+        except ImportError:
+            rows.append(
+                (
+                    "fluxlit_metrics_extra",
+                    "FAIL",
+                    "Prometheus metrics enabled but prometheus-client is missing; "
+                    "pip install 'fluxlit[metrics]'",
+                )
+            )
+        else:
+            rows.append(("fluxlit_metrics_extra", "PASS", "prometheus-client importable"))
+
+    if fl is not None:
+        rows.append(("config.api_mount_path", "PASS", fl.settings.api_mount_path))
+        rows.append(
+            (
+                "config.url_session",
+                "PASS",
+                f"param={fl.settings.url_session_query_param!r}; "
+                f"tests={bool(os.environ.get('FLUXLIT_TESTS'))}; "
+                f"disabled={bool(os.environ.get('FLUXLIT_DISABLE_URL_SESSION'))}",
+            )
+        )
+        rows.append(("config.root_path", "PASS", fl.settings.root_path or "(empty)"))
+        rows.append(("config.trust_proxy", "PASS", str(fl.settings.trust_proxy)))
+        rows.append(
+            (
+                "config.public_base_url",
+                "PASS",
+                fl.settings.public_base_url.strip() or "(empty)",
+            )
+        )
+
+        legacy_public = os.environ.get("PUBLIC_BASE_URL", "").strip()
+        fluxlit_public = os.environ.get("FLUXLIT_PUBLIC_BASE_URL", "").strip()
+        if legacy_public and fluxlit_public and legacy_public != fluxlit_public:
+            status: CheckStatus = "FAIL" if fl.settings.strict_public_base_url else "WARN"
+            rows.append(
+                (
+                    "public_base_url_precedence",
+                    status,
+                    "PUBLIC_BASE_URL and FLUXLIT_PUBLIC_BASE_URL differ; "
+                    "FluxLit uses FLUXLIT_PUBLIC_BASE_URL",
+                )
+            )
+        elif fluxlit_public:
+            rows.append(("public_base_url_precedence", "PASS", "using FLUXLIT_PUBLIC_BASE_URL"))
+        elif legacy_public:
+            rows.append(("public_base_url_precedence", "PASS", "using PUBLIC_BASE_URL fallback"))
 
     if (
         fl is not None
