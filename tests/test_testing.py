@@ -61,6 +61,9 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
     class FakeAppTest:
         captured_path = ""
 
+        def __init__(self) -> None:
+            self.query_params: dict[str, str] = {}
+
         @classmethod
         def from_file(cls, path: str) -> FakeAppTest:
             cls.captured_path = path
@@ -75,6 +78,7 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
                 "prefix": os.environ["FLUXLIT_API_PREFIX"],
                 "tests": os.environ["FLUXLIT_TESTS"],
                 "syspath0": sys.path[0],
+                "qparams": dict(self.query_params),
             }
 
     monkeypatch.setitem(sys.modules, "streamlit", fake_streamlit)
@@ -86,12 +90,14 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
         target="demo:app",
         internal_api_base="http://test/api",
         extra_sys_path=tmp_path,
+        query_params={"page": "Home", "token": "abc"},
     )
     assert result["app"] == "demo:app"
     assert result["base"] == "http://test/api"
     assert result["prefix"] == "/v1"
     assert result["tests"] == "1"
     assert result["syspath0"] == str(tmp_path)
+    assert result["qparams"] == {"page": "Home", "token": "abc"}
     assert FakeAppTest.captured_path == str(streamlit_main_path())
 
 

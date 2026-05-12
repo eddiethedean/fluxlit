@@ -84,7 +84,9 @@ without putting secrets in the URL, consider {doc}`url-session` patterns instead
 
 **API routes** that return `page_url` should be exercised through
 {class}`~fluxlit.testing.FluxLitTestClient` so the same gateway prefix rules apply
-as in production.
+as in production. You can also pass ``query_params=`` to
+:meth:`~fluxlit.testing.FluxLitTestClient.streamlit` instead of mutating ``AppTest``
+manually.
 
 For **Streamlit** `AppTest`, set query values on the runner **before** `run()`:
 
