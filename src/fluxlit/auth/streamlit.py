@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from fluxlit.client import ApiClient
+from fluxlit.runtime.env_parse import truthy_env
 
 _log = logging.getLogger(__name__)
-
-
-def _fluxlit_debug() -> bool:
-    return os.environ.get("FLUXLIT_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _query_param_raw(query_params: Any, key: str) -> str | None:
@@ -51,7 +47,7 @@ def exchange_auth_code_from_query(
         try:
             st_module.query_params.pop(query_key)
         except Exception as exc:  # noqa: BLE001 — best-effort; Streamlit versions differ
-            if _fluxlit_debug():
+            if truthy_env("FLUXLIT_DEBUG"):
                 _log.debug(
                     "exchange_auth_code_from_query: query_params.pop(%r) failed: %s",
                     query_key,

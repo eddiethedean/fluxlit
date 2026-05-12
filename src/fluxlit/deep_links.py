@@ -3,18 +3,14 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from fluxlit.pages.records import PageRecord
 from fluxlit.pages.slug import page_slug
+from fluxlit.runtime.env_parse import truthy_env
 
 _log = logging.getLogger(__name__)
-
-
-def _fluxlit_debug() -> bool:
-    return os.environ.get("FLUXLIT_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _scalar_query_value(raw: Any) -> str | None:
@@ -41,7 +37,7 @@ def query_params(st: Any) -> dict[str, str]:
     try:
         keys = [str(k) for k in qp.keys()]
     except Exception as exc:  # noqa: BLE001 — best-effort for mocks / older Streamlit
-        if _fluxlit_debug():
+        if truthy_env("FLUXLIT_DEBUG"):
             _log.debug(
                 "query_params: could not list keys from st.query_params: %s", exc, exc_info=True
             )
@@ -54,7 +50,7 @@ def query_params(st: Any) -> dict[str, str]:
         try:
             raw = qp.get(k) if hasattr(qp, "get") else qp[k]
         except Exception as exc:  # noqa: BLE001
-            if _fluxlit_debug():
+            if truthy_env("FLUXLIT_DEBUG"):
                 _log.debug(
                     "query_params: could not read key %r from st.query_params: %s",
                     k,

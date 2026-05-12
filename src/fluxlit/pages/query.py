@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
+from fluxlit.runtime.env_parse import truthy_env
+
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
 _log = logging.getLogger(__name__)
-
-
-def _fluxlit_debug() -> bool:
-    return os.environ.get("FLUXLIT_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 class Query:
@@ -32,7 +29,7 @@ def _query_dict_from_st(st: Any) -> dict[str, Any]:
     try:
         keys = list(qp.keys())
     except Exception as exc:  # noqa: BLE001
-        if _fluxlit_debug():
+        if truthy_env("FLUXLIT_DEBUG"):
             _log.debug(
                 "_query_dict_from_st: could not list keys from st.query_params: %s",
                 exc,
@@ -44,7 +41,7 @@ def _query_dict_from_st(st: Any) -> dict[str, Any]:
         try:
             raw = qp.get(key) if hasattr(qp, "get") else qp[key]
         except Exception as exc:  # noqa: BLE001
-            if _fluxlit_debug():
+            if truthy_env("FLUXLIT_DEBUG"):
                 _log.debug(
                     "_query_dict_from_st: could not read key %r: %s",
                     key,

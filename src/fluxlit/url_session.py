@@ -15,7 +15,6 @@ and multipage patterns.
 from __future__ import annotations
 
 import logging
-import os
 import secrets
 import time
 from collections.abc import Mapping, MutableMapping
@@ -24,6 +23,7 @@ from typing import Protocol, TypeVar, cast, runtime_checkable
 from pydantic import BaseModel, ValidationError
 
 from fluxlit.config import JsonValue
+from fluxlit.runtime.env_parse import truthy_env
 from fluxlit.streamlit.facade import StreamlitSessionFacade
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
@@ -123,14 +123,10 @@ def new_session_id() -> str:
     return secrets.token_urlsafe(32)
 
 
-def _truthy_env(name: str) -> bool:
-    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _url_session_disabled() -> bool:
-    if _truthy_env("FLUXLIT_DISABLE_URL_SESSION"):
+    if truthy_env("FLUXLIT_DISABLE_URL_SESSION"):
         return True
-    return _truthy_env("FLUXLIT_TESTS") and not _truthy_env("FLUXLIT_FORCE_URL_SESSION_IN_TESTS")
+    return truthy_env("FLUXLIT_TESTS") and not truthy_env("FLUXLIT_FORCE_URL_SESSION_IN_TESTS")
 
 
 def _query_param_get(st: StreamlitSessionFacade, param: str) -> str | None:
@@ -160,7 +156,7 @@ def _query_param_set(st: StreamlitSessionFacade, param: str, value: str) -> bool
             return True
         return False
     except Exception as exc:
-        if _truthy_env("FLUXLIT_DEBUG"):
+        if truthy_env("FLUXLIT_DEBUG"):
             _log.debug(
                 "_query_param_set: failed to set query param %r: %s",
                 param,
@@ -271,7 +267,7 @@ def persist_url_session(
                 continue
             snap[str(k)] = cast(JsonValue, v)
     except Exception as exc:
-        if _truthy_env("FLUXLIT_DEBUG"):
+        if truthy_env("FLUXLIT_DEBUG"):
             _log.exception(
                 "persist_url_session: failed to snapshot session_state for param=%r sid=%s; "
                 "store not updated",

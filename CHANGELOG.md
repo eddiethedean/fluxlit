@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Internal:** Consolidate affirmative ``FLUXLIT_*`` environment parsing via ``fluxlit.runtime.env_parse.truthy_env`` (used for ``FLUXLIT_DEBUG``, URL-session test guards, and related call sites).
+
+<!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 ## 0.11.0 - 2026-05-12
 
 - **Proxy matrix:** Traefik **v3.2** strip-prefix smoke stack on port **8085** (`docker-compose.traefik.yml`, `traefik-dynamic.yml`); wired into `docker/proxy-deployment/run-all-proxy-smokes.sh` and the reverse-proxy matrix in {doc}`deployment`.

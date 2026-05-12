@@ -114,6 +114,15 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 
 **Next: 0.12.x (Phase 2)** — see **[Path to 1.0](#path-to-1-0)** Phase 2: evidence-backed load/chaos baselines, stability charter for metrics/manifest, multi-replica narrative upgrades, and stricter misconfiguration handling where appropriate.
 
+### Phase 2 — delivery checklist (track as issues/milestones)
+
+Use your issue tracker or release milestones to burn these down; this list mirrors Phase 2 in **[Path to 1.0](#path-to-1-0)** above.
+
+- [ ] **Evidence:** scripted load/soak/chaos runs with expected signals (metrics, logs, `readyz`) aligned with [docs/runbooks.md](docs/runbooks.md).
+- [ ] **Multi-replica:** first-class docs for horizontal scale (sticky sessions, external `SessionStore`, rollout/drain) building on URL-session and examples.
+- [ ] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs (and code comments where it prevents drift).
+- [ ] **DX / misconfiguration:** clearer startup or CLI errors for invalid combinations (`forwarded_allow_ips`, `public_base_url` / `root_path` mismatch, multi-worker unified mode).
+
 **Gaps vs “production”**
 
 - CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
