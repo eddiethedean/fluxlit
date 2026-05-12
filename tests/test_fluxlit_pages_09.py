@@ -178,9 +178,9 @@ def test_parse_query_params_soft_and_strict() -> None:
 
 
 def test_parse_query_params_adapter() -> None:
-    from typing import TypedDict
-
+    # Pydantic requires typing_extensions.TypedDict on Python < 3.12.
     from pydantic import TypeAdapter
+    from typing_extensions import TypedDict
 
     class TD(TypedDict, total=False):
         a: int
