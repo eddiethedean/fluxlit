@@ -39,6 +39,7 @@ from fluxlit.auth.streamlit import (
 )
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
+from fluxlit.deep_links import match_nav_page, query_params
 from fluxlit.testing import FluxLitTestClient, streamlit_main_path
 from fluxlit.tracing import reset_trace_hook, set_trace_hook, trace_span
 from fluxlit.url_session import (
@@ -73,10 +74,12 @@ __all__ = [
     "register_oidc_bff_routes",
     "SessionStore",
     "InMemorySessionStore",
+    "match_nav_page",
     "new_session_id",
     "ensure_url_session",
     "hydrate_url_session",
     "persist_url_session",
+    "query_params",
     "reset_trace_hook",
     "set_trace_hook",
     "streamlit_main_path",

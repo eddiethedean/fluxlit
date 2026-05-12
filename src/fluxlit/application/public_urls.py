@@ -120,5 +120,13 @@ class FluxLitPublicUrls:
             url = f"{url}?{urlencode(query)}"
         return url
 
+    def page_url(self, request: Request, path: str, *, query: dict[str, str] | None = None) -> str:
+        """Alias for :meth:`for_page` (invite links, password reset, and other deep links).
+
+        Prefer this name in app code and docs when the intent is a **shareable page URL**
+        rather than an internal path join.
+        """
+        return self.for_page(request, path, query=query)
+
 
 __all__ = ["FluxLitPublicUrls"]
