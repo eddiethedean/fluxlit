@@ -2,14 +2,11 @@
 
 ## Unreleased
 
-## 0.8.1 - 2026-05-12
-
-- **Public URLs:** `FluxLit.urls` exposes :class:`~fluxlit.application.public_urls.FluxLitPublicUrls` with `app_base`, `api_base`, `docs_url`, `redoc_url`, `openapi_url`, `health_url`, `ready_url`, and `for_page` (including `query=`) so links match `FLUXLIT_ROOT_PATH`, `FLUXLIT_API_MOUNT_PATH`, and `FLUXLIT_PUBLIC_BASE_URL` under the unified gateway.
-
 ## 0.8.0 - 2026-05-12
 
 - **CLI:** `fluxlit config` prints resolved binding, redacted effective settings, derived internal API base, and structured configuration warnings (with documentation links); supports `--json` and `--strict`.
 - **Docs:** Expanded support matrix with production pinning patterns (`uv`, `pip-tools`), explicit core dependency lower bounds, Streamlit extra guidance, testing compatibility notes, and upgrade checklist cross-links.
+- **Public URLs:** `FluxLit.urls` exposes :class:`~fluxlit.application.public_urls.FluxLitPublicUrls` with `app_base`, `api_base`, `docs_url`, `redoc_url`, `openapi_url`, `health_url`, `ready_url`, and `for_page` (including `query=`) so links match `FLUXLIT_ROOT_PATH`, `FLUXLIT_API_MOUNT_PATH`, and `FLUXLIT_PUBLIC_BASE_URL` under the unified gateway.
 
 **Upgrading from 0.7.x:** `fluxlit build` emits `pip install "fluxlit>=0.8,<0.9"` in generated Dockerfiles; refresh pinned Compose lockfiles (`examples/docker_compose/requirements.in` / `requirements.txt`) and Kubernetes image tags when you bump the FluxLit line. Run `fluxlit config` after changing proxy or public URL env vars.
 
