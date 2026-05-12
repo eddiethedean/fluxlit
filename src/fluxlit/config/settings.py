@@ -98,6 +98,15 @@ class FluxlitSettings(BaseSettings):
             "(fluxlit_dispatch, path, redacted query); default is DEBUG only."
         ),
     )
+    debug: bool = Field(
+        default=False,
+        description=(
+            "When true (``FLUXLIT_DEBUG=1`` or ``fluxlit dev/run --debug``), enable "
+            "gateway access logs, API request logging, bump default log level to ``debug``, "
+            "expose ``GET /__fluxlit/debug`` on the gateway, and propagate request ids from "
+            ":meth:`fluxlit.app.FluxLit.get_client` where applicable. Do not enable in production."
+        ),
+    )
     url_session_query_param: str = Field(
         default="fluxlit_sid",
         description=(

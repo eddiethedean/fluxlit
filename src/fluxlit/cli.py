@@ -186,6 +186,7 @@ def _execute_unified_cli(
     reload: bool,
     reload_scope: str,
     workbench: bool,
+    debug: bool = False,
 ) -> None:
     """Shared entry for ``fluxlit dev``, ``run``, and ``workbench``."""
     if reload and reload_scope not in {"gateway", "full"}:
@@ -194,6 +195,9 @@ def _execute_unified_cli(
             err=True,
         )
         raise typer.Exit(code=2)
+
+    if debug:
+        os.environ["FLUXLIT_DEBUG"] = "1"
 
     from fluxlit.runtime import load_fluxlit
 
@@ -269,6 +273,14 @@ def dev(
             "loopback browser URL hint (set FLUXLIT_ROOT_PATH when using a subpath)."
         ),
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help=(
+            "Diagnostics: set FLUXLIT_DEBUG=1 (gateway access logs, API request logging, "
+            "GET /__fluxlit/debug JSON, verbose gateway path splits). Not for production."
+        ),
+    ),
 ) -> None:
     """Run the unified stack for local development (Streamlit subprocess + Uvicorn gateway).
 
@@ -287,6 +299,7 @@ def dev(
         reload=reload,
         reload_scope=reload_scope,
         workbench=workbench,
+        debug=debug,
     )
 
 
@@ -358,6 +371,14 @@ def run_cmd(
             "loopback browser URL hint (set FLUXLIT_ROOT_PATH when using a subpath)."
         ),
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help=(
+            "Diagnostics: set FLUXLIT_DEBUG=1 (gateway access logs, API request logging, "
+            "GET /__fluxlit/debug JSON, verbose gateway path splits). Not for production."
+        ),
+    ),
 ) -> None:
     """Run the unified stack for production-style use (no Uvicorn reload).
 
@@ -376,6 +397,7 @@ def run_cmd(
         reload=False,
         reload_scope="gateway",
         workbench=workbench,
+        debug=debug,
     )
 
 
@@ -406,6 +428,11 @@ def workbench_cmd(
         "--no-pidfile",
         help="Do not write a PID file (also respect FLUXLIT_NO_PIDFILE=1).",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Same as ``fluxlit run --debug`` (sets FLUXLIT_DEBUG=1).",
+    ),
 ) -> None:
     """Run the unified stack for Posit Workbench / Posit Connect-style path proxies.
 
@@ -425,6 +452,7 @@ def workbench_cmd(
         reload=False,
         reload_scope="gateway",
         workbench=True,
+        debug=debug,
     )
 
 

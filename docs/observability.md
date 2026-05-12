@@ -35,6 +35,8 @@ When {attr}`~fluxlit.config.FluxlitSettings.enable_gateway_access_log` is `True`
 
 With the default (`False`), the same line is logged at **DEBUG** only.
 
+When **debug mode** is on (`FLUXLIT_DEBUG=1` or `fluxlit dev` / `run` / `workbench --debug`), gateway access logging and API request logging are enabled by default, the default log level moves to **debug** if it was still **info**, and the gateway emits an extra **DEBUG** line per request with the split between API path and Streamlit path. A redacted JSON snapshot is available at **`GET /__fluxlit/debug`** (disabled if that path would collide with `api_mount_path`); see {doc}`configuration` and the **Debug mode** section in {doc}`troubleshooting`.
+
 If you enable gateway INFO logs in production, combine them with your normal log pipeline (filters, aggregators) and scrub or avoid echoing sensitive headers. For copying header dicts into logs or debug output, use {mod}`fluxlit.logging.redact`. Broader secrets and rotation guidance: {doc}`secrets`.
 
 ### Gateway log schema

@@ -16,6 +16,7 @@ from fluxlit.auth.jwt import JWTBearer
 from fluxlit.auth.oidc import GenericOIDCClient
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings, JsonValue
+from fluxlit.runtime.debug_settings import merge_debug_settings
 
 
 class FluxLit:
@@ -83,6 +84,8 @@ class FluxLit:
             settings_updates["streamlit_page_config"] = merged_pages
         if settings_updates:
             self.settings = self.settings.model_copy(update=settings_updates)
+
+        self.settings = merge_debug_settings(self.settings)
 
         fa_kwargs: dict[str, Any] = dict(fastapi_kwargs or {})
         # Always align with FluxlitSettings so the gateway and Streamlit baseUrlPath match.
@@ -178,8 +181,10 @@ class FluxLit:
         """Return an :class:`~fluxlit.client.ApiClient` for server-side API calls.
 
         Uses ``FLUXLIT_INTERNAL_API_BASE`` when set (as in the managed runtime).
+        When :attr:`~fluxlit.config.FluxlitSettings.debug` is true, the client forwards
+        ``X-Request-ID`` to the API for log correlation with the gateway.
         """
-        return ApiClient()
+        return ApiClient(propagate_request_id=self.settings.debug)
 
     def make_jwt_bearer(self) -> JWTBearer:
         """JWT :class:`~fluxlit.auth.jwt.JWTBearer` from :attr:`settings` (``FLUXLIT_JWT_*``).

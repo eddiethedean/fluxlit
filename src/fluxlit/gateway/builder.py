@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -119,6 +120,37 @@ def build_gateway(
             )
             prom_metrics = None
 
+    debug_mode = bool(proxy_settings and proxy_settings.debug)
+    debug_snapshot: dict[str, Any] | None = None
+    debug_path = "/__fluxlit/debug"
+    if debug_mode and proxy_settings:
+        if debug_path == prefix or debug_path.startswith(f"{prefix}/"):
+            gateway_log.warning(
+                "FluxLit debug endpoint %r conflicts with api_mount_path %r; disabling it",
+                debug_path,
+                prefix,
+            )
+            debug_mode = False
+        else:
+            from fluxlit.config.config_print import redact_fluxlit_settings_dict
+
+            debug_snapshot = {
+                "fluxlit_debug": True,
+                "gateway": {"api_prefix": prefix, "root_mount": mount},
+                "settings": redact_fluxlit_settings_dict(proxy_settings),
+                "streamlit_upstream_env": (
+                    "set"
+                    if (os.environ.get("FLUXLIT_STREAMLIT_UPSTREAM") or "").strip()
+                    else "unset"
+                ),
+            }
+            gateway_log.info(
+                "fluxlit debug mode: GET %s redacted snapshot (api_prefix=%r root_mount=%r)",
+                debug_path,
+                prefix,
+                mount,
+            )
+
     return make_gateway_app(
         api_app=api_app,
         resolve_upstream=resolve_upstream,
@@ -131,4 +163,7 @@ def build_gateway(
         prom_path=prom_path,
         access_log=access_log,
         log_sensitive_query_keys=log_sensitive_query_keys,
+        debug_mode=debug_mode,
+        debug_snapshot=debug_snapshot,
+        debug_path=debug_path,
     )

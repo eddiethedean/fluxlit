@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
 import time
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 import httpx
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -44,6 +46,9 @@ def make_gateway_app(
     prom_path: str,
     access_log: bool,
     log_sensitive_query_keys: frozenset[str],
+    debug_mode: bool = False,
+    debug_snapshot: dict[str, Any] | None = None,
+    debug_path: str = "/__fluxlit/debug",
 ) -> ASGIApp:
     """Return the ASGI handler for HTTP/WebSocket (not lifespan)."""
 
@@ -62,6 +67,10 @@ def make_gateway_app(
             path, streamlit_path = split_gateway_paths(path_in, mount)
             is_api = path == prefix or path.startswith(f"{prefix}/")
             dispatch = "api" if is_api else "streamlit"
+            if debug_mode:
+                from fluxlit.gateway.debug_ring import record_gateway_dispatch
+
+                record_gateway_dispatch(request_id=rid, dispatch=dispatch, path_in=path_in)
             if (
                 prom_metrics
                 and scope["type"] == "http"
@@ -88,6 +97,29 @@ def make_gateway_app(
                 )
                 await send({"type": "http.response.body", "body": body})
                 return
+            if (
+                scope["type"] == "http"
+                and str(scope.get("method", "GET")).upper() == "GET"
+                and path == debug_path
+            ):
+                skip_prom_observe = True
+                if not debug_mode or debug_snapshot is None:
+                    await not_found(send)
+                    return
+                from fluxlit.gateway.debug_ring import recent_gateway_dispatches
+
+                payload = dict(debug_snapshot)
+                payload["recent_dispatches"] = recent_gateway_dispatches()
+                body = json.dumps(payload, default=str).encode("utf-8")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 200,
+                        "headers": [(b"content-type", b"application/json; charset=utf-8")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
             qs_raw = scope.get("query_string", b"") or b""
             try:
                 qs_dec = qs_raw.decode("latin-1")
@@ -100,6 +132,14 @@ def make_gateway_app(
                 "path": path_in,
                 "query": redact_query_string(qs_dec, sensitive_keys=log_sensitive_query_keys),
             }
+            if debug_mode:
+                gateway_log.debug(
+                    "fluxlit debug split path_in=%r mount=%r api_path=%r streamlit_path=%r",
+                    path_in,
+                    mount,
+                    path,
+                    streamlit_path,
+                )
             log_msg = "gateway %s %s request_id=%s"
             log_args = (method_or_type, path_in, rid)
             if access_log:

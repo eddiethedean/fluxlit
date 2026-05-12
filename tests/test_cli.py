@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import subprocess
 import sys
 import types
@@ -585,6 +586,32 @@ def test_dev_passes_reload_scope_full_to_run_unified(
     )
     assert res.exit_code == 0
     assert called.get("reload_scope") == "full"
+
+
+def test_dev_debug_sets_fluxlit_debug_environment_variable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "dbg_cli_app.py").write_text(
+        "from fluxlit import FluxLit\napp = FluxLit(title='DBG')\n", encoding="utf-8"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    prev_debug = os.environ.pop("FLUXLIT_DEBUG", None)
+    try:
+
+        def stub(*_a: object, **_k: object) -> None:
+            return None
+
+        monkeypatch.setattr("fluxlit.cli.run_unified", stub)
+        runner = CliRunner()
+        res = runner.invoke(app, ["dev", "dbg_cli_app:app", "--debug"], catch_exceptions=False)
+        assert res.exit_code == 0
+        assert os.environ.get("FLUXLIT_DEBUG") == "1"
+    finally:
+        if prev_debug is None:
+            os.environ.pop("FLUXLIT_DEBUG", None)
+        else:
+            os.environ["FLUXLIT_DEBUG"] = prev_debug
 
 
 def test_dev_resolves_target_fluxlit_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
