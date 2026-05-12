@@ -74,6 +74,12 @@ fluxlit doctor app:app --json
 The JSON object contains `status`, `target`, `warnings_only`, and a `checks` array
 with `name`, `status`, and `detail` for each diagnostic.
 
+Doctor checks are additive. Current diagnostics include import resolution, the loaded
+module file path, the first few `sys.path` entries, ambiguous `app` / `main` candidates,
+gateway bind availability, effective API prefix, URL-session test/disable state, proxy
+fields, public-base-url precedence, optional auth/metrics extras, and Streamlit upstream
+state when available.
+
 ## Reload (`dev` only)
 
 `--reload` enables Uvicorn’s file watcher. Scope is controlled by **`--reload-scope`**:

@@ -78,6 +78,19 @@ See {doc}`configuration` (reverse proxies) and {doc}`production-tls` (forwarded 
 
 - Install **`pip install "fluxlit[auth]"`** so PyJWT is available.
 
+**`fluxlit_metrics_extra` FAIL** with gateway metrics enabled
+
+- Install **`pip install "fluxlit[metrics]"`** so `prometheus-client` is available, or
+  unset `FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS`.
+
+**`public_base_url_precedence` WARN / FAIL**
+
+- Prefer `FLUXLIT_PUBLIC_BASE_URL` for FluxLit OAuth redirects. `PUBLIC_BASE_URL` is
+  only a fallback for platforms that already provide it.
+- If both are set differently, FluxLit uses `FLUXLIT_PUBLIC_BASE_URL`. Set
+  `FLUXLIT_STRICT_PUBLIC_BASE_URL=1` in deployment checks when a mismatch should fail
+  `fluxlit doctor`.
+
 **401 / 403 from API while developing**
 
 - The default **`client`** injected into pages does not send **Authorization**. Use {meth}`~fluxlit.client.ApiClient.for_fluxlit`, an `auth_header_factory`, or {func}`~fluxlit.streamlit_auth.prepare_streamlit_api_client` after OIDC — {doc}`auth-recipes`.

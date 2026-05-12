@@ -769,6 +769,68 @@ def test_doctor_checks_public_url_forwarded_and_security_warnings(
     assert any(name == "security_headers" and status == "WARN" for name, status, _ in rows)
 
 
+def test_doctor_checks_public_base_url_precedence_and_config_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_public_base_app.py"
+    module_path.write_text("from fluxlit import FluxLit\napp = FluxLit()\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://legacy.example")
+    monkeypatch.setenv("FLUXLIT_PUBLIC_BASE_URL", "https://fluxlit.example")
+    rows = cli_module._doctor_checks("doctor_public_base_app:app")  # noqa: SLF001
+    assert any(name == "import_module_file" and status == "PASS" for name, status, _ in rows)
+    assert ("config.api_mount_path", "PASS", "/api") in rows
+    assert any(
+        name == "public_base_url_precedence" and status == "WARN" and "FluxLit uses" in detail
+        for name, status, detail in rows
+    )
+
+
+def test_doctor_checks_public_base_url_strict_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_public_base_strict_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(strict_public_base_url=True))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://legacy.example")
+    monkeypatch.setenv("FLUXLIT_PUBLIC_BASE_URL", "https://fluxlit.example")
+    rows = cli_module._doctor_checks("doctor_public_base_strict_app:app")  # noqa: SLF001
+    assert any(
+        name == "public_base_url_precedence" and status == "FAIL" for name, status, _ in rows
+    )
+
+
+def test_doctor_checks_metrics_extra_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_metrics_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(enable_gateway_prometheus_metrics=True))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    real_import = __import__
+
+    def fake_import(name: str, *args: object, **kwargs: object):
+        if name == "prometheus_client":
+            raise ImportError("no prometheus")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+    rows = cli_module._doctor_checks("doctor_metrics_app:app")  # noqa: SLF001
+    assert any(
+        name == "fluxlit_metrics_extra" and status == "FAIL" and "fluxlit[metrics]" in detail
+        for name, status, detail in rows
+    )
+
+
 def test_doctor_checks_oauth_public_base_url_warning(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
