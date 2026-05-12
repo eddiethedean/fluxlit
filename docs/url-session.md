@@ -38,6 +38,15 @@ Treat the query string as part of your **public URL contract**. Any link or `st.
 
 {class}`~fluxlit.config.FluxlitSettings.url_session_query_param` (env: `FLUXLIT_URL_SESSION_QUERY_PARAM`) names the query key for your app and for **gateway access log redaction** (see {doc}`observability`). Helpers accept an explicit `param=` argument if you prefer not to read settings in Streamlit.
 
+## Tests and CI
+
+Set `FLUXLIT_TESTS=1` for Streamlit `AppTest` / Pytest runs. In that mode,
+`ensure_url_session`, `hydrate_url_session`, and `persist_url_session` no-op by
+default so headless tests do not depend on browser query strings or reruns. Set
+`FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1` for the rare test that intentionally covers
+URL-session continuity. `FLUXLIT_DISABLE_URL_SESSION=1` disables the helpers in any
+environment.
+
 ## Security
 
 - **HTTPS** in production: the token is effectively a **bearer secret** in the URL (bookmarks, `Referer`, shared links, screenshots).

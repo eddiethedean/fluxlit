@@ -14,6 +14,7 @@ and multipage patterns.
 
 from __future__ import annotations
 
+import os
 import secrets
 import time
 from collections.abc import Mapping, MutableMapping
@@ -107,6 +108,16 @@ def new_session_id() -> str:
     return secrets.token_urlsafe(32)
 
 
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _url_session_disabled() -> bool:
+    if _truthy_env("FLUXLIT_DISABLE_URL_SESSION"):
+        return True
+    return _truthy_env("FLUXLIT_TESTS") and not _truthy_env("FLUXLIT_FORCE_URL_SESSION_IN_TESTS")
+
+
 def _query_param_get(st: StreamlitSessionFacade, param: str) -> str | None:
     qp = st.query_params
     if qp is None or not hasattr(qp, "get"):
@@ -154,6 +165,8 @@ def hydrate_url_session(
 
     Returns the session id string when the query param is present, else ``None``.
     """
+    if _url_session_disabled():
+        return None
     sid = _query_param_get(st, param)
     if not sid:
         return None
@@ -184,6 +197,8 @@ def ensure_url_session(
     (read-only ``query_params``), still returns a new id and persists *initial* so
     callers can surface a warning or use client-side navigation.
     """
+    if _url_session_disabled():
+        return _query_param_get(st, param) or ""
     existing = _query_param_get(st, param)
     if existing:
         if initial:
@@ -212,6 +227,8 @@ def persist_url_session(
     Values are copied best-effort; remote stores should JSON-encode—non-JSON-safe
     values may need app-side filtering before :meth:`SessionStore.set`.
     """
+    if _url_session_disabled():
+        return None
     sid = _query_param_get(st, param)
     if not sid:
         return None

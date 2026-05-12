@@ -60,13 +60,14 @@ Recommended test environment for Streamlit UI tests:
 
 ```bash
 export FLUXLIT_TESTS=1
-export FLUXLIT_DISABLE_URL_SESSION=1
 python -m pytest
 ```
 
-`FLUXLIT_TESTS=1` is a convention for test-only branches in app code. Explicitly
-setting `FLUXLIT_DISABLE_URL_SESSION=1` keeps headless `AppTest` runs from depending
-on browser query-string continuity; production defaults are unchanged.
+`FLUXLIT_TESTS=1` tells FluxLit's URL-session helpers to no-op by default, keeping
+headless `AppTest` runs from depending on browser query-string continuity. Production
+defaults are unchanged. Set `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1` only for tests
+that explicitly cover URL-session behavior, or set `FLUXLIT_DISABLE_URL_SESSION=1`
+to disable URL-session helpers in any environment.
 
 ## What to test where
 
