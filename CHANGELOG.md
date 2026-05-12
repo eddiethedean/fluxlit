@@ -6,6 +6,11 @@
 
 - **Runtime:** File-backed import targets now prepend the target module's directory to `sys.path` before execution, so top-level multi-file apps can use sibling imports with `main:app` and explicit `./path/main.py:app` targets without setting `PYTHONPATH`.
 
+**Upgrading from 0.6.0:** Remove entrypoint workarounds that manually insert the app
+directory into `sys.path` solely for sibling imports. Keep explicit package installs or
+project-root test setup if your app intentionally imports packages outside the target
+module's directory.
+
 ## 0.6.0 - 2026-05-11
 
 - **0.6 development:** canonical smoke app shared by E2E/proxy/load paths; expanded `fluxlit doctor` diagnostics including `--json`; stable gateway log and Prometheus metric contracts; optional no-dependency tracing hooks plus an OpenTelemetry example; runnable URL-session external-store examples and platform docs; scaffold profiles; richer local smoke/load/chaos scripts; broader Docker proxy smoke matrix.

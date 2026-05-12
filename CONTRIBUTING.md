@@ -82,7 +82,7 @@ For a **PyPI / tag** release of FluxLit itself:
 
 1. **CHANGELOG** — add a dated section under `CHANGELOG.md` (move items from **Unreleased** if present).
 2. **Version** — bump `version` in `pyproject.toml` (semver **0.x**; document breaking changes in CHANGELOG).
-3. **Upgrade note** — if CLI, env, or defaults changed behavior, add a short **“Upgrading X → Y”** bullet list in CHANGELOG (commands to run, renames, removals).
+3. **Upgrade note** — if CLI, env, import behavior, or defaults changed, add a short **“Upgrading from X.Y.Z”** note in CHANGELOG (commands to run, renamed env vars, removed shims, and test-layout notes).
 4. **Tag** — `git tag vX.Y.Z` after merge to the release branch / `main` per your workflow.
 5. **Read the Docs** — confirm the **stable** build points at the new tag when applicable.
 
