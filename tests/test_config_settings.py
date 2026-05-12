@@ -67,6 +67,18 @@ def test_gateway_max_proxy_body_bytes_from_env(monkeypatch: pytest.MonkeyPatch) 
     assert s.gateway_max_proxy_request_body_bytes == 1048576
 
 
+def test_public_base_url_uses_legacy_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_PUBLIC_BASE_URL", raising=False)
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://public.example")
+    assert FluxlitSettings().public_base_url == "https://public.example"
+
+
+def test_fluxlit_public_base_url_wins_over_legacy(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://legacy.example")
+    monkeypatch.setenv("FLUXLIT_PUBLIC_BASE_URL", "https://fluxlit.example")
+    assert FluxlitSettings().public_base_url == "https://fluxlit.example"
+
+
 def test_settings_defaults_are_isolated() -> None:
     """Repeated dict/list defaults must not alias across instances."""
     a = FluxlitSettings()

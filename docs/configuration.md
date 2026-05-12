@@ -81,7 +81,9 @@ log_level = "info"
 | `FLUXLIT_CORS_MIDDLEWARE_KWARGS` | JSON object of extra keyword arguments for Starlette `CORSMiddleware` when CORS is enabled (e.g. `{"expose_headers": ["X-My-Header"], "max_age": 600}`). |
 | `FLUXLIT_STREAMLIT_RUN_CLI_ARGS` | JSON list of extra `streamlit run` CLI tokens appended after FluxLit’s built-in flags (e.g. `["--theme.base","light"]`). |
 | `FLUXLIT_STREAMLIT_PAGE_CONFIG` | JSON object merged into `streamlit.set_page_config` (keys such as `layout`, `page_icon`, `initial_sidebar_state`, `menu_items`; `page_title` defaults from `FLUXLIT_TITLE`). |
-| `FLUXLIT_PUBLIC_BASE_URL` | Public origin for OAuth redirects (e.g. `https://app.example.com`), used with BFF/OIDC helpers. |
+| `FLUXLIT_PUBLIC_BASE_URL` | Public origin for OAuth redirects (e.g. `https://app.example.com`), used with BFF/OIDC helpers. Prefer this namespaced variable over `PUBLIC_BASE_URL`. |
+| `PUBLIC_BASE_URL` | Compatibility fallback used only when `FLUXLIT_PUBLIC_BASE_URL` is unset. If both are set differently, FluxLit uses `FLUXLIT_PUBLIC_BASE_URL`; `fluxlit doctor` warns, or fails when `FLUXLIT_STRICT_PUBLIC_BASE_URL=1`. |
+| `FLUXLIT_STRICT_PUBLIC_BASE_URL` | If true, `fluxlit doctor` treats conflicting `PUBLIC_BASE_URL` / `FLUXLIT_PUBLIC_BASE_URL` values as a failure. |
 | `FLUXLIT_JWT_ISSUER` / `FLUXLIT_JWT_AUDIENCE` | Expected JWT `iss` / `aud` when using :meth:`fluxlit.jwt_auth.JWTBearer.from_fluxlit_settings` or :meth:`fluxlit.app.FluxLit.make_jwt_bearer`. |
 | `FLUXLIT_JWT_HS256_SECRET` | HS256 secret (dev/small deploys); omit if using JWKS. |
 | `FLUXLIT_JWT_JWKS_URL` | JWKS URL for RS256; omit if using HS256 secret. |
@@ -104,6 +106,17 @@ pip install "fluxlit[auth]"
 
 Core HTTP stack remains unchanged if you skip this extra.
 
+### Metrics dependencies
+
+Gateway Prometheus metrics require:
+
+```bash
+pip install "fluxlit[metrics]"
+```
+
+If `FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1` is set without that extra,
+`fluxlit doctor` reports `fluxlit_metrics_extra` with the install command.
+
 ## Reverse proxies (Posit Connect, Workbench, nginx)
 
 For a **subpath** deployment (e.g. `https://server.example.com/content/123/`), set **`FLUXLIT_ROOT_PATH`** to that prefix (no trailing slash), e.g. `/content/123`. FluxLit aligns gateway routing (whether the proxy **strips** the prefix or forwards the **full** public path) and Streamlit `baseUrlPath` for static assets and WebSockets. With `fluxlit run`, Uvicorn uses an empty `root_path` and the runtime injects the public mount into the ASGI scope so **strip-prefix** and **full-path** upstreams both work without doubling the prefix.
@@ -111,3 +124,19 @@ For a **subpath** deployment (e.g. `https://server.example.com/content/123/`), s
 Behind a trusted edge proxy, set **`FLUXLIT_TRUST_PROXY=1`** (or `fluxlit run --proxy-headers`) so scheme and host from `X-Forwarded-*` match what browsers use. Tighten **`FLUXLIT_FORWARDED_ALLOW_IPS`** if you do not want to trust all sources (default `*` when proxy trust is on and this is unset).
 
 Set **`FLUXLIT_PUBLIC_BASE_URL`** to the public origin (e.g. `https://server.example.com`) when using OAuth/OIDC so redirects stay on the user-facing URL.
+
+```{note}
+Some platforms set a generic `PUBLIC_BASE_URL`. FluxLit accepts it as a fallback for
+OAuth redirects, but the namespaced `FLUXLIT_PUBLIC_BASE_URL` wins when both are set.
+Run `fluxlit doctor --json` in deployment CI to catch mismatches before release.
+```
+
+## API clients in tests
+
+{class}`fluxlit.client.ApiClient` is for Streamlit-side server code. It reads
+`FLUXLIT_INTERNAL_API_BASE` and defaults to `http://127.0.0.1:8000/api`, so paths
+should be API-relative (`client.get("/users")`, not `client.get("/api/users")`).
+
+For in-process Pytest, prefer {class}`fluxlit.testing.FluxLitTestClient`; it exercises
+the gateway prefix without requiring a real port. Use `ApiClient` in tests only when
+you intentionally want to test the HTTP client wrapper itself.
