@@ -1,10 +1,15 @@
 # Testing
 
-```{note}
-**App developers** can skip this page unless you contribute to FluxLit or run the full CI matrix locally. End users should start with {doc}`quickstart` and {doc}`troubleshooting`.
-```
+This page covers two audiences:
 
-FluxLit’s tests fall into three bands: **fast** Pytest (default CI and local), **`slow`** subprocess checks, and **E2E** Playwright under `tests/e2e`. Docker-based **proxy smoke** exercises nginx-style routing. This page lists commands; {doc}`contributing` summarizes contributor workflow.
+- **App developers** writing tests for a FluxLit app with Pytest, `FluxLitTestClient`,
+  `ApiClient`, and Streamlit `AppTest`.
+- **FluxLit contributors** running the repository CI matrix locally.
+
+FluxLit’s own tests fall into three bands: **fast** Pytest (default CI and local),
+**`slow`** subprocess checks, and **E2E** Playwright under `tests/e2e`. Docker-based
+**proxy smoke** exercises nginx-style routing. {doc}`contributing` summarizes
+contributor workflow.
 
 ## Quick start
 
@@ -20,6 +25,66 @@ Parallel without the `slow` filter:
 ```bash
 python -m pytest -n auto
 ```
+
+## Pytest recipe for apps
+
+A minimal app test can exercise the real FluxLit gateway without opening sockets:
+
+```python
+# tests/test_app.py
+from fluxlit import FluxLit, FluxLitTestClient
+
+
+def make_app() -> FluxLit:
+    app = FluxLit(title="Tested App")
+
+    @app.api.get("/users")
+    def users():
+        return [{"name": "Ada"}]
+
+    return app
+
+
+def test_api_users():
+    client = FluxLitTestClient(make_app())
+    response = client.api_get("/users")
+    assert response.status_code == 200
+    assert response.json() == [{"name": "Ada"}]
+```
+
+Use `FluxLitTestClient` for API and OpenAPI assertions because it routes through the
+same gateway prefix rules as production (`/api` by default). Use plain FastAPI
+`TestClient(app.api)` only when you intentionally want to bypass the gateway.
+
+Recommended test environment for Streamlit UI tests:
+
+```bash
+export FLUXLIT_TESTS=1
+export FLUXLIT_DISABLE_URL_SESSION=1
+python -m pytest
+```
+
+`FLUXLIT_TESTS=1` is a convention for test-only branches in app code. Explicitly
+setting `FLUXLIT_DISABLE_URL_SESSION=1` keeps headless `AppTest` runs from depending
+on browser query-string continuity; production defaults are unchanged.
+
+## What to test where
+
+- **API logic and authorization:** test through `FluxLitTestClient.api_get(...)`,
+  `api_post(...)`, or `openapi()`. These tests are fast and deterministic.
+- **Streamlit page smoke:** use `FluxLitTestClient.streamlit(...)` or
+  `AppTest.from_file(str(streamlit_main_path()))` to assert that pages render expected
+  titles, text, and simple widgets.
+- **`ApiClient` calls from Streamlit:** prefer testing API endpoints directly, then keep
+  Streamlit tests thin. If you need to intercept calls, monkeypatch
+  `fluxlit.client.ApiClient.request` at the app boundary.
+- **Admin tables, `st.data_editor`, selection, and dynamic `key=` remounts:** keep
+  business rules and persistence in API/domain tests. Use Streamlit `AppTest` for a
+  small render smoke, and use browser E2E for flows that depend on rich frontend
+  interactions.
+- **Multipage navigation:** seed session state or call page functions through stable
+  app-level helpers where possible. See the multipage notes below for current
+  limitations.
 
 ## AppTest entrypoint
 
@@ -41,6 +106,19 @@ def test_home_page(monkeypatch):
 `streamlit_main_path()` points at the bundled Streamlit bootstrap that `fluxlit dev`
 and `FluxLitTestClient.streamlit()` use, while keeping tests independent of FluxLit's
 internal package layout.
+
+## Multipage and menu-heavy UIs
+
+Streamlit `AppTest` is strongest when a test starts on one page and checks simple
+widget state. It can be awkward for sidebar radios, `st.navigation`, fragment reruns,
+or tests that switch pages after the first `.run()`. For now:
+
+- Keep page-selection state behind app-level keys that tests can seed before `.run()`.
+- Give important widgets stable `key=` values.
+- Put table mutations and authorization in API/domain functions that can be tested
+  without Streamlit.
+- Add one `AppTest` smoke per important page, then use browser E2E for end-to-end
+  navigation when the widget tree is unstable.
 
 ## Markers
 
