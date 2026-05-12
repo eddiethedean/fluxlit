@@ -93,6 +93,10 @@ Matching order: exact **title**, exact **path**, Streamlit-style **slug** (``"/"
 ``"home"``), then path segments with slashes stripped from **both** sides (so
 ``reports/`` can match ``/reports``).
 
+The entrypoint also applies ``PageMeta.children`` for sidebar ordering (see
+:mod:`fluxlit.streamlit.nav_build`). If those edges contain a **cycle**, FluxLit emits a
+``UserWarning`` and falls back to appending unresolved pages in registration order.
+
 ## Security: tokens and PII in URLs
 
 Anything in the query string can leak via:

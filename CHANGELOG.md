@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Pages:** duplicate ``@app.page`` paths and distinct paths that normalize to the same Streamlit ``url_path`` slug (for example ``/a`` and ``/a/``) raise ``ValueError`` at registration; :func:`~fluxlit.pages.validate.validate_fluxlit_pages` reports the same for CI. ``PageMeta.children`` **cycles** emit ``UserWarning`` during nav ordering. :mod:`fluxlit.streamlit.nav_build` uses a heap-ordered frontier instead of resorting the whole ready queue each step.
+- **API:** :func:`~fluxlit.pages.slug.page_slug` centralizes slug rules; ``validate_fluxlit_pages`` is available on :mod:`fluxlit.pages` via lazy ``__getattr__`` to avoid import cycles.
+- **Tooling:** ``ty`` test overrides also ignore ``invalid-parameter-default`` and ``unresolved-reference`` (FastAPI-style ``Depends`` defaults and deliberate undefined forward refs in tests).
 - **CLI:** ``fluxlit doctor --check-pages`` (and ``--verbose``) runs ``fluxlit pages validate``-style checks; warns when experimental generator pages are enabled.
 - **Settings:** ``experimental_yield_pages`` and ``async_page_depends`` mirror ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES`` and ``FLUXLIT_ASYNC_PAGE_DEPENDS`` for ``fluxlit config`` / doctor visibility.
 - **Streamlit nav:** ``PageMeta.children`` merges title/icon overrides and sibling ordering with registered pages before ``st.navigation`` (unknown paths warn and are skipped).

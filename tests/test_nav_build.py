@@ -175,5 +175,6 @@ def test_order_cycle_still_lists_all_pages() -> None:
         fn=_z,
         page_meta=PageMeta(children=[{"path": "/a"}]),
     )
-    out = order_records_with_children([a, z])
+    with pytest.warns(UserWarning, match="cycle"):
+        out = order_records_with_children([a, z])
     assert {rec.path for rec in out} == {"/a", "/z"}

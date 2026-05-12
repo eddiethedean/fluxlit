@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
 from fluxlit.pages.records import PageRecord
+from fluxlit.pages.slug import page_slug
 
 
 def _scalar_query_value(raw: Any) -> str | None:
@@ -48,11 +49,6 @@ def query_params(st: Any) -> dict[str, str]:
     return out
 
 
-def _url_path_slug(path: str) -> str:
-    seg = path.strip("/")
-    return seg if seg else "home"
-
-
 def match_nav_page(
     params: Mapping[str, str],
     pages: Sequence[tuple[str, str] | tuple[str, str, Any] | Any],
@@ -79,7 +75,7 @@ def match_nav_page(
             path, title = str(duck.path), str(duck.title)
         else:
             path, title = row[0], row[1]
-        slug = _url_path_slug(path)
+        slug = page_slug(path)
         if wanted == title or wanted == path or wanted == slug:
             return (path, title)
         w = wanted.strip("/")

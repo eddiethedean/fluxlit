@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
+import heapq
 import warnings
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import replace
 
 from fluxlit.pages.records import PageRecord
-
-
-def page_slug(path: str) -> str:
-    """Sidebar ``url_path`` segment (matches Streamlit entrypoint)."""
-    return path.strip("/") or "home"
+from fluxlit.pages.slug import page_slug
 
 
 def apply_children_overrides(records: list[PageRecord]) -> list[PageRecord]:
@@ -97,22 +94,30 @@ def order_records_with_children(records: list[PageRecord]) -> list[PageRecord]:
     for s in nodes:
         incoming.setdefault(s, 0)
 
-    ready = sorted((s for s in nodes if incoming[s] == 0), key=lambda x: index[x])
-    dq = deque(ready)
+    ready_slugs = sorted((s for s in nodes if incoming[s] == 0), key=lambda x: index[x])
+    heap: list[tuple[int, str]] = [(index[s], s) for s in ready_slugs]
+    heapq.heapify(heap)
     out_slugs: list[str] = []
     seen: set[str] = set()
 
-    while dq:
-        s = dq.popleft()
+    while heap:
+        _, s = heapq.heappop(heap)
         if s in seen:
-            continue  # pragma: no cover — duplicate queue entries are unexpected
+            continue  # pragma: no cover — duplicate heap entries are unexpected
         out_slugs.append(s)
         seen.add(s)
         for c in sorted(adj[s], key=lambda x: index[x]):
             incoming[c] -= 1
             if incoming[c] == 0:
-                dq.append(c)
-        dq = deque(sorted(dq, key=lambda x: index[x]))
+                heapq.heappush(heap, (index[c], c))
+
+    if len(seen) < len(nodes):
+        warnings.warn(
+            "PageMeta.children ordering contains a cycle among page paths; "
+            "remaining pages are appended in registration order.",
+            UserWarning,
+            stacklevel=1,
+        )
 
     for s in sorted(nodes, key=lambda x: index[x]):
         if s not in seen:

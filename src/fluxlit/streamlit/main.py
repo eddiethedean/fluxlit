@@ -24,6 +24,7 @@ import streamlit as st
 
 from fluxlit.deep_links import match_nav_page, query_params
 from fluxlit.pages.records import PageRecord
+from fluxlit.pages.slug import page_slug
 from fluxlit.runtime import load_fluxlit
 from fluxlit.streamlit.nav_build import apply_children_overrides, order_records_with_children
 from fluxlit.streamlit.nav_order import navigation_sort_key
@@ -71,7 +72,7 @@ def run_streamlit_entrypoint() -> None:
 
     nav_pages = []
     for rec in records:
-        slug = rec.path.strip("/") or "home"
+        slug = page_slug(rec.path)
         icon = rec.icon or (
             rec.page_meta.page_icon if rec.page_meta and rec.page_meta.page_icon else None
         )
@@ -94,7 +95,7 @@ def run_streamlit_entrypoint() -> None:
     else:
         matched = match_nav_page(query_params(st), records)
         if matched is not None:
-            want_slug = matched[0].strip("/") or "home"
+            want_slug = page_slug(matched[0])
             for pg in nav_pages:
                 if pg.url_path == want_slug:
                     st.switch_page(pg)

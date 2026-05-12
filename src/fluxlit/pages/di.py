@@ -142,9 +142,7 @@ def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> An
         except RuntimeError:
             return _run_coro_no_loop(dependency())
         qual = getattr(dependency, "__qualname__", dependency)
-        msg = (
-            f"Async Depends({qual!r}) cannot be resolved under an active asyncio event loop."
-        )
+        msg = f"Async Depends({qual!r}) cannot be resolved under an active asyncio event loop."
         raise TypeError(msg)
     out = dependency()
     if inspect.iscoroutine(out):

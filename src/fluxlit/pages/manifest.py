@@ -56,14 +56,14 @@ def build_page_manifest(app: FluxLit[Any], *, version: int = 1) -> dict[str, Any
             ann = hints.get(pname, p.annotation)
             params.append({"name": pname, "annotation": _annotation_str(ann)})
         entry: dict[str, Any] = {
-                "path": rec.path,
-                "title": rec.title,
-                "tags": list(rec.tags),
-                "description": rec.description,
-                "icon": rec.icon,
-                "parameters": params,
-                "dependencies": _depends_qualnames(rec.fn),
-            }
+            "path": rec.path,
+            "title": rec.title,
+            "tags": list(rec.tags),
+            "description": rec.description,
+            "icon": rec.icon,
+            "parameters": params,
+            "dependencies": _depends_qualnames(rec.fn),
+        }
         if rec.page_meta and rec.page_meta.children:
             entry["children"] = list(rec.page_meta.children)
         pages_out.append(entry)

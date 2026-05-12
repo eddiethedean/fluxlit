@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, TypeAlias
 from fluxlit.pages.meta import PageMeta
 from fluxlit.pages.records import PageRecord
 from fluxlit.pages.signature import validate_strict_page_signature
+from fluxlit.pages.slug import page_slug
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit
@@ -72,6 +73,17 @@ def register_streamlit_page(
         default_title = "Page"
         if isinstance(fn, FunctionType):
             default_title = fn.__name__.replace("_", " ").title()
+        if any(r.path == path for r in app._pages):
+            msg = f"Duplicate Streamlit page path {path!r} is already registered"
+            raise ValueError(msg)
+        slug = page_slug(path)
+        for r in app._pages:
+            if page_slug(r.path) == slug:
+                msg = (
+                    f"Streamlit page url_path slug {slug!r} is already used by path "
+                    f"{r.path!r}; registering {path!r} would collide (same sidebar segment)"
+                )
+                raise ValueError(msg)
         desc = _docstring_first_line(fn)
         tag_tuple = tuple(tags or ())
         rec = PageRecord(

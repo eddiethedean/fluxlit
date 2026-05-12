@@ -86,9 +86,11 @@ multipage sidebar. Unknown paths emit a **runtime warning** and are skipped for 
 - ``fluxlit pages manifest [--target module:attr]`` prints JSON using project
   config when ``--target`` is omitted.
 - ``fluxlit pages validate [--target ...] [--strict]`` exits **0** when the manifest
-  is JSON-serializable and (if ``strict_page_signatures`` is on, or ``--strict`` is
+  is JSON-serializable, there are no **duplicate page paths** or clashing **url_path**
+  slugs (e.g. ``/a`` vs ``/a/``), and (if ``strict_page_signatures`` is on, or ``--strict`` is
   passed) every page handler passes strict signature checks; exits **1** with errors
-  printed to stdout for CI.
+  printed to stdout for CI. Registration-time :meth:`~fluxlit.app.FluxLit.page` rejects
+  duplicate paths and slug collisions early.
 
 ## Strict registration
 

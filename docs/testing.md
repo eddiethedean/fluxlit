@@ -407,6 +407,8 @@ On **CI failures**, the workflow uploads **`test-results/`** as artifact **`play
 
 The **`ty-check`** workflow job runs **`ty check`** (pinned `ty` version; **`fluxlit[metrics]`** is installed so optional imports resolve). Run locally after `pip install ty` (and optional `pip install -e ".[metrics]"`) from the repo root.
 
+``pyproject.toml`` relaxes a few ``ty`` rules under ``tests/**`` only (for example ``Depends`` default parameters and deliberate undefined forward refs in signature tests); production code under ``src/fluxlit`` stays fully checked.
+
 ## Readiness
 
 With the unified runtime, `GET /api/readyz` returns **503** if the Streamlit upstream is unreachable or if `GET` on the upstream root does not return **2xx**. In bare FastAPI tests (no `FLUXLIT_STREAMLIT_UPSTREAM`), it returns **200** with `streamlit: not_configured`.

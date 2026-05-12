@@ -342,9 +342,7 @@ def test_pages_validate_cli_strict_fails(tmp_path: Path, monkeypatch: pytest.Mon
     from fluxlit.cli import app as cli_app
 
     runner = CliRunner()
-    r = runner.invoke(
-        cli_app, ["pages", "validate", "--target", "badpage:app", "--strict"]
-    )
+    r = runner.invoke(cli_app, ["pages", "validate", "--target", "badpage:app", "--strict"])
     assert r.exit_code == 1
     out = (r.stdout or "") + (r.stderr or "")
     assert "nope" in out.lower() or "unknown" in out.lower() or "/" in out
@@ -452,6 +450,81 @@ def test_validate_fluxlit_pages_manifest_not_json_serializable(
     errs = validate_fluxlit_pages(app)
     assert len(errs) == 1
     assert "manifest JSON" in errs[0]
+
+
+def test_register_duplicate_path_raises() -> None:
+    app = FluxLit()
+
+    @app.page("/dup")
+    def a(st, client):
+        del st, client
+
+    def b(st, client):
+        del st, client
+
+    with pytest.raises(ValueError, match="Duplicate Streamlit page path"):
+        register_streamlit_page(app, "/dup")(b)
+
+
+def test_register_slug_collision_raises() -> None:
+    app = FluxLit()
+
+    @app.page("/x/")
+    def a(st, client):
+        del st, client
+
+    def b(st, client):
+        del st, client
+
+    with pytest.raises(ValueError, match="url_path slug"):
+        register_streamlit_page(app, "/x")(b)
+
+
+def test_validate_fluxlit_pages_reports_duplicate_paths_when_merged_registry() -> None:
+    from fluxlit.pages.validate import validate_fluxlit_pages
+
+    app = FluxLit()
+
+    @app.page("/p")
+    def a(st, client):
+        del st, client
+
+    def b(st, client):
+        del st, client
+
+    app._pages.append(PageRecord(path="/p", title="B", fn=b))
+    errs = validate_fluxlit_pages(app)
+    assert any("duplicate page path" in e for e in errs)
+
+
+def test_validate_fluxlit_pages_reports_slug_collision_when_merged_registry() -> None:
+    from fluxlit.pages.validate import validate_fluxlit_pages
+
+    app = FluxLit()
+
+    @app.page("/a/")
+    def a(st, client):
+        del st, client
+
+    def b(st, client):
+        del st, client
+
+    app._pages.append(PageRecord(path="/a", title="B", fn=b))
+    errs = validate_fluxlit_pages(app)
+    assert any("url_path slug" in e for e in errs)
+
+
+def test_fluxlit_pages_subpackage_lazy_validate_export() -> None:
+    import fluxlit.pages as pages
+
+    assert callable(pages.validate_fluxlit_pages)
+
+
+def test_fluxlit_pages_subpackage_getattr_unknown_raises() -> None:
+    import fluxlit.pages as pages
+
+    with pytest.raises(AttributeError, match="not_a_fluxlit_export"):
+        _ = pages.not_a_fluxlit_export
 
 
 def test_resolve_page_kwargs_sync_dep_returns_coro_without_flag_errors() -> None:

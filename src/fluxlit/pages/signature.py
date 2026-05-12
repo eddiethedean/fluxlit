@@ -76,18 +76,19 @@ def validate_strict_page_signature(fn: Callable[..., Any]) -> None:
     """Raise ``TypeError`` if *fn* uses unsupported parameter kinds or unknown injections."""
     sig = inspect.signature(fn)
     globalns = getattr(fn, "__globals__", None) or {}
+    qn = getattr(fn, "__qualname__", repr(fn))
     try:
         hints = get_type_hints(fn, globalns=globalns, include_extras=True)
     except NameError as e:
         msg = (
-            f"Could not resolve annotations for page handler {fn.__qualname__!r}: {e}. "
+            f"Could not resolve annotations for page handler {qn!r}: {e}. "
             "Fix missing imports, use ``from __future__ import annotations``, or replace "
             "forward references with concrete types when strict_page_signatures is enabled."
         )
         raise TypeError(msg) from e
     except TypeError as e:
         msg = (
-            f"Invalid type hints for page handler {fn.__qualname__!r}: {e}. "
+            f"Invalid type hints for page handler {qn!r}: {e}. "
             "Check Annotated metadata, string forward refs, and duplicate parameter names."
         )
         raise TypeError(msg) from e
