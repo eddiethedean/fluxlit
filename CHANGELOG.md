@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **CLI:** `fluxlit config` prints resolved binding, redacted effective settings, derived internal API base, and structured configuration warnings (with documentation links); supports `--json` and `--strict`.
 ## 0.7.0 - 2026-05-11
 
 - **Testing API:** `streamlit_main_path()` is now a public helper for supported `AppTest.from_file(...)` usage; `FluxLitTestClient.streamlit()` uses it and sets `FLUXLIT_TESTS=1` during AppTest runs.

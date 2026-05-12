@@ -1,4 +1,4 @@
-"""Typer CLI: ``fluxlit dev``, ``run``, ``shutdown``, ``doctor``, ``build``, ``new``.
+"""Typer CLI: ``fluxlit dev``, ``run``, ``shutdown``, ``doctor``, ``config``, ``build``, ``new``.
 
 The ``fluxlit`` setuptools entrypoint calls :func:`main`. Commands resolve defaults from
 :func:`fluxlit.config.load_project_config` and :class:`~fluxlit.config.FluxlitSettings`.
@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import typer
 
 from fluxlit.config import load_project_config, resolve_binding, resolve_target
+from fluxlit.config.config_print import build_config_payload
 from fluxlit.runtime import run_unified, shutdown_unified_process
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -703,6 +704,88 @@ def doctor(
             typer.echo(f"{status:4}  {name}: {message}")
         typer.echo("")
     if not warnings_only and any(s == "FAIL" for _, s, _ in rows):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def config(
+    target: str | None = typer.Argument(
+        default=None,
+        help="Import path to your FluxLit instance (default: from fluxlit.toml or app:app).",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON (secrets redacted).",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Exit with code 1 when any warning is emitted (errors always exit 1).",
+    ),
+) -> None:
+    """Print effective FluxLit configuration after precedence rules (env, project file, app).
+
+    Shows resolved bind defaults, redacted settings, derived internal API base, and warnings
+    with documentation links. Does not start the server.
+    """
+    from fluxlit.runtime import load_fluxlit
+
+    pc = load_project_config()
+    resolved_target = resolve_target(target, pc)
+    fl = load_fluxlit(resolved_target)
+    host_r, port_r, log_r = resolve_binding(
+        cli_host=None,
+        cli_port=None,
+        cli_log_level=None,
+        pc=pc,
+        settings_gateway_host=fl.settings.gateway_host,
+        settings_gateway_port=fl.settings.gateway_port,
+        settings_log_level=fl.settings.log_level,
+    )
+    payload = build_config_payload(
+        target=resolved_target,
+        bind_host=host_r,
+        bind_port=port_r,
+        log_level=log_r,
+        pc=pc,
+        fl=fl,
+    )
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+    else:
+        typer.echo("FluxLit effective configuration")
+        typer.echo("")
+        typer.echo(f"  target: {payload['target']}")
+        b = payload["binding"]
+        typer.echo(
+            f"  binding (resolved): host={b['host']} port={b['port']} log_level={b['log_level']}"
+        )
+        comp = payload["computed"]
+        typer.echo(f"  public_mount_path: {comp['public_mount_path'] or '(empty)'}")
+        typer.echo(f"  derived_internal_api_base: {comp['derived_internal_api_base']}")
+        if comp.get("ambient_internal_api_base"):
+            typer.echo(f"  FLUXLIT_INTERNAL_API_BASE: {comp['ambient_internal_api_base']}")
+        pf = payload.get("project_file")
+        if pf:
+            typer.echo(f"  project_file: {json.dumps(pf)}")
+        warns = payload["warnings"]
+        if warns:
+            typer.echo("")
+            typer.echo("Warnings:")
+            for w in warns:
+                lvl = str(w.get("level", "warn")).upper()
+                typer.echo(f"  [{lvl}] {w.get('code', '')}: {w.get('message', '')}")
+                if w.get("doc"):
+                    typer.echo(f"         Docs: {w['doc']}")
+        typer.echo("")
+        typer.echo("Settings (redacted, JSON):")
+        typer.echo(json.dumps(payload["settings"], indent=2))
+        typer.echo("")
+    warns = payload["warnings"]
+    if any(w.get("level") == "error" for w in warns):
+        raise typer.Exit(code=1)
+    if strict and any(w.get("level") == "warn" for w in warns):
         raise typer.Exit(code=1)
 
 
