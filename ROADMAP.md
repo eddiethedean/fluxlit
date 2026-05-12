@@ -14,6 +14,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Doctor / config:** ``fluxlit doctor --verbose`` snapshots; ``--check-pages`` runs validate-style checks; settings expose ``experimental_yield_pages`` and ``async_page_depends`` for env parity.
 - **Async Depends (optional):** ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` resolves async dependency callables when no asyncio loop is running (see :doc:`streamlit-pages-typing`).
 - **0.8.x foundation** (gateway, URL session, testing client, observability, docs) remains as documented in prior roadmap sections.
+- **Pins:** Optional env-driven features (async ``Depends``, experimental generator pages) and supported Python / Streamlit ranges are summarized in [docs/support-matrix.md](docs/support-matrix.md).
 
 **Next: 0.9.1–0.10**
 

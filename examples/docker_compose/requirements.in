@@ -1,3 +1,4 @@
-# Regenerate: pip install pip-tools && pip-compile requirements.in
+# Regenerate after publishing a new FluxLit version to PyPI:
+#   uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt
 # Bump bounds when adopting a newly published FluxLit minor, then recompile.
-fluxlit>=0.8,<0.9
+fluxlit>=0.9,<1.0

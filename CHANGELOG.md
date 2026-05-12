@@ -2,27 +2,26 @@
 
 ## Unreleased
 
-- **Pages:** duplicate ``@app.page`` paths and distinct paths that normalize to the same Streamlit ``url_path`` slug (for example ``/a`` and ``/a/``) raise ``ValueError`` at registration; :func:`~fluxlit.pages.validate.validate_fluxlit_pages` reports the same for CI. ``PageMeta.children`` **cycles** emit ``UserWarning`` during nav ordering. :mod:`fluxlit.streamlit.nav_build` uses a heap-ordered frontier instead of resorting the whole ready queue each step.
-- **API:** :func:`~fluxlit.pages.slug.page_slug` centralizes slug rules; ``validate_fluxlit_pages`` is available on :mod:`fluxlit.pages` via lazy ``__getattr__`` to avoid import cycles.
-- **Tooling:** ``ty`` test overrides also ignore ``invalid-parameter-default`` and ``unresolved-reference`` (FastAPI-style ``Depends`` defaults and deliberate undefined forward refs in tests).
-- **CLI:** ``fluxlit doctor --check-pages`` (and ``--verbose``) runs ``fluxlit pages validate``-style checks; warns when experimental generator pages are enabled.
-- **Settings:** ``experimental_yield_pages`` and ``async_page_depends`` mirror ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES`` and ``FLUXLIT_ASYNC_PAGE_DEPENDS`` for ``fluxlit config`` / doctor visibility.
-- **Streamlit nav:** ``PageMeta.children`` merges title/icon overrides and sibling ordering with registered pages before ``st.navigation`` (unknown paths warn and are skipped).
-- **Depends:** optional async dependency callables when ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` (resolved with ``anyio.run`` when no asyncio loop is running).
-- **Docs:** PageMeta vs ``set_page_config`` truth table; gateway header bridge notes; generator and Protocol typing guidance; testing recipes for ``page_overrides`` / ``FLUXLIT_TEST_PAGE_OVERRIDES``.
-- **CLI:** ``fluxlit pages validate`` checks manifest JSON-serializability and optional strict page signatures (``--strict``).
-- **Manifest:** ``manifest_stability`` for ``manifest_version`` **1** is now **stable** (was experimental in the initial 0.9.0 notes).
+Nothing unreleased yet.
 
 ## 0.9.0 - 2026-05-12
 
 - **Streamlit pages (0.9):** :class:`~fluxlit.pages.records.PageRecord` registry with :attr:`~fluxlit.app.FluxLit.page_records`; :meth:`~fluxlit.app.FluxLit.page` accepts ``icon``, ``tags``, and static ``page_meta``; handlers may return :class:`~fluxlit.pages.meta.PageMeta` for breadcrumbs and similar post-run UI. :class:`~fluxlit.pages.di.Depends`, :class:`~fluxlit.pages.di.Header`, and :class:`~fluxlit.pages.di.Cookie` resolve extra parameters beside ``(st, client)`` (see {doc}`streamlit-pages-typing`). Optional :class:`~fluxlit.url_session.SessionStore` on :class:`~fluxlit.app.FluxLit` enables ``SessionStore`` injection.
 - **Navigation:** :meth:`~fluxlit.app.FluxLit.navigation` with :class:`~fluxlit.pages.navigation.NavigationModel` orders multipage sidebar entries by path.
 - **Query / session:** :func:`~fluxlit.pages.query.parse_query_params`, :class:`~fluxlit.pages.query.Query`, :class:`~fluxlit.pages.session_state.SessionModel`, and :func:`~fluxlit.url_session.hydrate_url_session_typed` for typed URL/session payloads.
-- **Manifest:** :meth:`~fluxlit.app.FluxLit.build_page_manifest` and ``fluxlit pages manifest`` (experimental ``manifest_version`` **1**). :class:`~fluxlit.config.FluxlitSettings` adds ``strict_page_signatures`` for registration-time handler checks.
+- **Registration & CI:** duplicate ``@app.page`` paths, or distinct paths that normalize to the same Streamlit ``url_path`` slug (for example ``/a`` and ``/a/``), raise ``ValueError`` at registration; :func:`~fluxlit.pages.validate.validate_fluxlit_pages` reports the same for CI.
+- **Slug & lazy validate:** :func:`~fluxlit.pages.slug.page_slug` centralizes slug rules; ``validate_fluxlit_pages`` is available on :mod:`fluxlit.pages` via lazy ``__getattr__`` to avoid import cycles.
+- **Manifest & CLI:** :meth:`~fluxlit.app.FluxLit.build_page_manifest` (``manifest_version`` **1**, ``manifest_stability`` **stable``); ``fluxlit pages manifest`` and ``fluxlit pages validate`` (``--strict`` for signature checks independent of settings); optional ``children`` keys from ``page_meta`` in the manifest.
+- **PageMeta children & nav:** ``PageMeta.children`` merges title/icon overrides and sibling ordering before ``st.navigation`` (unknown paths warn); **cycles** in ``children`` emit ``UserWarning`` during ordering; :mod:`fluxlit.streamlit.nav_build` uses a heap-ordered frontier for the ready queue.
+- **Deep links:** the Streamlit entrypoint passes the same ordered ``page_records`` list to :func:`~fluxlit.deep_links.match_nav_page` as to ``st.navigation``, so ``?page=`` matches the visible sidebar (see {doc}`deep-links`).
+- **Strict signatures:** :class:`~fluxlit.config.FluxlitSettings.strict_page_signatures` / ``FLUXLIT_STRICT_PAGE_SIGNATURES``; clearer errors when annotations cannot be resolved.
+- **Async depends:** optional async dependency callables when ``FLUXLIT_ASYNC_PAGE_DEPENDS=1`` (resolved with ``anyio.run`` when no asyncio loop is running); :attr:`~fluxlit.config.FluxlitSettings.async_page_depends` for ``fluxlit config`` / doctor visibility.
+- **Experimental generator pages:** :class:`~fluxlit.pages.flags.FluxlitFeatureFlags` and :attr:`~fluxlit.config.FluxlitSettings.experimental_yield_pages` mirror ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES``; when enabled, generator handlers run **two** ``next()`` steps in one script run. ``fluxlit doctor --check-pages`` / ``--verbose`` run validate-style checks and warn when this flag is on.
+- **Docs:** PageMeta vs ``set_page_config`` truth table; gateway ``Header`` / ``Cookie`` bridge; generator and Protocol typing guidance; ``page_overrides`` / ``FLUXLIT_TEST_PAGE_OVERRIDES`` in {doc}`testing`; :mod:`fluxlit.gateway.http_proxy` notes on headers in the Streamlit process.
+- **Tooling:** ``ty`` test overrides ignore ``invalid-parameter-default`` and ``unresolved-reference`` (FastAPI-style ``Depends`` defaults and deliberate forward refs in tests).
 - **Testing:** :meth:`~fluxlit.testing.FluxLitTestClient.streamlit` accepts ``page_overrides`` (JSON via ``FLUXLIT_TEST_PAGE_OVERRIDES``) for dependency injection in AppTest.
-- **Feature flags:** :class:`~fluxlit.pages.flags.FluxlitFeatureFlags` reads ``FLUXLIT_EXPERIMENTAL_YIELD_PAGES``; when enabled, generator handlers run **two** ``next()`` steps in one script run (experimental).
 - **Typing:** :class:`~fluxlit.app.FluxLit` is a :class:`typing.Generic` over settings type for static checkers; :class:`~fluxlit.streamlit.page.PageFn` allows optional :class:`~fluxlit.pages.meta.PageMeta` returns.
-- **CLI / packaging:** ``fluxlit pages`` subgroup; ``fluxlit build`` Dockerfile pin updated to ``fluxlit>=0.9,<1.0``.
+- **CLI / packaging:** ``fluxlit pages`` subgroup; ``fluxlit build`` Dockerfile pin ``fluxlit>=0.9,<1.0``; ``fluxlit new`` minimal scaffold includes ``typing.Any``, :class:`~fluxlit.client.ApiClient`, and a ``Depends`` example.
 
 **Upgrading from 0.8.x:** Bump pins to ``fluxlit>=0.9,<1.0``. :attr:`~fluxlit.app.FluxLit.pages` remains ``(path, title, handler)`` tuples. Opt into ``strict_page_signatures``, manifest, and DI markers as needed; see {doc}`streamlit-pages-typing`.
 
