@@ -16,6 +16,16 @@ from fluxlit.app import FluxLit
 from fluxlit.gateway import build_gateway
 
 
+def streamlit_main_path() -> Path:
+    """Return FluxLit's supported Streamlit entry script for ``AppTest.from_file``.
+
+    Use this instead of constructing a path from ``fluxlit.__file__``; the helper is
+    part of FluxLit's testing API and can keep working if the internal package layout
+    changes.
+    """
+    return Path(__file__).resolve().parent / "streamlit" / "main.py"
+
+
 @dataclass(frozen=True)
 class FluxLitTestClient:
     """Test harness that mirrors production routing (API prefix + gateway).
@@ -71,7 +81,8 @@ class FluxLitTestClient:
         """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit.main`.
 
         Requires Streamlit >= 1.30 for ``AppTest``. Patches ``FLUXLIT_APP``,
-        ``FLUXLIT_INTERNAL_API_BASE``, and ``FLUXLIT_API_PREFIX`` for the duration of the run.
+        ``FLUXLIT_INTERNAL_API_BASE``, ``FLUXLIT_API_PREFIX``, and ``FLUXLIT_TESTS`` for
+        the duration of the run.
 
         Args:
             target: Import path ``module:FluxLit`` (same as CLI).
@@ -89,7 +100,7 @@ class FluxLitTestClient:
 
         from streamlit.testing.v1 import AppTest
 
-        entry = Path(__file__).resolve().parent / "streamlit" / "main.py"
+        entry = streamlit_main_path()
         internal = internal_api_base or f"http://127.0.0.1:1{self.api_prefix}"
 
         with (
@@ -98,6 +109,7 @@ class FluxLitTestClient:
                     "FLUXLIT_APP": target,
                     "FLUXLIT_INTERNAL_API_BASE": internal,
                     "FLUXLIT_API_PREFIX": self.api_prefix,
+                    "FLUXLIT_TESTS": "1",
                 }
             ),
             _maybe_syspath(extra_sys_path),

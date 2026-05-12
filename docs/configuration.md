@@ -20,6 +20,10 @@ When you use **`fluxlit dev`** or **`fluxlit run`**, the parent process sets add
 
 `create_gateway_app` / bare tests may run without the upstream variables; then `GET /readyz` reports `streamlit: not_configured`. See {mod}`fluxlit.runtime` and {doc}`deployment`.
 
+For Pytest and in-process Streamlit `AppTest` patterns, including when to set
+`FLUXLIT_APP`, `FLUXLIT_TESTS`, and `FLUXLIT_DISABLE_URL_SESSION`, see
+{doc}`testing`.
+
 ## Precedence
 
 1. **CLI flags** (highest)
