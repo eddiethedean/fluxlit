@@ -19,8 +19,10 @@ from urllib.parse import urlparse
 
 import typer
 
+from fluxlit.cli_doctor_verbose import build_doctor_verbose_detail, format_doctor_verbose_human
 from fluxlit.config import load_project_config, resolve_binding, resolve_target
 from fluxlit.config.config_print import build_config_payload
+from fluxlit.config.project import ProjectConfig
 from fluxlit.runtime import run_unified, shutdown_unified_process
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -426,8 +428,17 @@ def workbench_cmd(
     )
 
 
-def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
-    """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``."""
+def _doctor_collect(
+    target: str,
+    pc: ProjectConfig | None,
+    *,
+    verbose: bool,
+) -> tuple[list[tuple[str, CheckStatus, str]], dict[str, object] | None]:
+    """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``.
+
+    When ``verbose`` is True and the app imports, also return a redacted configuration
+    snapshot for JSON / human ``--verbose`` output.
+    """
     from fluxlit.runtime import load_fluxlit
     from fluxlit.runtime.import_target import import_target_candidates
 
@@ -438,6 +449,8 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
     rows.append(("sys_path_head", "PASS", sys_path_head or "(empty)"))
 
     fl = None
+    host_r: str | None = None
+    port_r: int | None = None
     mod_name = target.partition(":")[0]
     candidates = import_target_candidates(mod_name)
     if len(candidates) > 1:
@@ -496,8 +509,7 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
         rows.append(("streamlit_version", "WARN", str(e)))
 
     if fl is not None:
-        pc = load_project_config()
-        host, port, _ = resolve_binding(
+        host_r, port_r, _ = resolve_binding(
             cli_host=None,
             cli_port=None,
             cli_log_level=None,
@@ -506,16 +518,21 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
             settings_gateway_port=fl.settings.gateway_port,
             settings_log_level=fl.settings.log_level,
         )
-        bind_host = "127.0.0.1" if host in {"0.0.0.0", ""} else "::1" if host == "::" else host
+        if host_r in {"0.0.0.0", ""}:
+            bind_host = "127.0.0.1"
+        elif host_r == "::":
+            bind_host = "::1"
+        else:
+            bind_host = host_r
         try:
-            infos = socket.getaddrinfo(bind_host, port, type=socket.SOCK_STREAM)
+            infos = socket.getaddrinfo(bind_host, port_r, type=socket.SOCK_STREAM)
             if not infos:
                 raise OSError(f"could not resolve bind host {bind_host!r}")
             family, socktype, proto, _, sockaddr = infos[0]
             with socket.socket(family, socktype, proto) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 s.bind(sockaddr)
-            rows.append(("gateway_bind", "PASS", f"{host}:{port} is available"))
+            rows.append(("gateway_bind", "PASS", f"{host_r}:{port_r} is available"))
         except OSError as e:
             rows.append(("gateway_bind", "FAIL", str(e)))
 
@@ -728,6 +745,25 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
             )
         )
 
+    verbose_detail: dict[str, object] | None = None
+    if verbose:
+        if fl is not None and host_r is not None and port_r is not None:
+            verbose_detail = build_doctor_verbose_detail(
+                fl,
+                resolved_target=target,
+                bind_host=host_r,
+                bind_port=port_r,
+                pc=pc,
+            )
+        else:
+            verbose_detail = {"resolved_target": target, "import_failed": True}
+
+    return rows, verbose_detail
+
+
+def _doctor_checks(target: str, *, verbose: bool = False) -> list[tuple[str, CheckStatus, str]]:
+    """Backward-compatible wrapper used by tests."""
+    rows, _ = _doctor_collect(target, load_project_config(), verbose=verbose)
     return rows
 
 
@@ -736,13 +772,14 @@ def _doctor_payload(
     *,
     target: str,
     warnings_only: bool,
+    verbose_detail: dict[str, object] | None = None,
 ) -> dict[str, object]:
     has_fail = any(status == "FAIL" for _, status, _ in rows)
     has_warn = any(status == "WARN" for _, status, _ in rows)
     status = (
         "fail" if has_fail and not warnings_only else "warn" if has_fail or has_warn else "pass"
     )
-    return {
+    out: dict[str, object] = {
         "status": status,
         "target": target,
         "warnings_only": warnings_only,
@@ -751,6 +788,9 @@ def _doctor_payload(
             for name, check_status, detail in rows
         ],
     }
+    if verbose_detail is not None:
+        out["verbose"] = verbose_detail
+    return out
 
 
 @app.command()
@@ -769,6 +809,13 @@ def doctor(
         "--json",
         help="Emit machine-readable JSON instead of human-readable text.",
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="After checks, print a redacted effective-config snapshot (also included as "
+        "``verbose`` in ``--json`` output).",
+    ),
 ) -> None:
     """Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).
 
@@ -777,10 +824,17 @@ def doctor(
     pc = load_project_config()
     resolved_target = resolve_target(target, pc)
 
-    rows = _doctor_checks(resolved_target)
+    rows, verbose_detail = _doctor_collect(resolved_target, pc, verbose=verbose)
     if json_output:
         typer.echo(
-            json.dumps(_doctor_payload(rows, target=resolved_target, warnings_only=warnings_only))
+            json.dumps(
+                _doctor_payload(
+                    rows,
+                    target=resolved_target,
+                    warnings_only=warnings_only,
+                    verbose_detail=verbose_detail if verbose else None,
+                )
+            )
         )
     else:
         typer.echo("FluxLit doctor")
@@ -788,6 +842,11 @@ def doctor(
         for name, status, message in rows:
             typer.echo(f"{status:4}  {name}: {message}")
         typer.echo("")
+        if verbose and verbose_detail is not None:
+            typer.echo("--- Verbose (effective configuration; secrets redacted) ---")
+            for line in format_doctor_verbose_human(verbose_detail):
+                typer.echo(line)
+            typer.echo("")
     if not warnings_only and any(s == "FAIL" for _, s, _ in rows):
         raise typer.Exit(code=1)
 
