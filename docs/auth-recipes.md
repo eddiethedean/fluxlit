@@ -12,14 +12,14 @@ Public URLs below assume the default API mount **`/api`** (see {attr}`~fluxlit.c
 
 ## Friendly API (env-driven, less boilerplate)
 
-**JWT:** set `FLUXLIT_JWT_ISSUER`, `FLUXLIT_JWT_AUDIENCE`, and either `FLUXLIT_JWT_HS256_SECRET` or `FLUXLIT_JWT_JWKS_URL`, then use `app.make_jwt_bearer()` anywhere you would build {class}`~fluxlit.jwt_auth.JWTBearer` by hand.
+**JWT:** set `FLUXLIT_JWT_ISSUER`, `FLUXLIT_JWT_AUDIENCE`, and either `FLUXLIT_JWT_HS256_SECRET` or `FLUXLIT_JWT_JWKS_URL`, then use `app.make_jwt_bearer()` anywhere you would build {class}`~fluxlit.auth.jwt.JWTBearer` by hand.
 
 ```python
 from typing import Annotated
 
 from fastapi import Depends
 from fluxlit import FluxLit
-from fluxlit.jwt_auth import StandardClaims
+from fluxlit.auth.jwt import StandardClaims
 
 app = FluxLit()  # loads FluxlitSettings from env / .env
 _bearer = app.make_jwt_bearer()
@@ -87,7 +87,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fluxlit import FluxLit
-from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
+from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
 
 JWT_SECRET = os.environ["FLUXLIT_JWT_HS256_SECRET"]  # e.g. openssl rand -hex 32
 JWT_ISSUER = "https://mycompany.internal/auth"
@@ -134,7 +134,7 @@ Point `jwks_url` at your IdP’s JWKS document. PyJWT will fetch keys and respec
 ```python
 import os
 
-from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer
+from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer
 
 _bearer_prod = JWTBearer(
     JWTAuthConfig(
@@ -154,7 +154,7 @@ Use `Depends(_bearer_prod)` on routes the same way as the HS256 example.
 ## Scopes and roles
 
 ```python
-from fluxlit.jwt_auth import RequireScopes, RequireRoles
+from fluxlit.auth.jwt import RequireRoles, RequireScopes
 
 _need_reports = RequireScopes(_bearer, "reports.read", scope_claim="scope")
 _need_admin = RequireRoles(_bearer, "admin", roles_claim="roles")

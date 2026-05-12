@@ -162,11 +162,13 @@ python -m pytest -n auto \
 open htmlcov/index.html
 ```
 
-The **`coverage`** CI job runs the same measurement with **`--cov-fail-under=80`** so merges cannot silently collapse overall line coverage (current baseline is ~85%; the floor leaves headroom for platform noise). Reproduce the gate locally:
+The **`coverage`** CI job runs the same measurement with **`--cov-fail-under=100`**
+so merges cannot silently reduce the package coverage gate for `src/fluxlit`.
+Reproduce the gate locally:
 
 ```bash
 python -m pytest -n auto -m "not slow" \
-  --cov=fluxlit --cov-report=term-missing --cov-fail-under=80
+  --cov=fluxlit --cov-report=term-missing --cov-fail-under=100
 ```
 
 CI uploads `coverage.xml` as a workflow artifact. Third-party PR comment bots (Codecov, etc.) remain optional if you want diff-based coverage later.

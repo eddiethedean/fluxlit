@@ -53,7 +53,10 @@ def _parse_table(raw: dict[str, Any]) -> ProjectConfig:
         if key == "gateway_port":
             if isinstance(val, bool) or val is None:
                 continue
-            kwargs[key] = int(val)
+            try:
+                kwargs[key] = int(val)
+            except (TypeError, ValueError):
+                continue
         elif isinstance(val, str):
             kwargs[key] = val
     return ProjectConfig(**kwargs)

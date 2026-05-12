@@ -19,6 +19,19 @@ jobs:
       - name: soak_http.sh against stdlib http.server
         run: |
           python -m http.server 19876 --bind 127.0.0.1 &
-          sleep 1
+          python - <<'PY'
+          import time
+          import urllib.request
+
+          deadline = time.monotonic() + 10
+          while True:
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:19876/", timeout=1):
+                      break
+              except OSError:
+                  if time.monotonic() >= deadline:
+                      raise
+                  time.sleep(0.2)
+          PY
           chmod +x scripts/soak_http.sh
           COUNT=40 BASE_URL=http://127.0.0.1:19876 PATH_SUFFIX=/ ./scripts/soak_http.sh

@@ -20,7 +20,7 @@ class AuthAttachment:
         self._fluxlit = app
 
     def make_jwt_bearer(self) -> JWTBearer:
-        """JWT :class:`~fluxlit.jwt_auth.JWTBearer` from settings (``FLUXLIT_JWT_*``)."""
+        """JWT :class:`~fluxlit.auth.jwt.JWTBearer` from settings (``FLUXLIT_JWT_*``)."""
         return JWTBearer.from_fluxlit_settings(self._fluxlit.settings)
 
     def attach_oidc_login(

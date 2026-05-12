@@ -245,6 +245,6 @@ def persist_url_session(
                 continue
             snap[str(k)] = cast(JsonValue, v)
     except Exception:
-        snap = {}
+        return sid
     store.set(sid, snap, ttl_seconds=ttl_seconds)
     return sid

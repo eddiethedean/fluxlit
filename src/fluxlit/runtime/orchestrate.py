@@ -113,6 +113,11 @@ def asgi_from_fluxlit(fl: FluxLitType, import_target: str) -> ASGIApp:
     def resolve_upstream() -> str:
         return upstream_url_box[0]
 
+    api_state = getattr(fl.api, "state", None)
+    if api_state is not None:
+        api_state.fluxlit_streamlit_upstream_resolver = resolve_upstream
+        api_state.fluxlit_settings = fl.settings
+
     gateway_app: ASGIApp = build_gateway(
         fl.api,
         "",

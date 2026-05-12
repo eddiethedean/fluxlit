@@ -268,7 +268,7 @@ def test_persist_iterable_session_state_without_filtered_state() -> None:
     assert store.get("s") == {"ok": 1}
 
 
-def test_persist_falls_back_to_empty_snapshot_on_state_error() -> None:
+def test_persist_preserves_existing_store_on_state_error() -> None:
     class _BadState:
         def __iter__(self):
             raise RuntimeError("bad state")
@@ -277,8 +277,9 @@ def test_persist_falls_back_to_empty_snapshot_on_state_error() -> None:
     st.query_params["fluxlit_sid"] = "s"
     st.session_state = _BadState()  # type: ignore[assignment]
     store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("s", {"existing": "value"})
     assert persist_url_session(st, store) == "s"
-    assert store.get("s") == {}
+    assert store.get("s") == {"existing": "value"}
 
 
 def test_persist_skips_dunder_keys() -> None:

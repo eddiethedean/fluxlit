@@ -174,7 +174,7 @@ class FluxLit:
         return ApiClient()
 
     def make_jwt_bearer(self) -> JWTBearer:
-        """JWT :class:`~fluxlit.jwt_auth.JWTBearer` from :attr:`settings` (``FLUXLIT_JWT_*``).
+        """JWT :class:`~fluxlit.auth.jwt.JWTBearer` from :attr:`settings` (``FLUXLIT_JWT_*``).
 
         Requires ``jwt_issuer``, ``jwt_audience``, and either ``jwt_hs256_secret`` or
         ``jwt_jwks_url``. Raises :class:`ValueError` with env-oriented hints if misconfigured.

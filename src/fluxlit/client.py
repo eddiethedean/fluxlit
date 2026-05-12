@@ -56,7 +56,8 @@ class ApiClient:
             timeout: Per-request timeout in seconds.
             default_headers: Merged into each request (caller headers override on key clash).
             auth_header_factory: Callable returning headers (e.g. ``Authorization``) per request.
-                Use instead of putting long-lived secrets in Streamlit widget state.
+                Use instead of putting long-lived secrets in Streamlit widget state. Per-call
+                ``headers`` override these generated headers on key clash.
             propagate_request_id: If True, send ``X-Request-ID`` when
                 :func:`fluxlit.logging.get_request_id` is set (usually empty in Streamlit).
         """
@@ -99,10 +100,10 @@ class ApiClient:
 
     def _build_request_headers(self, headers: HeaderTypes | None) -> HeaderTypes:
         merged = httpx.Headers(self._default_headers)
-        if headers is not None:
-            merged.update(headers)
         if self._auth_header_factory:
             merged.update(self._auth_header_factory())
+        if headers is not None:
+            merged.update(headers)
         if self._propagate_request_id:
             rid = get_request_id()
             if rid:
@@ -318,8 +319,12 @@ class ApiClient:
             path: Relative API path.
             response_model: Pydantic model type for the response body.
             body: Request JSON (from ``model_dump()`` if a :class:`~pydantic.BaseModel`).
+                Mutually exclusive with ``json``.
             Remaining kwargs: forwarded to :meth:`post`.
         """
+        if body is not None and json is not None:
+            msg = "Pass only one of body or json"
+            raise TypeError(msg)
         json_body: JsonValue | None
         if isinstance(body, BaseModel):
             json_body = body.model_dump(mode="json")

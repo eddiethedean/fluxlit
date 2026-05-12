@@ -41,7 +41,7 @@ from fastapi import Depends
 from fluxlit import FluxLit
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
-from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
+from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer, StandardClaims, issue_hs256_access_token
 from fluxlit.streamlit_auth import bearer_headers_from_session
 
 settings = FluxlitSettings(

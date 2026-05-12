@@ -89,6 +89,17 @@ def test_gateway_port_bool_is_ignored(tmp_path: Path) -> None:
     assert pc.gateway_port is None
 
 
+def test_gateway_port_invalid_string_is_ignored(tmp_path: Path) -> None:
+    (tmp_path / "fluxlit.toml").write_text(
+        'target = "a:b"\ngateway_port = "not-a-port"\n',
+        encoding="utf-8",
+    )
+    pc = load_project_config(tmp_path)
+    assert pc is not None
+    assert pc.target == "a:b"
+    assert pc.gateway_port is None
+
+
 def test_fluxlit_toml_non_table_returns_none(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "fluxlit.toml").write_text("target = 'x:y'\n", encoding="utf-8")
     monkeypatch.setattr(project_module.tomllib, "loads", lambda text: ["not", "a", "table"])

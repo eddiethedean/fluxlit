@@ -700,6 +700,78 @@ def test_doctor_checks_gateway_bind_failure(
     assert any(name == "gateway_bind" and status == "FAIL" for name, status, _ in rows)
 
 
+def test_doctor_checks_gateway_bind_uses_ipv6_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_ipv6_bind_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_host='::1', gateway_port=59401))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(
+        cli_module.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [
+            (
+                cli_module.socket.AF_INET6,
+                cli_module.socket.SOCK_STREAM,
+                0,
+                "",
+                ("::1", 59401, 0, 0),
+            )
+        ],
+    )
+    captured: dict[str, object] = {}
+
+    class FakeSocket:
+        def __init__(self, family: int, socktype: int, proto: int) -> None:
+            captured["family"] = family
+            captured["socktype"] = socktype
+            captured["proto"] = proto
+
+        def __enter__(self) -> FakeSocket:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def setsockopt(self, *args: object) -> None:
+            return None
+
+        def bind(self, addr: tuple[str, int, int, int]) -> None:
+            captured["addr"] = addr
+
+    monkeypatch.setattr(cli_module.socket, "socket", FakeSocket)
+    rows = cli_module._doctor_checks("doctor_ipv6_bind_app:app")  # noqa: SLF001
+    assert any(name == "gateway_bind" and status == "PASS" for name, status, _ in rows)
+    assert captured["family"] == cli_module.socket.AF_INET6
+    assert captured["addr"] == ("::1", 59401, 0, 0)
+
+
+def test_doctor_checks_gateway_bind_fails_when_host_does_not_resolve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_unresolved_bind_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(\n"
+        "    gateway_host='missing.local', gateway_port=59401\n"
+        "))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(cli_module.socket, "getaddrinfo", lambda *args, **kwargs: [])
+    rows = cli_module._doctor_checks("doctor_unresolved_bind_app:app")  # noqa: SLF001
+    assert any(
+        name == "gateway_bind" and status == "FAIL" and "could not resolve" in detail
+        for name, status, detail in rows
+    )
+
+
 def test_doctor_checks_warns_on_ambiguous_import_candidates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -822,6 +894,40 @@ def test_doctor_checks_metrics_extra_missing(
         name == "fluxlit_metrics_extra" and status == "FAIL" and "fluxlit[metrics]" in detail
         for name, status, detail in rows
     )
+
+
+def test_doctor_checks_metrics_extra_present(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_metrics_present_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(enable_gateway_prometheus_metrics=True))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.setattr(cli_module, "find_spec", lambda name: object())
+    rows = cli_module._doctor_checks("doctor_metrics_present_app:app")  # noqa: SLF001
+    assert ("fluxlit_metrics_extra", "PASS", "prometheus-client importable") in rows
+
+
+def test_doctor_checks_public_base_url_single_source_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_public_base_single_app.py"
+    module_path.write_text("from fluxlit import FluxLit\napp = FluxLit()\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    monkeypatch.setenv("FLUXLIT_PUBLIC_BASE_URL", "https://fluxlit.example")
+    monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
+    rows = cli_module._doctor_checks("doctor_public_base_single_app:app")  # noqa: SLF001
+    assert ("public_base_url_precedence", "PASS", "using FLUXLIT_PUBLIC_BASE_URL") in rows
+
+    monkeypatch.delenv("FLUXLIT_PUBLIC_BASE_URL", raising=False)
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://legacy.example")
+    rows = cli_module._doctor_checks("doctor_public_base_single_app:app")  # noqa: SLF001
+    assert ("public_base_url_precedence", "PASS", "using PUBLIC_BASE_URL fallback") in rows
 
 
 def test_doctor_checks_oauth_public_base_url_warning(

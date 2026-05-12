@@ -98,7 +98,7 @@ For Pydantic-validated JSON, use {meth}`~fluxlit.client.ApiClient.get_model` and
 
 ### Secured routes (JWT and similar)
 
-The `client` injected into `@app.page` handlers has **no** `Authorization` header. Use it for public endpoints or for logging in; for routes protected with {class}`~fluxlit.jwt_auth.JWTBearer` (or your own dependency), create a client that adds the bearer on every request:
+The `client` injected into `@app.page` handlers has **no** `Authorization` header. Use it for public endpoints or for logging in; for routes protected with {class}`~fluxlit.auth.jwt.JWTBearer` (or your own dependency), create a client that adds the bearer on every request:
 
 ```python
 from fluxlit.client import ApiClient

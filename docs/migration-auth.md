@@ -12,7 +12,7 @@ pip install "fluxlit[auth]"
 
 ### 2a. Shared JWT dependency (friendly: env + `make_jwt_bearer`)
 
-If you set `FLUXLIT_JWT_ISSUER`, `FLUXLIT_JWT_AUDIENCE`, and `FLUXLIT_JWT_HS256_SECRET` (or `FLUXLIT_JWT_JWKS_URL`), you can skip hand-building {class}`~fluxlit.jwt_auth.JWTAuthConfig`:
+If you set `FLUXLIT_JWT_ISSUER`, `FLUXLIT_JWT_AUDIENCE`, and `FLUXLIT_JWT_HS256_SECRET` (or `FLUXLIT_JWT_JWKS_URL`), you can skip hand-building {class}`~fluxlit.auth.jwt.JWTAuthConfig`:
 
 ```python
 from fluxlit import FluxLit
@@ -23,12 +23,12 @@ _bearer = app.make_jwt_bearer()
 
 ### 2a-alt. Shared JWT dependency (explicit config)
 
-Create one {class}`~fluxlit.jwt_auth.JWTBearer` and reuse it. HS256 is fine for local development; use `jwks_url` + RS256 for staging/production.
+Create one {class}`~fluxlit.auth.jwt.JWTBearer` and reuse it. HS256 is fine for local development; use `jwks_url` + RS256 for staging/production.
 
 ```python
 # app.py (fragment)
 import os
-from fluxlit.jwt_auth import JWTAuthConfig, JWTBearer
+from fluxlit.auth.jwt import JWTAuthConfig, JWTBearer
 
 _bearer = JWTBearer(
     JWTAuthConfig(
@@ -47,7 +47,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fluxlit import FluxLit
-from fluxlit.jwt_auth import StandardClaims
+from fluxlit.auth.jwt import StandardClaims
 
 app = FluxLit(title="My app")
 
@@ -65,7 +65,7 @@ def _note() -> None:
 ### 2c. Optional: scopes / roles
 
 ```python
-from fluxlit.jwt_auth import RequireScopes
+from fluxlit.auth.jwt import RequireScopes
 
 _need_read = RequireScopes(_bearer, "data.read")
 
@@ -181,7 +181,7 @@ def home(st, client: ApiClient) -> None:
     ...
 ```
 
-This performs a **server-side** `POST` to `/api/auth/exchange` and stores `fluxlit_access_token`. Use that token with `ApiClient.for_fluxlit` or `bearer_headers_from_session` when calling APIs that expect your BFF-issued JWT (configure {class}`~fluxlit.jwt_auth.JWTBearer` with the same issuer/audience/secret as `OIDCBFFConfig`).
+This performs a **server-side** `POST` to `/api/auth/exchange` and stores `fluxlit_access_token`. Use that token with `ApiClient.for_fluxlit` or `bearer_headers_from_session` when calling APIs that expect your BFF-issued JWT (configure {class}`~fluxlit.auth.jwt.JWTBearer` with the same issuer/audience/secret as `OIDCBFFConfig`).
 
 ## Step 5: Hardening
 

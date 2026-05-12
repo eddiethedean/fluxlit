@@ -12,7 +12,7 @@ It exists to reduce friction when combining:
 
 - FastAPI for HTTP APIs, validation, and OpenAPI
 - Streamlit for data and admin UIs
-- Future: shared authentication, configuration, and deployment patterns
+- Shared authentication, configuration, testing, and deployment patterns
 
 FluxLit should feel natural to Python teams building internal tools and data products—without giving up operational rigor.
 
@@ -39,7 +39,10 @@ FluxLit is not only a demo launcher. Over time it should support:
 - Structured logging, health/readiness, and metrics hooks
 - Authentication patterns used in enterprises (forward auth, JWT, OIDC)
 
-**Today (0.1.x):** the sidecar gateway and `/api` prefix are the foundation; auth, metrics, and official container recipes are **not** complete—see the roadmap.
+**Current 0.x line:** the sidecar gateway, `/api` prefix, health/readiness,
+structured logging hooks, optional metrics, JWT/OIDC helpers, Docker/Kubernetes
+examples, and testing utilities are in place. See the roadmap for remaining
+hardening and post-1.0 research.
 
 ### 3. Pythonic surface
 
@@ -101,9 +104,10 @@ Full page reload can drop Streamlit’s in-process session unless state is **reh
 | Logging | `fluxlit.logging` | Request id context for gateway / API |
 | Runtime | `fluxlit.runtime` | Load `FluxLit` by import path, spawn Streamlit, run Uvicorn |
 | Streamlit | `fluxlit.streamlit.main` | Streamlit script; reads `FLUXLIT_APP`, builds navigation |
-| Helpers | `fluxlit.api`, `fluxlit.auth` | Router helpers; auth placeholders |
+| Helpers | `fluxlit.api`, `fluxlit.auth` | Router helpers, JWT validation, OIDC/BFF, and Streamlit auth utilities |
 
-`fluxlit build` emits starter container files; a dedicated `fluxlit.deploy` module and richer K8s examples remain future work.
+`fluxlit build` emits starter container files; richer deployment abstractions can
+still grow around the shipped Docker Compose, proxy, and Kubernetes examples.
 
 ---
 
@@ -116,7 +120,10 @@ Full page reload can drop Streamlit’s in-process session unless state is **reh
 - **Sessions** (signed cookies, optional external store)
 - **OAuth2/OIDC** via providers (Azure AD, Okta, Google, GitHub, etc.)
 
-**Today:** `fluxlit.auth` may expose small helpers; end-to-end auth is **application responsibility** until dedicated FluxLit middleware and Streamlit session bridging land.
+**Current:** `fluxlit.auth` includes JWT validation helpers, OIDC/BFF route
+registration, and Streamlit-side API client helpers. Application teams still own
+their provider configuration, authorization rules, and any organization-specific
+session storage.
 
 ---
 
@@ -129,7 +136,9 @@ Full page reload can drop Streamlit’s in-process session unless state is **reh
 - Uvicorn (primary) / other ASGI servers where compatible
 - Posit Workbench / Posit Connect (patterns TBD; may require vendor-specific docs)
 
-**Today:** run `fluxlit run` behind your own reverse proxy; tune `FLUXLIT_ROOT_PATH` and forwarded headers per your environment.
+**Current:** run `fluxlit run` behind your reverse proxy, or start from the
+repository's Docker Compose / Kubernetes examples. Tune `FLUXLIT_ROOT_PATH`,
+forwarded headers, probes, and secrets per your platform.
 
 ---
 

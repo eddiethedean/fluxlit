@@ -8,17 +8,24 @@ from fluxlit.config import FluxlitSettings
 from fluxlit.runtime import read_streamlit_upstream_url
 
 
-def _streamlit_readiness_urls(upstream: str) -> list[str]:
+def _streamlit_readiness_urls(
+    upstream: str, *, settings: FluxlitSettings | None = None
+) -> list[str]:
     """Candidate Streamlit URLs that indicate the sidecar is serving traffic."""
     base = upstream.rstrip("/")
     urls = [f"{base}/"]
-    mount = FluxlitSettings().public_mount_path().strip().strip("/")
+    mount = (settings or FluxlitSettings()).public_mount_path().strip().strip("/")
     if mount:
         urls.append(f"{base}/{mount}/")
     return urls
 
 
-async def probe_streamlit_ready(*, timeout_s: float = 0.5) -> tuple[bool, str]:
+async def probe_streamlit_ready(
+    *,
+    timeout_s: float = 0.5,
+    upstream: str | None = None,
+    settings: FluxlitSettings | None = None,
+) -> tuple[bool, str]:
     """Return ``(ok, detail)`` for whether the Streamlit upstream accepts HTTP traffic.
 
     When ``FLUXLIT_STREAMLIT_UPSTREAM`` / file state is unset (typical in bare FastAPI
@@ -28,13 +35,13 @@ async def probe_streamlit_ready(*, timeout_s: float = 0.5) -> tuple[bool, str]:
     upstream root (``{upstream}/``). Other status codes (including 3xx/4xx) are treated
     as not ready so Kubernetes-style probes reflect a healthy Streamlit app.
     """
-    upstream = read_streamlit_upstream_url()
-    if not upstream:
+    resolved_upstream = read_streamlit_upstream_url() if upstream is None else upstream
+    if not resolved_upstream:
         return True, "not_configured"
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
             detail = ""
-            for url in _streamlit_readiness_urls(upstream):
+            for url in _streamlit_readiness_urls(resolved_upstream, settings=settings):
                 response = await client.get(url)
                 if 200 <= response.status_code < 300:
                     return True, "ok"

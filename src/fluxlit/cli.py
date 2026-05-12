@@ -43,7 +43,7 @@ def _dockerfile_body(target: str) -> str:
         f"# python:3.12-slim @ {_py_slim_digest}\n"
         f"FROM python@{_py_slim_digest}\n"
         "WORKDIR /app\n"
-        'RUN pip install --no-cache-dir "fluxlit>=0.5.0"\n'
+        'RUN pip install --no-cache-dir "fluxlit>=0.7,<0.8"\n'
         "COPY . .\n"
         "RUN useradd --create-home --uid 1000 appuser \\\n"
         "    && chown -R appuser:appuser /app\n"
@@ -420,11 +420,15 @@ def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
             settings_gateway_port=fl.settings.gateway_port,
             settings_log_level=fl.settings.log_level,
         )
-        bind_host = "127.0.0.1" if host in {"0.0.0.0", ""} else host
+        bind_host = "127.0.0.1" if host in {"0.0.0.0", ""} else "::1" if host == "::" else host
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            infos = socket.getaddrinfo(bind_host, port, type=socket.SOCK_STREAM)
+            if not infos:
+                raise OSError(f"could not resolve bind host {bind_host!r}")
+            family, socktype, proto, _, sockaddr = infos[0]
+            with socket.socket(family, socktype, proto) as s:
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                s.bind((bind_host, port))
+                s.bind(sockaddr)
             rows.append(("gateway_bind", "PASS", f"{host}:{port} is available"))
         except OSError as e:
             rows.append(("gateway_bind", "FAIL", str(e)))

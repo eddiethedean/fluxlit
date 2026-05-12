@@ -18,6 +18,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from fluxlit.asgi_types import ASGIApp, ASGIMessage, Scope
+from fluxlit.config import FluxlitSettings
 from fluxlit.runtime import asgi_from_fluxlit, create_unified_app, load_fluxlit
 
 
@@ -102,6 +103,37 @@ async def test_httpx_asgi_transport_api_healthz_after_lifespan(
         r = await _httpx_get(asgi, "/api/healthz")
     assert r.status_code == 200
     assert r.json() == {"status": "ok"}
+
+
+@pytest.mark.asyncio
+async def test_unified_readyz_uses_live_sidecar_url_and_instance_settings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _minimal_asgi_env(monkeypatch)
+    fl = load_fluxlit("tests.e2e.minimal_app:app")
+    fl.settings = FluxlitSettings(root_path="/mounted")
+    captured: dict[str, object] = {}
+
+    async def fake_probe(
+        *,
+        timeout_s: float = 0.5,  # noqa: ARG001
+        upstream: str | None = None,
+        settings: FluxlitSettings | None = None,
+    ) -> tuple[bool, str]:
+        captured["upstream"] = upstream
+        captured["settings"] = settings
+        return True, "ok"
+
+    monkeypatch.setattr("fluxlit.application.api_bootstrap.probe_streamlit_ready", fake_probe)
+    asgi = asgi_from_fluxlit(fl, "tests.e2e.minimal_app:app")
+    async with _lifespan_running(asgi):
+        r = await _httpx_get(asgi, "/api/readyz")
+
+    assert r.status_code == 200
+    assert r.json() == {"status": "ready", "streamlit": "ok"}
+    assert str(captured["upstream"]).startswith("http://127.0.0.1:")
+    assert isinstance(captured["settings"], FluxlitSettings)
+    assert captured["settings"].root_path == "/mounted"
 
 
 @pytest.mark.asyncio

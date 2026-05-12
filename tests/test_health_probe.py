@@ -9,7 +9,8 @@ from typing import Any
 
 import pytest
 
-from fluxlit.health import probe_streamlit_ready
+from fluxlit.config import FluxlitSettings
+from fluxlit.health import _streamlit_readiness_urls, probe_streamlit_ready
 from fluxlit.runtime import find_free_port
 
 
@@ -160,6 +161,14 @@ async def test_probe_ready_when_streamlit_uses_public_mount(
     ok, detail = await probe_streamlit_ready(timeout_s=2.0)
     assert ok is True
     assert detail == "ok"
+
+
+def test_readiness_urls_use_explicit_settings() -> None:
+    settings = FluxlitSettings(root_path="/mounted")
+    assert _streamlit_readiness_urls("http://127.0.0.1:8501", settings=settings) == [
+        "http://127.0.0.1:8501/",
+        "http://127.0.0.1:8501/mounted/",
+    ]
 
 
 @pytest.mark.asyncio

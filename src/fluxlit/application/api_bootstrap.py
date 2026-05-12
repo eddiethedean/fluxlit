@@ -18,6 +18,8 @@ from fluxlit.logging import REQUEST_ID_HEADER, new_request_id, reset_request_id,
 from fluxlit.security import SecurityHeadersMiddleware
 
 _api_log = logging.getLogger("fluxlit.api")
+_STATE_SETTINGS = "fluxlit_settings"
+_STATE_UPSTREAM_RESOLVER = "fluxlit_streamlit_upstream_resolver"
 
 _CORS_MIDDLEWARE_EXCLUSIVE_KWARGS = frozenset(
     {"allow_origins", "allow_credentials", "allow_methods", "allow_headers"}
@@ -33,6 +35,8 @@ def _cors_middleware_extras(
 
 def wire_fluxlit_api(api: FastAPI, settings: FluxlitSettings) -> None:
     """Apply security/CORS/request logging and register ``/healthz`` / ``/readyz``."""
+    setattr(api.state, _STATE_SETTINGS, settings)
+
     if settings.enable_security_headers:
         api.add_middleware(SecurityHeadersMiddleware)
     if settings.cors_allow_origins:
@@ -74,7 +78,13 @@ def wire_fluxlit_api(api: FastAPI, settings: FluxlitSettings) -> None:
 
     @api.get("/readyz", include_in_schema=False, response_model=None)
     async def _readyz() -> JSONResponse:
-        ok, detail = await probe_streamlit_ready()
+        active_settings = getattr(api.state, _STATE_SETTINGS, settings)
+        resolver = getattr(api.state, _STATE_UPSTREAM_RESOLVER, None)
+        upstream = resolver() if callable(resolver) else None
+        ok, detail = await probe_streamlit_ready(
+            upstream=upstream,
+            settings=active_settings,
+        )
         if ok:
             return JSONResponse(content={"status": "ready", "streamlit": detail})
         return JSONResponse(

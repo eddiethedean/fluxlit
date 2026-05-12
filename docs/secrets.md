@@ -29,7 +29,7 @@ See {doc}`observability` for JSON formatter examples and correlation IDs.
 
 ### HS256 (shared secret)
 
-Used when validation uses a single symmetric key (e.g. **`FLUXLIT_JWT_HS256_SECRET`** or your own {class}`~fluxlit.jwt_auth.JWTAuthConfig`).
+Used when validation uses a single symmetric key (e.g. **`FLUXLIT_JWT_HS256_SECRET`** or your own {class}`~fluxlit.auth.jwt.JWTAuthConfig`).
 
 1. **Generate** a new strong secret; keep the old one available during overlap if you need **zero-downtime** acceptance of tokens signed with either key (requires app support for multiple secrets—not the default single-env configuration).
 2. **Simplest safe rollout:** schedule a short window; deploy the new secret; **invalidate** outstanding access tokens if TTL allows, or accept that old tokens fail until they expire.
@@ -37,7 +37,7 @@ Used when validation uses a single symmetric key (e.g. **`FLUXLIT_JWT_HS256_SECR
 
 ### JWKS (asymmetric / IdP keys)
 
-When using **`FLUXLIT_JWT_JWKS_URL`** (or an equivalent URL in {class}`~fluxlit.jwt_auth.JWTAuthConfig`), verification keys come from the IdP.
+When using **`FLUXLIT_JWT_JWKS_URL`** (or an equivalent URL in {class}`~fluxlit.auth.jwt.JWTAuthConfig`), verification keys come from the IdP.
 
 1. **IdP key rotation** is controlled by the issuer: new keys appear in JWKS with a new **`kid`**; old keys remain until signing stops.
 2. FluxLit’s JWT path fetches JWKS as configured—ensure **network egress** to the JWKS URL from the gateway and watch **cache / TTL** behavior if you customize HTTP clients; after IdP rotation, stale caches can cause **short 401 bursts** until refreshed.

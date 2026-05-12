@@ -243,6 +243,22 @@ def test_import_target_candidates_find_files_and_packages(tmp_path: Path) -> Non
     assert candidates == [(first / "app.py").resolve(), (package / "__init__.py").resolve()]
     assert import_target_candidates("pkg.app", paths=[str(first)]) == []
     assert import_target_candidates("./app.py", paths=[str(first)]) == []
+    assert import_target_candidates("pkg/app", paths=[str(first)]) == []
+
+
+def test_import_target_candidates_skips_unresolvable_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+    real_resolve = Path.resolve
+
+    def bad_resolve(self: Path, *args: object, **kwargs: object) -> Path:
+        if self.name == "app.py":
+            raise OSError("cannot resolve")
+        return real_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", bad_resolve)
+    assert import_target_candidates("app", paths=[str(tmp_path)]) == []
 
 
 def test_internal_api_base_url_maps_inaddr_any_to_loopback() -> None:

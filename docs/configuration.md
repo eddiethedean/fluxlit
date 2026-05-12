@@ -88,7 +88,7 @@ log_level = "info"
 | `FLUXLIT_PUBLIC_BASE_URL` | Public origin for OAuth redirects (e.g. `https://app.example.com`), used with BFF/OIDC helpers. Prefer this namespaced variable over `PUBLIC_BASE_URL`. |
 | `PUBLIC_BASE_URL` | Compatibility fallback used only when `FLUXLIT_PUBLIC_BASE_URL` is unset. If both are set differently, FluxLit uses `FLUXLIT_PUBLIC_BASE_URL`; `fluxlit doctor` warns, or fails when `FLUXLIT_STRICT_PUBLIC_BASE_URL=1`. |
 | `FLUXLIT_STRICT_PUBLIC_BASE_URL` | If true, `fluxlit doctor` treats conflicting `PUBLIC_BASE_URL` / `FLUXLIT_PUBLIC_BASE_URL` values as a failure. |
-| `FLUXLIT_JWT_ISSUER` / `FLUXLIT_JWT_AUDIENCE` | Expected JWT `iss` / `aud` when using :meth:`fluxlit.jwt_auth.JWTBearer.from_fluxlit_settings` or :meth:`fluxlit.app.FluxLit.make_jwt_bearer`. |
+| `FLUXLIT_JWT_ISSUER` / `FLUXLIT_JWT_AUDIENCE` | Expected JWT `iss` / `aud` when using :meth:`fluxlit.auth.jwt.JWTBearer.from_fluxlit_settings` or :meth:`fluxlit.app.FluxLit.make_jwt_bearer`. |
 | `FLUXLIT_JWT_HS256_SECRET` | HS256 secret (dev/small deploys); omit if using JWKS. |
 | `FLUXLIT_JWT_JWKS_URL` | JWKS URL for RS256; omit if using HS256 secret. |
 | `FLUXLIT_JWT_LEEWAY_SECONDS` | Clock skew leeway for JWT validation (default `0`). |

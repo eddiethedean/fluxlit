@@ -44,6 +44,24 @@ def test_api_client_merges_auth_factory_headers(monkeypatch: pytest.MonkeyPatch)
     assert captured.get("authorization") == "Bearer secret"
 
 
+def test_api_client_call_headers_override_auth_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(dict(request.headers))
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(handler)
+    with ApiClient(
+        base_url="http://127.0.0.1:8000/api",
+        auth_header_factory=lambda: {"Authorization": "Bearer default"},
+    ) as client:
+        client._client = httpx.Client(base_url=client._client.base_url, transport=transport)
+        client.get("/ping", headers={"Authorization": "Bearer per-call"})
+    assert captured.get("authorization") == "Bearer per-call"
+
+
 def test_api_client_for_fluxlit_rejects_both_factory_and_token() -> None:
     with pytest.raises(TypeError, match="only one"):
         ApiClient.for_fluxlit(bearer_token="a", auth_header_factory=lambda: {})
@@ -174,6 +192,13 @@ def test_post_model_serializes_pydantic_body(monkeypatch: pytest.MonkeyPatch) ->
         user = client.post_model("/users", _User, body=_User(name="sent"))
     assert user.name == "Bob"
     assert captured["json"] == b'{"name":"sent"}'
+
+
+def test_post_model_rejects_body_and_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        with pytest.raises(TypeError, match="body or json"):
+            client.post_model("/users", _User, body={"name": "Ada"}, json={"name": "Grace"})
 
 
 def test_get_model_raises_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
