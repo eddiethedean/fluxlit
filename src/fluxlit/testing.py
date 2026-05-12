@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import os
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +14,7 @@ from starlette.testclient import TestClient
 
 from fluxlit.app import FluxLit
 from fluxlit.gateway import build_gateway
+from fluxlit.gateway.paths import normalize_root_mount
 
 
 def streamlit_main_path() -> Path:
@@ -34,34 +35,68 @@ class FluxLitTestClient:
     through :func:`fluxlit.gateway.build_gateway`, so paths include the configured
     ``api_prefix`` and ``/healthz`` behaves like production.
 
+    **Public mount** — Set ``root_mount`` (or :meth:`with_root_path`) to simulate
+    Workbench / Posit-style URLs where the browser path is ``{mount}{api_prefix}/…``.
+    Use :meth:`api_get` / :meth:`api_post` so URLs are built correctly; optional
+    ``root_path=`` on a single call builds a matching gateway for that request only.
+
     **Streamlit** — :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit.main`
     with the same environment variables the runtime sets.
     """
 
     app: FluxLit
     api_prefix: str = "/api"
+    root_mount: str = ""
 
-    @property
-    def api(self) -> TestClient:
-        """HTTP test client; non-API routes hit a dummy upstream (unused for ``/api`` tests)."""
+    def _normalized_api_prefix(self) -> str:
+        ap = (self.api_prefix or "/api").strip()
+        return ap if ap.startswith("/") else f"/{ap}"
+
+    def _effective_mount(self, root_path: str | None) -> str:
+        if root_path is not None:
+            return normalize_root_mount(root_path)
+        return normalize_root_mount(self.root_mount)
+
+    def _public_api_url(self, path: str, *, root_path: str | None) -> str:
+        p = path if path.startswith("/") else f"/{path}"
+        mount = self._effective_mount(root_path)
+        core = f"{self._normalized_api_prefix()}{p}"
+        return f"{mount}{core}" if mount else core
+
+    def _gateway_client(self, root_path: str | None) -> TestClient:
+        mount = self._effective_mount(root_path)
         gateway = build_gateway(
             self.app.api,
             "http://127.0.0.1:9",
             api_prefix=self.api_prefix,
+            root_mount=mount,
             access_log=self.app.settings.enable_gateway_access_log,
             proxy_settings=self.app.settings,
         )
         return TestClient(gateway)
 
-    def api_get(self, path: str, **kwargs: Any) -> httpx.Response:
-        """``GET`` relative to ``api_prefix`` (leading slash optional on ``path``)."""
-        p = path if path.startswith("/") else f"/{path}"
-        return self.api.get(f"{self.api_prefix}{p}", **kwargs)
+    @property
+    def api(self) -> TestClient:
+        """HTTP test client; non-API routes hit a dummy upstream (unused for ``/api`` tests)."""
+        return self._gateway_client(None)
 
-    def api_post(self, path: str, **kwargs: Any) -> httpx.Response:
-        """``POST`` relative to ``api_prefix``."""
-        p = path if path.startswith("/") else f"/{path}"
-        return self.api.post(f"{self.api_prefix}{p}", **kwargs)
+    def with_root_path(self, root_path: str) -> FluxLitTestClient:
+        """Return a copy of this client with a browser-visible path prefix (Workbench-style)."""
+        return replace(self, root_mount=normalize_root_mount(root_path))
+
+    def api_get(self, path: str, *, root_path: str | None = None, **kwargs: Any) -> httpx.Response:
+        """``GET`` relative to ``api_prefix`` (leading slash optional on ``path``).
+
+        When ``root_path`` is set, the request uses that public mount for this call only
+        (a separate gateway instance). Omit it to use :attr:`root_mount` on this client.
+        """
+        url = self._public_api_url(path, root_path=root_path)
+        return self._gateway_client(root_path).get(url, **kwargs)
+
+    def api_post(self, path: str, *, root_path: str | None = None, **kwargs: Any) -> httpx.Response:
+        """``POST`` relative to ``api_prefix`` (optional per-call ``root_path``)."""
+        url = self._public_api_url(path, root_path=root_path)
+        return self._gateway_client(root_path).post(url, **kwargs)
 
     def openapi(self) -> dict[str, Any]:
         """Fetch and parse ``GET {api_prefix}/openapi.json``; raises if not a JSON object."""
@@ -71,12 +106,34 @@ class FluxLitTestClient:
             raise TypeError(msg)
         return data
 
+    def assert_docs_available(self, *, root_path: str | None = None) -> None:
+        """Assert OpenAPI JSON and Swagger UI are reachable through the gateway.
+
+        Raises:
+            AssertionError: If OpenAPI is missing/invalid or ``GET …/docs`` is not
+                available (including when FastAPI ``docs_url`` is disabled).
+        """
+        spec = self.api_get("/openapi.json", root_path=root_path)
+        spec.raise_for_status()
+        body = spec.json()
+        if not isinstance(body, dict) or "openapi" not in body:
+            msg = "OpenAPI JSON missing or invalid."
+            raise AssertionError(msg)
+        doc = self.api_get("/docs", root_path=root_path, follow_redirects=False)
+        if doc.status_code == 404:
+            msg = "Swagger UI not available at /docs (docs_url disabled on FastAPI?)."
+            raise AssertionError(msg)
+        if doc.status_code not in (200, 307, 308):
+            msg = f"Unexpected GET /docs status: {doc.status_code}"
+            raise AssertionError(msg)
+
     def streamlit(
         self,
         *,
         target: str,
         internal_api_base: str | None = None,
         extra_sys_path: str | Path | None = None,
+        query_params: dict[str, str] | None = None,
     ) -> Any:
         """Execute Streamlit's ``AppTest`` against :mod:`fluxlit.streamlit.main`.
 
@@ -89,6 +146,8 @@ class FluxLitTestClient:
             internal_api_base: Override internal API URL; default is a placeholder with
                 the correct ``api_prefix`` suffix.
             extra_sys_path: Optional directory prepended to ``sys.path`` (e.g. project root).
+            query_params: Optional initial query string values (same as assigning to
+                ``AppTest.query_params`` before the first ``run()``).
 
         Returns:
             The result of ``AppTest.from_file(...).run()`` (Streamlit type).
@@ -114,7 +173,11 @@ class FluxLitTestClient:
             ),
             _maybe_syspath(extra_sys_path),
         ):
-            return AppTest.from_file(str(entry)).run()
+            at = AppTest.from_file(str(entry))
+            if query_params:
+                for key, value in query_params.items():
+                    at.query_params[key] = value
+            return at.run()
 
 
 def _import_streamlit() -> Any:

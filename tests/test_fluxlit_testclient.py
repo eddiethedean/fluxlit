@@ -32,6 +32,113 @@ def test_fluxlit_testclient_api_healthz() -> None:
     assert res.json() == {"status": "ok"}
 
 
+def test_fluxlit_testclient_api_property_hits_gateway_with_mount() -> None:
+    fl = FluxLit(title="T")
+    tc = FluxLitTestClient(fl).with_root_path("/wb")
+    res = tc.api.get("/wb/api/healthz")
+    assert res.status_code == 200
+
+
+def test_fluxlit_testclient_with_root_path_api_get() -> None:
+    fl = FluxLit(title="T")
+    tc = FluxLitTestClient(fl).with_root_path("/workbench")
+    res = tc.api_get("/healthz")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+
+def test_fluxlit_testclient_api_get_per_call_root_path() -> None:
+    fl = FluxLit(title="T")
+    tc = FluxLitTestClient(fl)
+    res = tc.api_get("/healthz", root_path="/wb")
+    assert res.status_code == 200
+
+
+def test_fluxlit_testclient_assert_docs_available() -> None:
+    FluxLitTestClient(FluxLit(title="T")).assert_docs_available()
+
+
+def test_fluxlit_testclient_assert_docs_available_with_root_path_kwarg() -> None:
+    FluxLitTestClient(FluxLit(title="T")).assert_docs_available(root_path="/wb")
+
+
+def test_fluxlit_testclient_assert_docs_available_under_root_mount() -> None:
+    FluxLitTestClient(FluxLit(title="T")).with_root_path("/wb").assert_docs_available()
+
+
+def test_fluxlit_testclient_assert_docs_available_fails_without_docs() -> None:
+    fl = FluxLit(title="T", fastapi_kwargs={"docs_url": None, "redoc_url": None})
+    tc = FluxLitTestClient(fl)
+    with pytest.raises(AssertionError, match="Swagger UI not available"):
+        tc.assert_docs_available()
+
+
+def test_fluxlit_testclient_assert_docs_invalid_openapi_payload() -> None:
+    fl = FluxLit(title="T")
+
+    def fake_get(self: FluxLitTestClient, path: str, **kwargs: Any) -> Any:
+        class R:
+            status_code = 200
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict[str, object]:
+                return {"paths": {}}
+
+        return R()
+
+    with patch.object(FluxLitTestClient, "api_get", fake_get):
+        with pytest.raises(AssertionError, match="OpenAPI JSON"):
+            FluxLitTestClient(fl).assert_docs_available()
+
+
+def test_fluxlit_testclient_assert_docs_unexpected_docs_status() -> None:
+    fl = FluxLit(title="T")
+
+    def fake_get(self: FluxLitTestClient, path: str, **kwargs: Any) -> Any:
+        class R:
+            def __init__(self, code: int) -> None:
+                self.status_code = code
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict[str, str]:
+                return {"openapi": "3.1.0", "paths": {}}
+
+        if path.endswith("/openapi.json"):
+            return R(200)
+        return R(418)
+
+    with patch.object(FluxLitTestClient, "api_get", fake_get):
+        with pytest.raises(AssertionError, match="Unexpected GET /docs"):
+            FluxLitTestClient(fl).assert_docs_available()
+
+
+def test_fluxlit_testclient_streamlit_query_params(
+    tmp_path: Path,
+    requires_streamlit_apptest,
+) -> None:
+    module_path = tmp_path / "qp_tc_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit, query_params\n\n"
+        "app = FluxLit(title='QP App')\n\n"
+        "@app.page('/')\n"
+        "def home(st, client):\n"
+        "    p = query_params(st)\n"
+        "    st.text_input('t', value=p.get('token', ''), key='tkey')\n",
+        encoding="utf-8",
+    )
+    fl = FluxLit(title="x")
+    at = FluxLitTestClient(fl).streamlit(
+        target="qp_tc_app:app",
+        extra_sys_path=tmp_path,
+        query_params={"token": "from-query"},
+    )
+    assert at.text_input(key="tkey").value == "from-query"
+
+
 def test_fluxlit_testclient_custom_api_prefix() -> None:
     fl = FluxLit(title="T")
 

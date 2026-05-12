@@ -5,6 +5,7 @@
 - **Workbench / Posit:** ``fluxlit workbench`` and ``--workbench`` on ``dev`` / ``run`` enable Uvicorn proxy headers and print a loopback browser URL hint; see platforms and CLI docs for Posit Connect / Workbench-style ``FLUXLIT_ROOT_PATH`` deployments.
 - **Doctor:** ``fluxlit doctor --verbose`` / ``-v`` prints a redacted effective-configuration snapshot (pages, derived internal API base, OpenAPI URLs, proxy/session extras); ``--json --verbose`` adds a ``verbose`` object to the payload.
 - **Deep links:** ``fluxlit.query_params`` and ``fluxlit.match_nav_page`` for Streamlit query parsing and optional ``?page=`` routing; ``FluxLitPublicUrls.page_url`` as an alias for ``for_page``. See ``docs/deep-links.md``.
+- **Testing:** ``FluxLitTestClient`` supports ``root_mount`` / ``with_root_path``, per-call ``root_path`` on ``api_get`` / ``api_post``, ``streamlit(..., query_params=...)``, and ``assert_docs_available()``; see ``docs/testing.md``.
 
 ## 0.8.0 - 2026-05-12
 

@@ -147,6 +147,71 @@ Invite links and password-reset flows often land on the Streamlit shell with
 and `AppTest.query_params[...]` before `.run()` to assert prefilled widgets.
 Repository tests live in `tests/test_deep_links.py`.
 
+## FluxLitTestClient: subpaths, docs, query params, and `ApiClient`
+
+### Path prefix (Workbench / Posit-style)
+
+{class}`~fluxlit.testing.FluxLitTestClient` builds the same composite gateway as production.
+When the browser URL includes a public mount (for example `/content/42/...`), use
+:meth:`~fluxlit.testing.FluxLitTestClient.with_root_path` so :meth:`~fluxlit.testing.FluxLitTestClient.api_get`
+emits ``{mount}{api_prefix}/…`` paths:
+
+```python
+from fluxlit import FluxLit, FluxLitTestClient
+
+
+def make_app() -> FluxLit:
+    app = FluxLit(title="Demo")
+
+    @app.api.get("/widgets")
+    def widgets():
+        return [{"id": 1}]
+
+    return app
+
+
+def test_api_under_content_prefix():
+    tc = FluxLitTestClient(make_app()).with_root_path("/content/42")
+    res = tc.api_get("/widgets")
+    assert res.status_code == 200
+```
+
+For a **single request** with a mount that differs from the client’s default, pass
+``root_path=`` to :meth:`~fluxlit.testing.FluxLitTestClient.api_get` or
+:meth:`~fluxlit.testing.FluxLitTestClient.api_post` (each call uses a matching
+short-lived gateway). Prefer :meth:`~fluxlit.testing.FluxLitTestClient.with_root_path`
+when most calls share one prefix.
+
+If you use :attr:`~fluxlit.testing.FluxLitTestClient.api` directly, pass the **full**
+public path (for example ``"/wb/api/healthz"``) when ``root_mount`` is non-empty.
+
+### OpenAPI / Swagger smoke
+
+:meth:`~fluxlit.testing.FluxLitTestClient.assert_docs_available` checks that
+``GET …/openapi.json`` returns a valid OpenAPI document and that ``GET …/docs`` is
+not missing (``200`` or common redirect codes). Optional ``root_path=`` matches the
+``api_get`` / ``api_post`` helpers.
+
+### Streamlit ``AppTest`` and query parameters
+
+Pass ``query_params=`` to :meth:`~fluxlit.testing.FluxLitTestClient.streamlit` to seed
+``AppTest.query_params`` before the first ``run()`` (same pattern as {doc}`deep-links`).
+
+### Bearer tokens and `ApiClient.for_fluxlit`
+
+In Streamlit page handlers, prefer :meth:`fluxlit.client.ApiClient.for_fluxlit` so
+``Authorization: Bearer …`` is applied consistently with production:
+
+```python
+from fluxlit.client import ApiClient
+
+client = ApiClient.for_fluxlit(bearer_token=st.session_state["access_token"])
+profile = client.get("/users/me").json()
+```
+
+Exercise secured API routes with :class:`~fluxlit.testing.FluxLitTestClient` first
+(fast, deterministic), then keep Streamlit ``AppTest`` assertions thin.
+
 ## Markers
 
 | Marker | Meaning |
