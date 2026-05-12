@@ -58,7 +58,7 @@ Prefer these public hooks over importing private runtime modules:
 |------|----------------|
 | API routes, dependencies, OpenAPI | {attr}`fluxlit.app.FluxLit.api` (FastAPI app). |
 | Streamlit pages | {meth}`fluxlit.app.FluxLit.page` and {meth}`fluxlit.app.FluxLit.discover_pages`. |
-| Streamlit → API calls | {class}`fluxlit.client.ApiClient` and `ApiClient.for_fluxlit(...)`. |
+| Streamlit → API calls | {class}`fluxlit.client.ApiClient`, {meth}`fluxlit.client.ApiClient.with_bearer`, {meth}`fluxlit.client.ApiClient.for_fluxlit`. See {doc}`streamlit-api-client`. |
 | JWT / OIDC / BFF auth | {mod}`fluxlit.auth` and the exports from {mod}`fluxlit`. |
 | URL-bound continuity | {class}`fluxlit.url_session.SessionStore` plus `ensure_url_session`, `hydrate_url_session`, and `persist_url_session`. |
 | Logging and redaction | {mod}`fluxlit.logging`, including JSON formatting and stable gateway log fields. |

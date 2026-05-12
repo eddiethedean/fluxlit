@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Streamlit → API client:** `ApiClient.with_bearer` for bearer auth on top of the injected page client; new guide `docs/streamlit-api-client.md` (when to use injected `client` vs `for_fluxlit`, errors, shared internal base). Closes #28.
 - **Debug mode:** ``FLUXLIT_DEBUG=1`` or ``fluxlit dev`` / ``run`` / ``workbench`` with ``--debug`` turns on gateway access logs, API request logging, bumps the default log level to ``debug`` when it was still ``info``, serves a redacted ``GET /__fluxlit/debug`` snapshot (unless ``api_mount_path`` would shadow it), records recent dispatches in-process, prints a ``[fluxlit-debug]`` banner to stderr at unified startup, and makes :meth:`fluxlit.app.FluxLit.get_client` propagate ``X-Request-ID`` to the API. See ``docs/configuration.md``, ``docs/cli.md``, ``docs/troubleshooting.md``, and ``docs/observability.md``.
 - **Workbench / Posit:** ``fluxlit workbench`` and ``--workbench`` on ``dev`` / ``run`` enable Uvicorn proxy headers and print a loopback browser URL hint; see platforms and CLI docs for Posit Connect / Workbench-style ``FLUXLIT_ROOT_PATH`` deployments.
 - **Doctor:** ``fluxlit doctor --verbose`` / ``-v`` prints a redacted effective-configuration snapshot (pages, derived internal API base, OpenAPI URLs, proxy/session extras); ``--json --verbose`` adds a ``verbose`` object to the payload.

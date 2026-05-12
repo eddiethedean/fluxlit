@@ -197,16 +197,24 @@ not missing (``200`` or common redirect codes). Optional ``root_path=`` matches 
 Pass ``query_params=`` to :meth:`~fluxlit.testing.FluxLitTestClient.streamlit` to seed
 ``AppTest.query_params`` before the first ``run()`` (same pattern as {doc}`deep-links`).
 
-### Bearer tokens and `ApiClient.for_fluxlit`
+### Bearer tokens: `with_bearer`, `for_fluxlit`, and the injected `client`
 
-In Streamlit page handlers, prefer :meth:`fluxlit.client.ApiClient.for_fluxlit` so
-``Authorization: Bearer …`` is applied consistently with production:
+The page **injected `client`** has no `Authorization` header by default. For a token in
+`st.session_state`, either chain :meth:`fluxlit.client.ApiClient.with_bearer` on that
+client (same base URL and options) or construct :meth:`fluxlit.client.ApiClient.for_fluxlit`.
+See {doc}`streamlit-api-client` for when to prefer each and for error-handling examples.
 
 ```python
 from fluxlit.client import ApiClient
 
+# Option A: new client (common in snippets)
 client = ApiClient.for_fluxlit(bearer_token=st.session_state["access_token"])
 profile = client.get("/users/me").json()
+
+# Option B: from the injected page client
+def my_page(st, client, /) -> None:
+    with client.with_bearer(st.session_state["access_token"]) as api:
+        profile = api.get("/users/me").json()
 ```
 
 Exercise secured API routes with :class:`~fluxlit.testing.FluxLitTestClient` first
