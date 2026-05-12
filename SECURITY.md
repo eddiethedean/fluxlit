@@ -6,12 +6,13 @@ Security fixes are applied to the **current release line** on [PyPI](https://pyp
 
 | Version   | Support note                                      |
 | --------- | ------------------------------------------------- |
-| **0.7.x** | Active                                            |
-| **0.6.x** | Best-effort fixes; upgrade to 0.7.x recommended   |
-| **0.5.x** | Best-effort fixes; upgrade to 0.7.x recommended   |
-| **0.4.x** | Best-effort fixes; upgrade to 0.7.x recommended   |
-| **0.3.x** | Best-effort fixes; upgrade to 0.7.x recommended   |
-| **0.2.x** | Best-effort fixes; upgrade to 0.7.x recommended   |
+| **0.8.x** | Active                                            |
+| **0.7.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
+| **0.6.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
+| **0.5.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
+| **0.4.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
+| **0.3.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
+| **0.2.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
 | **< 0.2** | Upgrade recommended; limited backporting        |
 
 Pre-release installs (e.g. from `main`) should track the latest commit for fixes.

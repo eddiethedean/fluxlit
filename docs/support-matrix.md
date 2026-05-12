@@ -1,6 +1,6 @@
 # Support matrix
 
-Published combinations for **FluxLit 0.7.x** on PyPI. Outside this matrix, installs may work but are **best-effort** until tested in CI.
+Published combinations for **FluxLit 0.8.x** on PyPI. Outside this matrix, installs may work but are **best-effort** until tested in CI.
 
 ## Python
 
@@ -36,7 +36,7 @@ FluxLit sits between **FastAPI**, **Streamlit**, **Uvicorn**, **Starlette**, **h
 Minimal **`requirements.in`** sketch (adjust pins to your policy):
 
 ```text
-fluxlit>=0.7,<0.8
+fluxlit>=0.8,<0.9
 streamlit>=1.36
 ```
 

@@ -4,7 +4,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.7.x)
+## Current status (0.8.x)
 
 **Done**
 
@@ -157,7 +157,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Log schema reference** | Document stable field names for gateway access logs, JSON formatter extras, request IDs, redacted query strings, and error classes so teams can build dashboards safely. |
 | **Metrics contract** | Define which Prometheus metric names and labels are stable enough for alerts, and which remain experimental to avoid accidental cardinality or compatibility promises. |
 
-**Implemented in `main` (0.6 / 0.7):** canonical smoke app and richer local smoke/load scripts; Docker proxy smoke matrix; external URL-session store examples; platform docs; optional tracing hooks and OpenTelemetry recipe; stable gateway log and Prometheus metric contracts; scaffold profiles; expanded `fluxlit doctor --json`; public `streamlit_main_path()` testing helper; official Pytest/AppTest recipe; URL-session test-mode defaults; monorepo import diagnostics; public-base-url precedence checks; and a multipage AppTest example.
+**Implemented in `main` (0.6 / 0.7 / 0.8):** canonical smoke app and richer local smoke/load scripts; Docker proxy smoke matrix; external URL-session store examples; platform docs; optional tracing hooks and OpenTelemetry recipe; stable gateway log and Prometheus metric contracts; scaffold profiles; expanded `fluxlit doctor --json`; public `streamlit_main_path()` testing helper; official Pytest/AppTest recipe; URL-session test-mode defaults; monorepo import diagnostics; public-base-url precedence checks; multipage AppTest example; `fluxlit config` for effective settings and warnings; and an expanded support matrix for production pinning.
 
 ### Success criteria (0.6)
 
@@ -188,6 +188,22 @@ repositories, especially monorepos and Streamlit AppTest suites.
 - App authors can copy a Pytest recipe for API tests and thin Streamlit smoke tests without inspecting FluxLit internals.
 - Doctor output explains common import, proxy, URL-session, extras, and public-base-url mistakes before deployment.
 - URL-session continuity remains production-friendly while AppTest defaults avoid unstable browser-query behavior.
+
+---
+
+## Version 0.8 — Configuration visibility and docs (released)
+
+**Theme:** Make effective configuration inspectable before deploy, and document production dependency pinning more explicitly.
+
+### Shipped
+
+- **CLI:** `fluxlit config` prints resolved binding, redacted settings, derived internal API base, structured warnings with documentation links, and optional `--json` / `--strict`.
+- **Docs / policy:** support matrix expanded for `uv` / `pip-tools` / constraints, Streamlit extra guidance, testing compatibility notes, and README cross-links.
+
+### Success criteria (0.8)
+
+- Operators can dump effective FluxLit configuration without starting the full stack.
+- Production pinning guidance names core packages and upgrade expectations alongside the CI matrix.
 
 ---
 
