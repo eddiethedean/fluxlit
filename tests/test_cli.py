@@ -13,14 +13,16 @@ from typer.testing import CliRunner
 
 import fluxlit.cli as cli_module
 from fluxlit.cli import app
+from fluxlit.runtime import find_free_port
 
 
 def test_doctor_prints_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    port = find_free_port()
     module_path = tmp_path / "demo_cli_app.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(title='CLI App', settings=FluxlitSettings(gateway_port=59201))\n",
+        f"app = FluxLit(title='CLI App', settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -37,11 +39,12 @@ def test_doctor_prints_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
 def test_doctor_verbose_prints_effective_block(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "demo_cli_verbose_app.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(title='V', settings=FluxlitSettings(gateway_port=59220))\n",
+        f"app = FluxLit(title='V', settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -56,11 +59,12 @@ def test_doctor_verbose_prints_effective_block(
 def test_doctor_json_verbose_includes_verbose_object(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "demo_cli_json_verbose_app.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(title='JV', settings=FluxlitSettings(gateway_port=59221))\n",
+        f"app = FluxLit(title='JV', settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -76,11 +80,12 @@ def test_doctor_json_verbose_includes_verbose_object(
 def test_doctor_json_without_verbose_omits_verbose_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "demo_cli_json_no_verbose.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(settings=FluxlitSettings(gateway_port=59222))\n",
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -224,11 +229,12 @@ def test_doctor_collect_bind_host_zero_resolves_to_loopback_for_probe(
 def test_doctor_json_outputs_structured_checks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "demo_cli_json_app.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(title='CLI JSON App', settings=FluxlitSettings(gateway_port=59211))\n",
+        f"app = FluxLit(title='CLI JSON App', settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -279,12 +285,13 @@ def test_doctor_json_warnings_only_exits_zero(
 def test_doctor_json_warning_status_and_check_schema(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_json_warn_only.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(settings=FluxlitSettings("
-        "trust_proxy=True, forwarded_allow_ips='*', gateway_port=59212))\n",
+        f"trust_proxy=True, forwarded_allow_ips='*', gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -307,11 +314,12 @@ def test_doctor_json_warning_status_and_check_schema(
 def test_doctor_json_missing_upstream_file_reports_structured_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_json_missing_upstream.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(settings=FluxlitSettings(gateway_port=59213))\n",
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -333,17 +341,18 @@ def test_doctor_json_missing_upstream_file_reports_structured_failure(
 def test_doctor_warns_when_internal_api_path_mismatches_mount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_mount_app.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(title='M', settings=FluxlitSettings("
-        "api_mount_path='/api/v1', gateway_port=59203))\n",
+        f"api_mount_path='/api/v1', gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:59203/api")
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", f"http://127.0.0.1:{port}/api")
 
     runner = CliRunner()
     res = runner.invoke(app, ["doctor", "doc_mount_app:app"])
@@ -355,13 +364,14 @@ def test_doctor_warns_when_internal_api_path_mismatches_mount(
 def test_doctor_passes_proxy_headers_when_subpath_and_trust_proxy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_subpath_trust_ok.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(title='ST', settings=FluxlitSettings("
         "root_path='/content/1', trust_proxy=True, public_base_url='https://example.com', "
-        "gateway_port=59278))\n",
+        f"gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -376,12 +386,13 @@ def test_doctor_passes_proxy_headers_when_subpath_and_trust_proxy(
 def test_doctor_warns_when_trust_proxy_has_broad_forwarded_allow_ips(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_proxy_broad.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(settings=FluxlitSettings("
-        "trust_proxy=True, forwarded_allow_ips='*', gateway_port=59279))\n",
+        f"trust_proxy=True, forwarded_allow_ips='*', gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -395,13 +406,14 @@ def test_doctor_warns_when_trust_proxy_has_broad_forwarded_allow_ips(
 def test_doctor_warns_when_public_base_url_path_mismatches_root_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_public_base_mismatch.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(settings=FluxlitSettings("
         "root_path='/apps/demo', public_base_url='https://example.com/wrong', "
-        "gateway_port=59280))\n",
+        f"gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -415,11 +427,12 @@ def test_doctor_warns_when_public_base_url_path_mismatches_root_path(
 def test_doctor_fails_missing_streamlit_upstream_state_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_missing_upstream_file.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(settings=FluxlitSettings(gateway_port=59281))\n",
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -435,11 +448,12 @@ def test_doctor_fails_fluxlit_auth_extra_when_pyjwt_unimportable(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_jwt_blocked.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(title='B', settings=FluxlitSettings(gateway_port=59301))\n",
+        f"app = FluxLit(title='B', settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -461,11 +475,12 @@ def test_doctor_fails_fluxlit_auth_extra_when_pyjwt_unimportable(
 def test_doctor_reports_auth_extra_when_jwt_env_set(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_jwt_env.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
-        "app = FluxLit(title='J', settings=FluxlitSettings(gateway_port=59299))\n",
+        f"app = FluxLit(title='J', settings=FluxlitSettings(gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -480,13 +495,14 @@ def test_doctor_reports_auth_extra_when_jwt_env_set(
 def test_doctor_warns_when_subpath_without_trust_proxy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_subpath_proxy.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(title='S', settings=FluxlitSettings("
         "root_path='/content/1', trust_proxy=False, public_base_url='https://example.com', "
-        "gateway_port=59277))\n",
+        f"gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -501,17 +517,18 @@ def test_doctor_warns_when_subpath_without_trust_proxy(
 def test_doctor_passes_when_internal_api_path_matches_mount(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    port = find_free_port()
     module_path = tmp_path / "doc_mount_ok.py"
     module_path.write_text(
         "from fluxlit import FluxLit\n"
         "from fluxlit.config import FluxlitSettings\n\n"
         "app = FluxLit(title='M', settings=FluxlitSettings("
-        "api_mount_path='/api/v1', gateway_port=59204))\n",
+        f"api_mount_path='/api/v1', gateway_port={port}))\n",
         encoding="utf-8",
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", "http://127.0.0.1:59204/api/v1")
+    monkeypatch.setenv("FLUXLIT_INTERNAL_API_BASE", f"http://127.0.0.1:{port}/api/v1")
 
     runner = CliRunner()
     res = runner.invoke(app, ["doctor", "doc_mount_ok:app"])

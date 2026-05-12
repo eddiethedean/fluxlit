@@ -6,6 +6,11 @@ Environment variables (set by the parent process):
 - ``FLUXLIT_API_PREFIX`` — API mount path (e.g. ``/api``).
 - ``FLUXLIT_INTERNAL_API_BASE`` — base URL for :class:`~fluxlit.client.ApiClient`.
 
+When multiple pages are registered, the entrypoint reads ``?page=`` (or the key used by
+:func:`fluxlit.deep_links.match_nav_page`) before :func:`streamlit.navigation` so deep
+links and :class:`streamlit.testing.v1.AppTest` can open a specific page by title, path,
+or slug (see :mod:`fluxlit.testing` helpers).
+
 Do not import this module in library code; it executes Streamlit UI on import.
 """
 
@@ -17,6 +22,7 @@ from typing import Any, cast
 
 import streamlit as st
 
+from fluxlit.deep_links import match_nav_page, query_params
 from fluxlit.runtime import load_fluxlit
 from fluxlit.streamlit.page_config import build_set_page_config_kwargs
 
@@ -65,6 +71,12 @@ def run_streamlit_entrypoint() -> None:
         st.title(fluxlit_app.settings.title)
         st.info('Register UI with `@app.page("/")` on functions that accept `(st, client)`.')
     else:
+        matched = match_nav_page(query_params(st), fluxlit_app.pages)
+        if matched is not None:
+            want_slug = matched[0].strip("/") or "home"
+            for pg in nav_pages:
+                if pg.url_path == want_slug:
+                    st.switch_page(pg)
         st.navigation(nav_pages).run()
 
 

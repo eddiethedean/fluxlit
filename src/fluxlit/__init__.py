@@ -3,7 +3,8 @@
 FluxLit unifies **FastAPI** and **Streamlit** behind one ASGI gateway: use
 :class:`~fluxlit.app.FluxLit` for routes and pages, :class:`~fluxlit.client.ApiClient`
 from Streamlit for server-side HTTP to your API, and :class:`~fluxlit.testing.FluxLitTestClient`
-in tests.
+in tests (with :func:`~fluxlit.testing.apptest_select_page` and
+``assert_no_streamlit_exception`` helpers).
 
 The ``fluxlit`` console script (see :mod:`fluxlit.cli`) runs the combined dev/prod stack.
 
@@ -40,7 +41,13 @@ from fluxlit.auth.streamlit import (
 from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
 from fluxlit.deep_links import match_nav_page, query_params
-from fluxlit.testing import FluxLitTestClient, streamlit_main_path
+from fluxlit.testing import (
+    FluxLitTestClient,
+    apptest_assert_no_errors,
+    apptest_select_page,
+    assert_no_streamlit_exception,
+    streamlit_main_path,
+)
 from fluxlit.tracing import reset_trace_hook, set_trace_hook, trace_span
 from fluxlit.url_session import (
     InMemorySessionStore,
@@ -54,6 +61,9 @@ from fluxlit.url_session import (
 __all__ = [
     "ApiClient",
     "FluxLitTestClient",
+    "apptest_assert_no_errors",
+    "apptest_select_page",
+    "assert_no_streamlit_exception",
     "FluxlitSettings",
     "FluxLit",
     "FluxLitPublicUrls",

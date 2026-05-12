@@ -196,6 +196,29 @@ not missing (``200`` or common redirect codes). Optional ``root_path=`` matches 
 
 Pass ``query_params=`` to :meth:`~fluxlit.testing.FluxLitTestClient.streamlit` to seed
 ``AppTest.query_params`` before the first ``run()`` (same pattern as {doc}`deep-links`).
+The bundled entrypoint (:mod:`fluxlit.streamlit.main`) calls
+:func:`fluxlit.deep_links.match_nav_page` before :func:`streamlit.navigation`, so a
+``page`` query value can open a registered FluxLit page (by **title**, **path**, or
+**slug**).
+
+### AppTest navigation helpers
+
+- :meth:`~fluxlit.testing.FluxLitTestClient.assert_no_streamlit_exception` (and
+  :func:`fluxlit.testing.apptest_assert_no_errors`) fail if ``AppTest`` collected
+  ``st.exception`` or ``st.error``.
+- :meth:`~fluxlit.testing.FluxLitTestClient.select_page` (and
+  :func:`fluxlit.testing.apptest_select_page`) set ``at.query_params`` and ``run()``
+  again with the same ``FLUXLIT_*`` patch as :meth:`~fluxlit.testing.FluxLitTestClient.streamlit`
+  (pass ``target=`` and ``extra_sys_path=`` like the first call).
+
+```python
+from fluxlit import FluxLit, FluxLitTestClient
+
+tc = FluxLitTestClient(FluxLit())
+at = tc.streamlit(target="my_pkg.app:app", extra_sys_path=".", query_params={"page": "Admin"})
+tc.assert_no_streamlit_exception(at)
+at_home = tc.select_page(at, "Home", target="my_pkg.app:app", extra_sys_path=".")
+```
 
 ### Bearer tokens: `with_bearer`, `for_fluxlit`, and the injected `client`
 

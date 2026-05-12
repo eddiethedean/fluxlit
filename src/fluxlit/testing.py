@@ -27,6 +27,63 @@ def streamlit_main_path() -> Path:
     return Path(__file__).resolve().parent / "streamlit" / "main.py"
 
 
+def apptest_assert_no_errors(at: Any) -> None:
+    """Raise :class:`AssertionError` if ``AppTest`` captured ``st.exception`` or ``st.error``.
+
+    Use after :meth:`FluxLitTestClient.streamlit` (or any ``AppTest`` run) to fail fast
+    when the script surfaced an error to users.
+    """
+    exc = getattr(at, "exception", None)
+    if exc is not None and len(exc) > 0:
+        details = [getattr(x, "value", repr(x)) for x in exc]
+        msg = f"AppTest captured st.exception: {details!r}"
+        raise AssertionError(msg)
+    err = getattr(at, "error", None)
+    if err is not None and len(err) > 0:
+        details = [getattr(x, "value", repr(x)) for x in err]
+        msg = f"AppTest captured st.error: {details!r}"
+        raise AssertionError(msg)
+
+
+def assert_no_streamlit_exception(at: Any) -> None:
+    """Alias for :func:`apptest_assert_no_errors` (Streamlit ``AppTest`` naming)."""
+    apptest_assert_no_errors(at)
+
+
+def apptest_select_page(
+    at: Any,
+    client: FluxLitTestClient,
+    *,
+    target: str,
+    page: str,
+    internal_api_base: str | None = None,
+    extra_sys_path: str | Path | None = None,
+    page_key: str = "page",
+) -> Any:
+    """Set ``page`` query key and ``run()`` with the same ``FLUXLIT_*`` patch as ``streamlit``.
+
+    ``AppTest.run`` does not automatically keep ``FLUXLIT_*`` variables from the first
+    :meth:`FluxLitTestClient.streamlit` call; this helper re-applies the same patch
+    :meth:`FluxLitTestClient.streamlit` uses so the entrypoint can resolve ``target``
+    again after you change ``at.query_params``.
+    """
+    _import_streamlit()
+    internal = internal_api_base or f"http://127.0.0.1:1{client._normalized_api_prefix()}"
+    at.query_params[page_key] = page
+    with (
+        _patched_env(
+            {
+                "FLUXLIT_APP": target,
+                "FLUXLIT_INTERNAL_API_BASE": internal,
+                "FLUXLIT_API_PREFIX": client.api_prefix,
+                "FLUXLIT_TESTS": "1",
+            }
+        ),
+        _maybe_syspath(extra_sys_path),
+    ):
+        return at.run()
+
+
 @dataclass(frozen=True)
 class FluxLitTestClient:
     """Test harness that mirrors production routing (API prefix + gateway).
@@ -42,6 +99,12 @@ class FluxLitTestClient:
 
     **Streamlit** — :meth:`streamlit` runs ``AppTest`` against :mod:`fluxlit.streamlit.main`
     with the same environment variables the runtime sets.
+
+    **AppTest multipage** — :meth:`assert_no_streamlit_exception` fails on ``st.error`` /
+    ``st.exception``. :meth:`select_page` sets ``?page=`` and reruns; the entrypoint
+    honors :func:`fluxlit.deep_links.match_nav_page` before :func:`streamlit.navigation`.
+    Module-level :func:`apptest_assert_no_errors`, :func:`assert_no_streamlit_exception`,
+    and :func:`apptest_select_page` mirror the same behavior.
     """
 
     app: FluxLit
@@ -179,6 +242,31 @@ class FluxLitTestClient:
                     at.query_params[key] = value
             return at.run()
 
+    def assert_no_streamlit_exception(self, at: Any) -> None:
+        """Fail if *at* collected ``st.exception`` or ``st.error`` blocks."""
+        apptest_assert_no_errors(at)
+
+    def select_page(
+        self,
+        at: Any,
+        page: str,
+        *,
+        target: str,
+        internal_api_base: str | None = None,
+        extra_sys_path: str | Path | None = None,
+        page_key: str = "page",
+    ) -> Any:
+        """Set query key and ``run()`` again with ``target`` env (same patch as ``streamlit``)."""
+        return apptest_select_page(
+            at,
+            self,
+            target=target,
+            page=page,
+            internal_api_base=internal_api_base,
+            extra_sys_path=extra_sys_path,
+            page_key=page_key,
+        )
+
 
 def _import_streamlit() -> Any:
     try:
@@ -218,3 +306,12 @@ def _maybe_syspath(extra: str | Path | None) -> Iterator[None]:
     finally:
         with contextlib.suppress(ValueError):
             sys.path.remove(p)
+
+
+__all__ = [
+    "FluxLitTestClient",
+    "apptest_assert_no_errors",
+    "apptest_select_page",
+    "assert_no_streamlit_exception",
+    "streamlit_main_path",
+]
