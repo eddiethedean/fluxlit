@@ -95,7 +95,7 @@ def make_gateway_app(
                         "headers": [(b"content-type", ct_b)],
                     }
                 )
-                await send({"type": "http.response.body", "body": body})
+                await send({"type": "http.response.body", "body": body, "more_body": False})
                 return
             if (
                 scope["type"] == "http"
@@ -118,7 +118,7 @@ def make_gateway_app(
                         "headers": [(b"content-type", b"application/json; charset=utf-8")],
                     }
                 )
-                await send({"type": "http.response.body", "body": body})
+                await send({"type": "http.response.body", "body": body, "more_body": False})
                 return
             qs_raw = scope.get("query_string", b"") or b""
             try:

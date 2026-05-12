@@ -51,6 +51,7 @@ def test_oidc_bff_login_callback_exchange() -> None:
         token_audience="app",
         access_token_ttl_seconds=600,
         public_base_url="http://testserver",
+        allow_unverified_id_token_for_custom_oidc=True,
     )
     register_oidc_bff_routes(app, cfg)
     client = TestClient(app)
@@ -85,6 +86,7 @@ def test_oidc_login_redirect_uri_uses_public_base_and_callback_path() -> None:
         first_party_secret="bff-first-party-secret-32bytes-x",
         public_base_url="https://customer.example/connect",
         callback_path="/api/auth/callback",
+        allow_unverified_id_token_for_custom_oidc=True,
     )
     register_oidc_bff_routes(app, cfg)
     client = TestClient(app)
@@ -102,6 +104,7 @@ def test_oidc_bff_exchange_rejects_reuse() -> None:
         oidc=_StubOIDC(),
         first_party_secret="bff-first-party-secret-32bytes-x",
         public_base_url="http://testserver",
+        allow_unverified_id_token_for_custom_oidc=True,
     )
     register_oidc_bff_routes(app, cfg)
     client = TestClient(app)

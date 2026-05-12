@@ -1,4 +1,9 @@
-"""HTTP reverse proxy from ASGI to Streamlit upstream (httpx)."""
+"""HTTP reverse proxy from ASGI to Streamlit upstream (httpx).
+
+Responses are read with ``stream=False`` and the full body buffered before returning
+to the client; very large upstream payloads can use significant memory. For limits on
+**request** bodies proxied to Streamlit, see ``gateway_max_proxy_request_body_bytes``.
+"""
 
 from __future__ import annotations
 

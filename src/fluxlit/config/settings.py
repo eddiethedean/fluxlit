@@ -8,8 +8,8 @@ from typing import Any
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from fluxlit.config.json_types import JsonValue
 from fluxlit.api_mount import normalize_api_mount_path
+from fluxlit.config.json_types import JsonValue
 
 
 class FluxlitSettings(BaseSettings):
@@ -152,7 +152,9 @@ class FluxlitSettings(BaseSettings):
         ge=0,
         description=(
             "Max incoming request body bytes proxied to Streamlit; ``0`` means unlimited. "
-            "When exceeded, the gateway responds with **413**."
+            "When exceeded, the gateway responds with **413**. "
+            "Upstream **responses** are fully buffered in the gateway process (see gateway proxy "
+            "notes); tune Streamlit/file responses separately if memory is a concern."
         ),
     )
     gateway_max_concurrent_upstream_http: int = Field(

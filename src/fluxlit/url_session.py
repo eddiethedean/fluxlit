@@ -70,7 +70,7 @@ class InMemorySessionStore:
 
     def _trim_size(self) -> None:
         while len(self._data) > self._max_entries:
-            # Drop arbitrary oldest bucket: simple pop of first key
+            # Dict iteration order: pop oldest insertion (not LRU by last access).
             self._data.pop(next(iter(self._data)))
 
     def get(self, session_id: str) -> dict[str, JsonValue] | None:
@@ -91,6 +91,14 @@ class InMemorySessionStore:
         *,
         ttl_seconds: float | None = None,
     ) -> None:
+        """Persist *data* for *session_id*; optional time-to-live in seconds.
+
+        TTL semantics: ``ttl_seconds`` is ``None`` → use ``default_ttl_seconds`` (which may
+        itself be ``None`` for no expiry). A **positive** value sets a monotonic deadline.
+        ``ttl_seconds`` of ``0`` does **not** mean "expire immediately"; it is treated like
+        "no TTL window" for this write (same as a negative value would be if passed, though
+        callers should use ``None`` for no expiry).
+        """
         self._evict_expired()
         ttl = self._default_ttl if ttl_seconds is None else ttl_seconds
         deadline: float | None = None

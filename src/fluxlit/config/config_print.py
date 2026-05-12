@@ -6,8 +6,8 @@ import os
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from fluxlit.config.project import ProjectConfig
 from fluxlit.api_mount import normalize_api_mount_path
+from fluxlit.config.project import ProjectConfig
 from fluxlit.runtime.import_target import internal_api_base_url
 
 if TYPE_CHECKING:

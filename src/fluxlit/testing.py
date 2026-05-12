@@ -12,8 +12,8 @@ from typing import Any
 import httpx
 from starlette.testclient import TestClient
 
-from fluxlit.app import FluxLit
 from fluxlit.api_mount import normalize_api_mount_path
+from fluxlit.app import FluxLit
 from fluxlit.gateway import build_gateway
 from fluxlit.gateway.paths import normalize_root_mount
 

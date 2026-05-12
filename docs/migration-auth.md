@@ -200,3 +200,9 @@ fluxlit doctor app:app
 ```
 
 See {doc}`security` for threats and token placement, {doc}`secrets` for rotation and avoiding leaks in logs, {doc}`production-tls` for proxies and TLS, and {doc}`auth-recipes` for copy-paste examples (forward-auth, API keys, JWKS).
+
+## FluxLit 0.8.1 (auth and internal client)
+
+- **OIDC BFF (custom provider):** If you call {func}`fluxlit.oidc.register_oidc_bff_routes` with a custom {class}`~fluxlit.oidc.OIDCProvider` (anything other than {class}`~fluxlit.oidc.GenericOIDCClient`), set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` only when that provider already verified ``id_token`` or for tests. Prefer ``GenericOIDCClient`` in production so the BFF validates with JWKS.
+- **`ApiClient`:** Paths passed to ``get`` / ``post`` / ``request`` must be **relative** to the API base; absolute or scheme-relative URL strings raise ``ValueError``.
+- **`public_base_url`:** Leave unset only for local experiments; production should set ``FLUXLIT_PUBLIC_BASE_URL`` (or ``OIDCBFFConfig.public_base_url``) so OAuth redirect URIs are stable behind proxies. An empty value now triggers a ``UserWarning`` when routes are registered.

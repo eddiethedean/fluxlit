@@ -10,6 +10,7 @@ import hashlib
 import json
 import secrets
 import time
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from urllib.parse import urlencode, urlparse, urlunparse
@@ -179,6 +180,14 @@ class OIDCBFFConfig:
     id_token_leeway_seconds: int = 0
     """Clock skew leeway (seconds) when validating ``id_token`` with JWKS."""
 
+    allow_unverified_id_token_for_custom_oidc: bool = False
+    """If True, allow non-:class:`GenericOIDCClient` providers to use parse-only ``sub``.
+
+    Default ``False``: custom :class:`OIDCProvider` callbacks reject minting tokens from
+    ``id_token`` without JWKS verification. Set ``True`` only when the provider verifies
+    tokens before returning them, or for tests.
+    """
+
 
 def _purge_expired(store: dict[str, tuple[str, float]], ttl: float, now: float) -> None:
     expired = [k for k, (_, t0) in store.items() if now - t0 > ttl]
@@ -197,6 +206,15 @@ def register_oidc_bff_routes(
     router_prefix: str = "",
 ) -> APIRouter:
     """Attach login, OAuth callback, and Streamlit-friendly token exchange routes."""
+    if not (config.public_base_url or "").strip():
+        warnings.warn(
+            (
+                "OIDCBFFConfig.public_base_url is empty: OAuth redirect_uri and post-login "
+                "URLs use request.base_url, which can be wrong behind proxies. Set "
+                "public_base_url or FLUXLIT_PUBLIC_BASE_URL in production."
+            ),
+            stacklevel=2,
+        )
     router = APIRouter(prefix=router_prefix, tags=["auth"])
 
     def redirect_uri(request: Request) -> str:
@@ -317,6 +335,15 @@ def _resolve_id_token_sub(*, id_token: str, config: OIDCBFFConfig) -> str:
             jwks_uri=doc.jwks_uri,
             audience=aud,
             leeway=config.id_token_leeway_seconds,
+        )
+    if not config.allow_unverified_id_token_for_custom_oidc:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Custom OIDCProvider requires JWKS validation via GenericOIDCClient, or set "
+                "OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True (insecure unless "
+                "your provider verifies id_token before returning it)."
+            ),
         )
     return _subject_from_id_token_parse_only(id_token)
 

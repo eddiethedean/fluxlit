@@ -265,7 +265,12 @@ def test_bff_callback_missing_code_or_state() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_MiniOidc(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_MiniOidc(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     c = TestClient(app)
     assert c.get("/auth/callback", params={"code": "", "state": "s"}).status_code == 400
@@ -276,7 +281,12 @@ def test_bff_callback_invalid_state() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_MiniOidc(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_MiniOidc(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     c = TestClient(app)
     assert c.get("/auth/callback", params={"code": "c", "state": "unknown"}).status_code == 400
@@ -290,7 +300,12 @@ def test_bff_callback_missing_id_token() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_NoIdToken(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_NoIdToken(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     c = TestClient(app)
     r1 = c.get("/auth/login", follow_redirects=False)
@@ -307,7 +322,12 @@ def test_bff_callback_invalid_id_token_jwt() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_BadIdToken(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_BadIdToken(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     c = TestClient(app)
     r1 = c.get("/auth/login", follow_redirects=False)
@@ -330,7 +350,12 @@ def test_bff_callback_id_token_missing_sub() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_NoSub(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_NoSub(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     c = TestClient(app)
     r1 = c.get("/auth/login", follow_redirects=False)
@@ -343,7 +368,12 @@ def test_exchange_validates_min_code_length() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_MiniOidc(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_MiniOidc(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     assert TestClient(app).post("/auth/exchange", json={"code": "short"}).status_code == 422
 
@@ -394,6 +424,7 @@ def test_bff_callback_generic_oidc_uses_jwks_verify(monkeypatch: pytest.MonkeyPa
             oidc=oidc,
             first_party_secret="bff-first-party-secret-32bytes-x",
             id_token_leeway_seconds=5,
+            public_base_url="http://testserver",
         ),
     )
     c = TestClient(app)
@@ -430,7 +461,12 @@ def test_bff_auth_exchange_code_is_single_use() -> None:
     app = FastAPI()
     register_oidc_bff_routes(
         app,
-        OIDCBFFConfig(oidc=_WithIdToken(), first_party_secret="bff-first-party-secret-32bytes-x"),
+        OIDCBFFConfig(
+            oidc=_WithIdToken(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=True,
+        ),
     )
     c = TestClient(app)
     r1 = c.get("/auth/login", follow_redirects=False)
@@ -490,6 +526,7 @@ def test_bff_callback_generic_oidc_custom_id_token_audience(
             oidc=oidc,
             first_party_secret="bff-first-party-secret-32bytes-x",
             id_token_audience="custom-resource-id",
+            public_base_url="http://testserver",
         ),
     )
     c = TestClient(app)
@@ -498,6 +535,30 @@ def test_bff_callback_generic_oidc_custom_id_token_audience(
     r2 = c.get("/auth/callback", params={"code": "c", "state": state}, follow_redirects=False)
     assert r2.status_code == 302
     assert captured["audience"] == "custom-resource-id"
+
+
+def test_bff_callback_custom_oidc_requires_allow_unverified_flag() -> None:
+    """Parse-only id_token path is opt-in for non-GenericOIDCClient."""
+
+    class _ReturnsIdToken(_MiniOidc):
+        def exchange_code(self, **_: object) -> dict[str, str]:
+            return {"id_token": "a.b.c", "access_token": "at"}
+
+    app = FastAPI()
+    register_oidc_bff_routes(
+        app,
+        OIDCBFFConfig(
+            oidc=_ReturnsIdToken(),
+            first_party_secret="bff-first-party-secret-32bytes-x",
+            public_base_url="http://testserver",
+            allow_unverified_id_token_for_custom_oidc=False,
+        ),
+    )
+    c = TestClient(app)
+    r1 = c.get("/auth/login", follow_redirects=False)
+    state = parse_qs(urlparse(r1.headers["location"]).query)["state"][0]
+    r2 = c.get("/auth/callback", params={"code": "c", "state": state}, follow_redirects=False)
+    assert r2.status_code == 500
 
 
 def test_verify_id_token_jwks_invalid_token_raises_502() -> None:

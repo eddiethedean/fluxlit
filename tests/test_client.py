@@ -328,3 +328,21 @@ def test_fluxlit_get_client_and_for_fluxlit_share_httpx_base_url(
     finally:
         injected.close()
         auth.close()
+
+
+@pytest.mark.parametrize(
+    "bad_path",
+    [
+        "http://evil.example/x",
+        "https://evil.example/x",
+        "//evil.example/x",
+        "/../http://evil.example/x",
+    ],
+)
+def test_api_client_rejects_absolute_and_scheme_relative_paths(
+    monkeypatch: pytest.MonkeyPatch, bad_path: str
+) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    with ApiClient(base_url="http://127.0.0.1:8000/api") as client:
+        with pytest.raises(ValueError, match="relative"):
+            client.get(bad_path)

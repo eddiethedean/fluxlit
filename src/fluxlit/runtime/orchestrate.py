@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING
 
 from starlette.types import ASGIApp
 
-from fluxlit.gateway import build_gateway, normalize_root_mount
 from fluxlit.api_mount import normalize_api_mount_path
+from fluxlit.gateway import build_gateway, normalize_root_mount
 from fluxlit.runtime.import_target import (
     find_free_port,
     internal_api_base_url,

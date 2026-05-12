@@ -125,6 +125,7 @@ async def proxy_websocket(
                 tg.start_soon(upstream_to_client)
     except (
         OSError,
+        TimeoutError,
         websockets.InvalidURI,
         websockets.InvalidHandshake,
         websockets.NegotiationError,

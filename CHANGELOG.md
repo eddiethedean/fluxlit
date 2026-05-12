@@ -2,13 +2,18 @@
 
 ## Unreleased
 
-## 0.8.1 - 2026-05-13
+## 0.8.1 - 2026-05-12
 
 - **Gateway / settings:** ``normalize_api_mount_path`` in ``fluxlit.api_mount`` aligns gateway dispatch with ``internal_api_base_url`` and ``FluxLitPublicUrls`` when ``api_mount_path`` / ``FLUXLIT_API_MOUNT_PATH`` omits a leading slash (e.g. ``api`` → ``/api``); :class:`~fluxlit.config.FluxlitSettings` validates ``api_mount_path``; ``create_gateway_app`` normalizes ``FLUXLIT_API_PREFIX`` the same way.
-- **Docs:** README coverage wording matches CI (100% line coverage; one test-helper ``pragma: no cover``); historical CHANGELOG CI note uses ``--cov-fail-under=100``; ``docs/testing.md`` documents ``ty-check`` as a required workflow job.
+- **Gateway:** WebSocket upstream ``websockets.connect`` **timeouts** (``TimeoutError``) are caught and the client socket is closed with code **1011** instead of leaking an ASGI exception.
+- **Gateway:** Prometheus and debug JSON ASGI responses set ``more_body: false`` on the terminal body message (stricter ASGI consumers).
+- **Client:** :class:`~fluxlit.client.ApiClient` rejects absolute and scheme-relative ``path`` values so httpx cannot bypass ``base_url`` to another host (:class:`ValueError`).
+- **OIDC BFF:** :class:`~fluxlit.auth.oidc.OIDCBFFConfig` adds ``allow_unverified_id_token_for_custom_oidc`` (default ``False``). Non-:class:`~fluxlit.auth.oidc.GenericOIDCClient` providers must set it to ``True`` to keep parse-only ``id_token`` ``sub`` extraction (tests or providers that verify tokens themselves). Empty ``public_base_url`` now emits a **runtime warning** at route registration.
+- **Docs / observability:** HTTP gateway proxy module and ``gateway_max_proxy_request_body_bytes`` document full upstream **response** buffering; :class:`~fluxlit.url_session.InMemorySessionStore` documents ``ttl_seconds=0`` semantics and trims oversize stores by **oldest insertion** order.
+- **Docs:** README coverage wording matches CI (100% line coverage; one test-helper ``pragma: no cover``); historical CHANGELOG CI note uses ``--cov-fail-under=100``; ``docs/testing.md`` documents ``ty-check`` as a required workflow job; ``docs/security.md`` and ``docs/migration-auth.md`` cover the above auth/client changes.
 - **CI:** ``ty-check`` no longer uses ``continue-on-error``.
 
-**Upgrading from 0.8.0:** No breaking API changes. If you pin FluxLit with an exact version (for example ``fluxlit==0.8.0`` in Compose lockfiles), bump to ``0.8.1``.
+**Upgrading from 0.8.0:** Bump pins (for example ``fluxlit==0.8.1`` in Compose lockfiles). If you use **custom** :class:`~fluxlit.auth.oidc.OIDCProvider` with :func:`~fluxlit.auth.oidc.register_oidc_bff_routes` (not :class:`~fluxlit.auth.oidc.GenericOIDCClient`), set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` **only** when your provider already verified ``id_token`` or in controlled tests; otherwise switch to ``GenericOIDCClient`` for JWKS validation. If :class:`~fluxlit.client.ApiClient` calls used absolute URLs as paths, switch to relative paths (or construct a separate httpx client for off-host calls).
 
 ## 0.8.0 - 2026-05-12
 

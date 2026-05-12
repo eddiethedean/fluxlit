@@ -9,7 +9,7 @@ Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recip
 ## OIDC BFF: production constraints
 
 - **Process memory only:** Login ``state`` and one-time ``auth_code`` values live in in-memory dicts on the BFF config. Use **a single API worker process** (or a single replica) unless you replace this with a shared store. Multiple Uvicorn workers or horizontally scaled replicas will see **broken or flaky logins** unless state is externalized.
-- **``id_token`` validation:** When you use {class}`~fluxlit.oidc.GenericOIDCClient`, the BFF validates the IdP ``id_token`` with **JWKS** (signature, ``iss``, ``aud``, ``exp``) before minting the first-party access token. Custom :class:`~fluxlit.oidc.OIDCProvider` implementations fall back to **parse-only** ``sub`` extraction (for tests and advanced integrations); do not point untrusted providers at that path in production.
+- **``id_token`` validation:** When you use {class}`~fluxlit.oidc.GenericOIDCClient`, the BFF validates the IdP ``id_token`` with **JWKS** (signature, ``iss``, ``aud``, ``exp``) before minting the first-party access token. For a **custom** :class:`~fluxlit.oidc.OIDCProvider`, parse-only ``sub`` extraction is **disabled by default**; set ``OIDCBFFConfig.allow_unverified_id_token_for_custom_oidc=True`` only when your provider already verified the token or for controlled tests (see {doc}`security`).
 
 ## Threat model (high level)
 
@@ -25,7 +25,7 @@ Step-by-step recipes (JWT, OIDC BFF, Streamlit clients) live in {doc}`auth-recip
 
 - **IdP client secrets:** FastAPI environment, secret manager, or deps — **never** in Streamlit subprocess env visible to untrusted code paths.
 - **Access tokens for `ApiClient`:** Prefer a factory (`auth_header_factory`) or session state populated **only** after a server-side exchange; TTL should be short.
-- **Internal API base:** `FLUXLIT_INTERNAL_API_BASE` points at your mounted API (e.g. `http://127.0.0.1:8000/api`). Keep it loopback or private-network in deployment guides.
+- **Internal API base:** `FLUXLIT_INTERNAL_API_BASE` points at your mounted API (e.g. `http://127.0.0.1:8000/api`). Keep it loopback or private-network in deployment guides. Server-side :class:`~fluxlit.client.ApiClient` rejects absolute and scheme-relative ``path`` arguments so ``httpx`` cannot be tricked into calling arbitrary hosts.
 
 ## End-to-end sketch (same origin)
 

@@ -30,11 +30,30 @@ T = TypeVar("T")
 AuthHeaderFactory = Callable[[], Mapping[str, str]]
 
 
+def _relative_api_path_or_raise(path: str) -> str:
+    """Normalize ``path`` for httpx merge with ``base_url``; reject absolute URLs.
+
+    httpx treats ``http://...`` (and similar) as overriding ``base_url``, which would
+    send requests off the intended gateway/API host.
+    """
+    url = path if path.startswith("/") else f"/{path}"
+    if "://" in url or url.startswith("//"):
+        msg = (
+            "ApiClient paths must be relative to the configured API base URL; "
+            f"absolute and scheme-relative fragments are rejected (got {path!r})"
+        )
+        raise ValueError(msg)
+    return url
+
+
 class ApiClient:
     """Sync HTTPX client scoped to your gateway-mounted API.
 
     Paths are relative to the API base (including the ``/api`` prefix in the base URL).
     For example use ``client.get("/users")``, not ``client.get("/api/users")``.
+    Paths must not be absolute URLs (``http://...``) or scheme-relative (``//...``);
+    those are rejected with :class:`ValueError` so user-controlled strings cannot bypass
+    ``base_url`` to another host.
 
     Use :meth:`for_fluxlit` or :meth:`with_bearer` when routes require ``Authorization``.
 
@@ -158,8 +177,12 @@ class ApiClient:
         timeout: TimeoutTypes | UseClientDefault = USE_CLIENT_DEFAULT,
         extensions: RequestExtensions | None = None,
     ) -> httpx.Response:
-        """Send a request; ``path`` may omit a leading slash."""
-        url = path if path.startswith("/") else f"/{path}"
+        """Send a request; ``path`` may omit a leading slash.
+
+        Raises:
+            ValueError: If ``path`` is an absolute or scheme-relative URL (see class doc).
+        """
+        url = _relative_api_path_or_raise(path)
         merged_headers = self._build_request_headers(headers)
         return self._client.request(
             method,

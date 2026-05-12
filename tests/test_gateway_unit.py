@@ -680,6 +680,52 @@ async def test_proxy_websocket_rejects_non_connect_first_message() -> None:
 
 
 @pytest.mark.asyncio
+async def test_proxy_websocket_connect_timeout_closes_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``websockets.connect`` open_timeout raises ``TimeoutError``; must not escape ASGI."""
+
+    class _TimeoutOnEnterCM:
+        async def __aenter__(self) -> object:
+            raise TimeoutError()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    def _fake_connect(*_a: object, **_kw: object) -> _TimeoutOnEnterCM:
+        return _TimeoutOnEnterCM()
+
+    monkeypatch.setattr("fluxlit.gateway.websocket_proxy.websockets.connect", _fake_connect)
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        return {"type": "websocket.connect"}
+
+    await _proxy_websocket(
+        {
+            "type": "websocket",
+            "path": "/_stcore/stream",
+            "headers": [(b"host", b"example")],
+            "query_string": b"",
+            "subprotocols": ["streamlit"],
+            "scheme": "http",
+            "client": ("1.2.3.4", 1),
+        },
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-timeout-rid",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert sent == [{"type": "websocket.close", "code": 1011}]
+
+
+@pytest.mark.asyncio
 async def test_proxy_websocket_options_and_bidirectional_bytes_text(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
