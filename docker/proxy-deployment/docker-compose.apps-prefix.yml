@@ -1,0 +1,18 @@
+# Merge with docker-compose.yml: strip-prefix proxy for /apps/my-app/ (multi-segment path).
+#   docker compose -f docker-compose.yml -f docker-compose.apps-prefix.yml up --build
+# Public URL: http://127.0.0.1:8083/apps/my-app/
+#
+# FluxLit must use the same browser-visible prefix (FLUXLIT_ROOT_PATH) and trust
+# X-Forwarded-* from nginx (FLUXLIT_TRUST_PROXY, set in the image Dockerfile).
+
+services:
+  fluxlit:
+    environment:
+      FLUXLIT_ROOT_PATH: /apps/my-app
+      FLUXLIT_PUBLIC_BASE_URL: http://127.0.0.1:8083/apps/my-app
+
+  nginx:
+    ports:
+      - "8083:80"
+    volumes:
+      - ./nginx-apps-prefix.conf:/etc/nginx/conf.d/default.conf:ro

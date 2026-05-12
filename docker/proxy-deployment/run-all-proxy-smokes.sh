@@ -12,6 +12,7 @@ fi
 cleanup() {
   docker compose -f docker-compose.yml -f docker-compose.root.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml down -v 2>/dev/null || true
+  docker compose -f docker-compose.yml -f docker-compose.apps-prefix.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml -f docker-compose.fullpath.yml down -v 2>/dev/null || true
   docker compose -f docker-compose.yml -f docker-compose.https.yml down -v 2>/dev/null || true
 }
@@ -26,6 +27,11 @@ echo "=== Strip-prefix proxy (8080) ==="
 docker compose -f docker-compose.yml up -d --build
 BASE_URL=http://127.0.0.1:8080 ./smoke-test.sh
 docker compose -f docker-compose.yml down -v
+
+echo "=== Strip-prefix /apps/my-app (8083) ==="
+docker compose -f docker-compose.yml -f docker-compose.apps-prefix.yml up -d --build
+PUBLIC_PREFIX=/apps/my-app BASE_URL=http://127.0.0.1:8083 ./smoke-test.sh
+docker compose -f docker-compose.yml -f docker-compose.apps-prefix.yml down -v
 
 echo "=== Full-path proxy (8081) ==="
 docker compose -f docker-compose.yml -f docker-compose.fullpath.yml up -d --build

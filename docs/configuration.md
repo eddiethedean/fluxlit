@@ -95,6 +95,8 @@ log_level = "info"
 | `FLUXLIT_JWT_LEEWAY_SECONDS` | Clock skew leeway for JWT validation (default `0`). |
 | `FLUXLIT_OIDC_BFF_SECRET` | Secret for first-party JWTs after OIDC callback; used by :meth:`fluxlit.app.FluxLit.attach_oidc_login` when `first_party_secret` is omitted. |
 
+For a **multi-segment** mount such as **`/apps/my-app`** (nginx, `FLUXLIT_PUBLIC_BASE_URL`, WebSockets, and **`fluxlit doctor`** troubleshooting), see {ref}`path-prefix-apps` in {doc}`production-tls`.
+
 **Passthrough caveats:** Do not use `FLUXLIT_STREAMLIT_RUN_CLI_ARGS` to set sidecar `--server.port`, `--server.address`, or `--server.baseUrlPath` (FluxLit assigns these; overrides break the parent process and gateway). In `FLUXLIT_CORS_MIDDLEWARE_KWARGS`, do not repeat `allow_origins`, `allow_credentials`, `allow_methods`, or `allow_headers` (FluxLit sets those from the dedicated fields; duplicates are ignored). Constructor `fastapi_kwargs` cannot change FastAPI `title` or `root_path`; they always follow `FluxlitSettings` so the API matches the public mount and Streamlit.
 
 Gateway proxy fields also exist on {class}`~fluxlit.config.FluxlitSettings` as `gateway_*` / `uvicorn_graceful_shutdown_timeout_s` for use from Python (e.g. tests or `FluxLit(settings=...)`). JSON log formatting is not configured via env; attach {class}`~fluxlit.logging.JsonLogFormatter` in your logging setup — see {doc}`observability`.

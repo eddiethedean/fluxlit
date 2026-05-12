@@ -290,7 +290,7 @@ docker compose -f docker/proxy-deployment/docker-compose.yml up --build
 ./docker/proxy-deployment/smoke-test.sh
 ```
 
-See [docker/proxy-deployment/README.md](../docker/proxy-deployment/README.md) for full-path, TLS, and `run-all-proxy-smokes.sh`.
+See [docker/proxy-deployment/README.md](../docker/proxy-deployment/README.md) for full-path, TLS, **`/apps/my-app`** strip-prefix (port **8083**), and `run-all-proxy-smokes.sh`.
 
 ## OpenAPI contract
 

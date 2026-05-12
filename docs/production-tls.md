@@ -40,6 +40,61 @@ proxy_set_header X-Forwarded-Proto $scheme;
 
 The repo’s **`docker/proxy-deployment/nginx.conf`** is the maintained reference for strip-prefix and subpath smoke tests.
 
+(path-prefix-apps)=
+
+## Path-prefixed mount (`/apps/my-app`)
+
+Many platforms expose apps under a **namespace path** (for example `/apps/<name>/` on a shared host). FluxLit needs three things to line up: the **browser-visible prefix** (`FLUXLIT_ROOT_PATH`), **proxy trust** so scheme/host come from your edge (`FLUXLIT_TRUST_PROXY` / `FLUXLIT_FORWARDED_ALLOW_IPS`), and—when you use OAuth or absolute links—**`FLUXLIT_PUBLIC_BASE_URL`** pointing at the same origin + path users open.
+
+### nginx: HTTP + WebSockets (strip prefix)
+
+Forward **`/apps/my-app/`** to the gateway and **strip** that prefix before it reaches Uvicorn (same pattern as **`docker/proxy-deployment/nginx.conf`**, which uses `/myapp/`). WebSockets use **`Upgrade`** / **`Connection`** and a long **`proxy_read_timeout`** because Streamlit keeps **`/_stcore/stream`** open.
+
+Maintained reference for the **`/apps/my-app/`** shape: **`docker/proxy-deployment/nginx-apps-prefix.conf`**. Bring it up with:
+
+```bash
+docker compose -f docker/proxy-deployment/docker-compose.yml \
+  -f docker/proxy-deployment/docker-compose.apps-prefix.yml up --build
+```
+
+### Environment (container or process)
+
+| Variable | Example | Role |
+|----------|---------|------|
+| `FLUXLIT_ROOT_PATH` | `/apps/my-app` | Must match the path segment users type after the host (no trailing slash). |
+| `FLUXLIT_TRUST_PROXY` | `1` | Lets Uvicorn honor **`X-Forwarded-Proto`**, **`X-Forwarded-For`**, **`X-Forwarded-Host`** from nginx. |
+| `FLUXLIT_FORWARDED_ALLOW_IPS` | Your LB CIDRs | **Not** `*` in production if clients can reach the app without passing through the proxy; see above. |
+| `FLUXLIT_PUBLIC_BASE_URL` | `https://portal.example.com/apps/my-app` | OAuth redirect base and stable absolute links; include the path when the app is not at `/`. |
+
+TLS usually terminates **at nginx or an ingress** in front of FluxLit. Set **`X-Forwarded-Proto: https`** from the TLS listener (or `$scheme` on an HTTPS `server` block), not from client-controlled input.
+
+### Generated URL shapes (browser → gateway)
+
+Assume public origin `https://portal.example.com` and mount `/apps/my-app` (strip-prefix proxy). Typical URLs:
+
+| User-facing URL | Served by |
+|-----------------|-----------|
+| `https://portal.example.com/apps/my-app/` | Streamlit shell (HTML + `/_stcore/...` assets) |
+| `https://portal.example.com/apps/my-app/api/docs` | Swagger UI (FastAPI OpenAPI) |
+| `https://portal.example.com/apps/my-app/api/healthz` | Liveness JSON |
+| `https://portal.example.com/apps/my-app/api/readyz` | Readiness JSON |
+| `wss://portal.example.com/apps/my-app/_stcore/stream` | Streamlit WebSocket (subprotocol `streamlit`) |
+
+In Python, prefer **`FluxLit.urls`** ({attr}`~fluxlit.app.FluxLit.urls`) so links follow `FLUXLIT_ROOT_PATH` and forwarded scheme/host; see {doc}`configuration` (“Public URL helpers”).
+
+### TLS termination and trust
+
+- **Terminate TLS** where you run your certificates (ingress, CDN, nginx). FluxLit still sees plain HTTP on the container port; it must receive **`X-Forwarded-Proto: https`** when you enable **`FLUXLIT_ENABLE_SECURITY_HEADERS`** so HSTS is only sent over HTTPS.
+- **Forwarded IP trust:** If **`FLUXLIT_TRUST_PROXY`** is on and **`FLUXLIT_FORWARDED_ALLOW_IPS`** is unset, Uvicorn defaults to **`*`** (trust every peer). Tighten to your reverse-proxy IP ranges so clients cannot spoof **`X-Forwarded-For`** from inside the trusted hop.
+
+### Troubleshooting with `fluxlit doctor` and debug
+
+1. Run **`fluxlit doctor app:app`** (or your import path) **inside the same image/env** as production. Inspect **WARN**/**FAIL** rows for `forwarded_allow_ips`, `public_base_url`, `proxy_headers`, and `import_shadowing`.
+2. With **`FLUXLIT_DEBUG=1`**, use **`GET …/__fluxlit/debug`** (when not shadowed by `api_mount_path`) for a redacted view of effective settings and recent gateway dispatches—see {doc}`configuration` and {doc}`troubleshooting`.
+3. If **`GET …/api/readyz`** is **503**, Streamlit is not reachable from the gateway; see {doc}`runbooks` and {doc}`deployment` readiness notes.
+
+CI runs **`docker/proxy-deployment/run-all-proxy-smokes.sh`**, including the **`/apps/my-app`** strip-prefix stack on port **8083**, plus **`smoke-test.sh`** checks for **`/api/docs`** and WebSockets.
+
 ## Content-Security-Policy (CSP) and Streamlit
 
 Streamlit serves **dynamic scripts**, **WebSockets**, and assets that evolve with versions. A **strict CSP** copied from a generic SPA guide will often **break** the UI (inline script hashes drift, `connect-src` for websockets, `frame-ancestors` for embedding).
