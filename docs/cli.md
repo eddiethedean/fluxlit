@@ -74,8 +74,14 @@ On **Windows**, **`--force` runs ``taskkill /T /F``** (POSIX uses ``SIGKILL``). 
 fluxlit doctor app:app --json
 ```
 
+With **`--verbose`** (or **`-v`**), plain-text mode prints an extra **Verbose** section after the
+check table (redacted settings, resolved bind, discovered pages, OpenAPI paths, URL-session
+env flags, and short hints). Combine with **`--json`** to add a top-level **`verbose`** object
+(same redacted snapshot) for machines.
+
 The JSON object contains `status`, `target`, `warnings_only`, and a `checks` array
-with `name`, `status`, and `detail` for each diagnostic.
+with `name`, `status`, and `detail` for each diagnostic. With **`--verbose`**, it also
+includes **`verbose`** (omit **`--verbose`** to keep JSON minimal).
 
 Doctor checks are additive. Current diagnostics include import resolution, the loaded
 module file path, the first few `sys.path` entries, ambiguous `app` / `main` candidates,

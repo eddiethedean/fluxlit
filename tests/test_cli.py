@@ -33,6 +33,193 @@ def test_doctor_prints_checks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     assert "demo_cli_app:app" in res.stdout
 
 
+def test_doctor_verbose_prints_effective_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "demo_cli_verbose_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='V', settings=FluxlitSettings(gateway_port=59220))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "demo_cli_verbose_app:app", "--verbose"])
+    assert res.exit_code == 0
+    assert "Verbose (effective configuration" in res.stdout
+    assert "resolved_target: demo_cli_verbose_app:app" in res.stdout
+    assert "internal_api_base (derived for Streamlit)" in res.stdout
+
+
+def test_doctor_json_verbose_includes_verbose_object(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "demo_cli_json_verbose_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(title='JV', settings=FluxlitSettings(gateway_port=59221))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "demo_cli_json_verbose_app:app", "--json", "--verbose"])
+    assert res.exit_code == 0
+    payload = json.loads(res.stdout)
+    assert "verbose" in payload
+    assert payload["verbose"]["resolved_target"] == "demo_cli_json_verbose_app:app"
+    assert "effective" in payload["verbose"]
+
+
+def test_doctor_json_without_verbose_omits_verbose_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "demo_cli_json_no_verbose.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_port=59222))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "demo_cli_json_no_verbose:app", "--json"])
+    assert res.exit_code == 0
+    assert "verbose" not in json.loads(res.stdout)
+
+
+def test_doctor_collect_verbose_import_failed_detail() -> None:
+    from fluxlit.config import load_project_config
+
+    rows, detail = cli_module._doctor_collect(  # noqa: SLF001
+        "nonexistent_module_xyz_fluxlit:app",
+        load_project_config(),
+        verbose=True,
+    )
+    assert detail == {
+        "resolved_target": "nonexistent_module_xyz_fluxlit:app",
+        "import_failed": True,
+    }
+    assert any(name == "import_target" and status == "FAIL" for name, status, _ in rows)
+
+
+def test_doctor_checks_passes_verbose_to_collect() -> None:
+    rows = cli_module._doctor_checks("tests.e2e.minimal_app:app", verbose=True)  # noqa: SLF001
+    assert any(name == "import_target" and status == "PASS" for name, status, _ in rows)
+
+
+def test_doctor_json_verbose_import_failed_includes_verbose_stub(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "broken_verbose_json_app.py"
+    module_path.write_text("# not a FluxLit instance\napp = 123\n", encoding="utf-8")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "broken_verbose_json_app:app", "--json", "--verbose"])
+    assert res.exit_code == 1
+    payload = json.loads(res.stdout)
+    assert payload["verbose"]["import_failed"] is True
+
+
+def test_doctor_collect_gateway_bind_ipv6_wildcard_maps_to_loopback_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_v6_wild_bind_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_host='::', gateway_port=59498))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    seen: list[tuple[object, ...]] = []
+
+    def capture_getaddrinfo(host: object, port: object, *args: object, **kwargs: object) -> list:
+        seen.append((host, port))
+        return [
+            (
+                cli_module.socket.AF_INET6,
+                cli_module.socket.SOCK_STREAM,
+                0,
+                "",
+                ("::1", int(port), 0, 0),
+            )
+        ]
+
+    monkeypatch.setattr(cli_module.socket, "getaddrinfo", capture_getaddrinfo)
+
+    class FakeSocket:
+        def __init__(self, family: int, socktype: int, proto: int) -> None:
+            self.family = family
+
+        def __enter__(self) -> FakeSocket:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def setsockopt(self, *args: object) -> None:
+            return None
+
+        def bind(self, addr: tuple[object, ...]) -> None:
+            return None
+
+    monkeypatch.setattr(cli_module.socket, "socket", FakeSocket)
+    rows = cli_module._doctor_checks("doctor_v6_wild_bind_app:app")  # noqa: SLF001
+    assert any(name == "gateway_bind" and status == "PASS" for name, status, _ in rows)
+    assert seen and seen[0][0] == "::1"
+
+
+def test_doctor_collect_bind_host_zero_resolves_to_loopback_for_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "doctor_zero_bind_app.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n"
+        "app = FluxLit(settings=FluxlitSettings(gateway_host='0.0.0.0', gateway_port=59497))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    seen: list[tuple[object, ...]] = []
+
+    def capture_getaddrinfo(host: object, port: object, *args: object, **kwargs: object) -> list:
+        seen.append((host, port))
+        return [
+            (
+                cli_module.socket.AF_INET,
+                cli_module.socket.SOCK_STREAM,
+                0,
+                "",
+                (host, int(port)),
+            )
+        ]
+
+    monkeypatch.setattr(cli_module.socket, "getaddrinfo", capture_getaddrinfo)
+
+    class FakeSocket:
+        def __init__(self, family: int, socktype: int, proto: int) -> None:
+            pass
+
+        def __enter__(self) -> FakeSocket:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def setsockopt(self, *args: object) -> None:
+            return None
+
+        def bind(self, addr: tuple[object, ...]) -> None:
+            return None
+
+    monkeypatch.setattr(cli_module.socket, "socket", FakeSocket)
+    rows = cli_module._doctor_checks("doctor_zero_bind_app:app")  # noqa: SLF001
+    assert any(name == "gateway_bind" and status == "PASS" for name, status, _ in rows)
+    assert seen and seen[0][0] == "127.0.0.1"
+
+
 def test_doctor_json_outputs_structured_checks(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
