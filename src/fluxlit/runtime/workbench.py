@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from fluxlit.api_mount import normalize_api_mount_path
+
 __all__ = [
     "browser_base_url",
     "format_workbench_startup_message",
@@ -29,10 +31,7 @@ def browser_base_url(bind_host: str, bind_port: int, *, scheme: str = "http") ->
 
 
 def _api_prefix_display(api_mount_path: str) -> str:
-    p = (api_mount_path or "/api").strip()
-    if not p.startswith("/"):
-        p = f"/{p}"
-    return p.rstrip("/") or "/"
+    return normalize_api_mount_path(api_mount_path)
 
 
 def format_workbench_startup_message(

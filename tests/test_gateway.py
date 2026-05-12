@@ -76,6 +76,15 @@ def test_custom_api_prefix(api: FastAPI) -> None:
     assert client.get("/api/ping").status_code != 200
 
 
+def test_api_prefix_without_leading_slash_dispatches_to_api(api: FastAPI) -> None:
+    """``api_prefix`` may omit a leading slash; browser paths stay ``/api/…``."""
+    gateway = build_gateway(api, "http://127.0.0.1:9", api_prefix="api")
+    client = TestClient(gateway)
+    res = client.get("/api/ping")
+    assert res.status_code == 200
+    assert res.json() == {"ok": "pong"}
+
+
 def test_healthz_available_under_api_prefix() -> None:
     fl = FluxLit(title="T")
     gateway = build_gateway(fl.api, "http://127.0.0.1:9", api_prefix="/api")

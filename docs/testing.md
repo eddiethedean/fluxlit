@@ -371,9 +371,9 @@ The suite starts a real unified gateway (including Streamlit WebSocket traffic) 
 
 On **CI failures**, the workflow uploads **`test-results/`** as artifact **`playwright-traces`** for inspection.
 
-## Optional type check (`ty`)
+## Type check (`ty`)
 
-CI runs **[`ty check`](https://docs.astral.sh/ty/)** in a **`ty-check`** job with **`continue-on-error: true`** (installs **`fluxlit[metrics]`** so optional imports resolve). Run locally after `pip install ty` (and optional `pip install -e ".[metrics]"`) from the repo root.
+The **`ty-check`** workflow job runs **`ty check`** (pinned `ty` version; **`fluxlit[metrics]`** is installed so optional imports resolve). Run locally after `pip install ty` (and optional `pip install -e ".[metrics]"`) from the repo root.
 
 ## Readiness
 

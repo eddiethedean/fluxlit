@@ -89,3 +89,13 @@ def test_settings_defaults_are_isolated() -> None:
     assert "k" not in b.streamlit_page_config
     assert b.streamlit_run_cli_args == []
     assert "y" not in b.cors_middleware_kwargs
+
+
+def test_api_mount_path_normalized_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FLUXLIT_API_MOUNT_PATH", "api")
+    assert FluxlitSettings().api_mount_path == "/api"
+
+
+def test_api_mount_path_normalized_constructor() -> None:
+    assert FluxlitSettings(api_mount_path="v1").api_mount_path == "/v1"
+    assert FluxlitSettings(api_mount_path="/x/").api_mount_path == "/x"

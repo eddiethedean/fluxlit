@@ -5,10 +5,11 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from fluxlit.config.json_types import JsonValue
+from fluxlit.api_mount import normalize_api_mount_path
 
 
 class FluxlitSettings(BaseSettings):
@@ -55,6 +56,12 @@ class FluxlitSettings(BaseSettings):
     )
     log_level: str = "info"
     api_mount_path: str = "/api"
+
+    @field_validator("api_mount_path", mode="after")
+    @classmethod
+    def _normalize_api_mount_path_field(cls, v: str) -> str:
+        return normalize_api_mount_path(v)
+
     streamlit_public_path: str = Field(
         default="",
         description=(

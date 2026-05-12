@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 from starlette.types import ASGIApp
 
+from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.config import FluxlitSettings
 from fluxlit.gateway._log import gateway_log
 from fluxlit.gateway.dispatch import make_gateway_app
@@ -96,7 +97,7 @@ def build_gateway(
             return upstream_resolver().strip().rstrip("/")
         return fixed_upstream
 
-    prefix = api_prefix.rstrip("/") or "/api"
+    prefix = normalize_api_mount_path(api_prefix)
     mount = normalize_root_mount(root_mount)
 
     _log_qs_keys = set(DEFAULT_SENSITIVE_QUERY_KEYS)

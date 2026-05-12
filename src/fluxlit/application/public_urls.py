@@ -7,17 +7,11 @@ from urllib.parse import urlencode, urlparse
 
 from starlette.requests import Request
 
+from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.gateway.paths import normalize_root_mount
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit as FluxLitType
-
-
-def _normalize_api_prefix(api_mount_path: str) -> str:
-    p = (api_mount_path or "/api").strip()
-    if not p.startswith("/"):
-        p = f"/{p}"
-    return p.rstrip("/") or "/"
 
 
 def _request_origin(request: Request) -> str:
@@ -75,7 +69,7 @@ class FluxLitPublicUrls:
 
     def api_base(self, request: Request) -> str:
         """Return the browser-visible base URL for the FastAPI app (includes ``api_mount_path``)."""
-        prefix = _normalize_api_prefix(self._fl.settings.api_mount_path)
+        prefix = normalize_api_mount_path(self._fl.settings.api_mount_path)
         return _join_url(self.app_base(request), prefix)
 
     def docs_url(self, request: Request) -> str | None:

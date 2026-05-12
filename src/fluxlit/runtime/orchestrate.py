@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from starlette.types import ASGIApp
 
 from fluxlit.gateway import build_gateway, normalize_root_mount
+from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.runtime.import_target import (
     find_free_port,
     internal_api_base_url,
@@ -54,7 +55,7 @@ def create_gateway_app() -> ASGIApp:
         )
         raise RuntimeError(msg)
     target = os.environ["FLUXLIT_APP"].strip()
-    api_prefix = os.environ.get("FLUXLIT_API_PREFIX", "/api")
+    api_prefix = normalize_api_mount_path(os.environ.get("FLUXLIT_API_PREFIX", "/api"))
     fl = load_fluxlit(target)
     mount = normalize_root_mount(fl.settings.public_mount_path())
     return _inject_public_root_path(

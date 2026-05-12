@@ -13,6 +13,7 @@ import httpx
 from starlette.testclient import TestClient
 
 from fluxlit.app import FluxLit
+from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.gateway import build_gateway
 from fluxlit.gateway.paths import normalize_root_mount
 
@@ -75,7 +76,7 @@ def apptest_select_page(
             {
                 "FLUXLIT_APP": target,
                 "FLUXLIT_INTERNAL_API_BASE": internal,
-                "FLUXLIT_API_PREFIX": client.api_prefix,
+                "FLUXLIT_API_PREFIX": normalize_api_mount_path(client.api_prefix),
                 "FLUXLIT_TESTS": "1",
             }
         ),
@@ -112,8 +113,7 @@ class FluxLitTestClient:
     root_mount: str = ""
 
     def _normalized_api_prefix(self) -> str:
-        ap = (self.api_prefix or "/api").strip()
-        return ap if ap.startswith("/") else f"/{ap}"
+        return normalize_api_mount_path(self.api_prefix)
 
     def _effective_mount(self, root_path: str | None) -> str:
         if root_path is not None:
@@ -223,14 +223,14 @@ class FluxLitTestClient:
         from streamlit.testing.v1 import AppTest
 
         entry = streamlit_main_path()
-        internal = internal_api_base or f"http://127.0.0.1:1{self.api_prefix}"
+        internal = internal_api_base or f"http://127.0.0.1:1{self._normalized_api_prefix()}"
 
         with (
             _patched_env(
                 {
                     "FLUXLIT_APP": target,
                     "FLUXLIT_INTERNAL_API_BASE": internal,
-                    "FLUXLIT_API_PREFIX": self.api_prefix,
+                    "FLUXLIT_API_PREFIX": normalize_api_mount_path(self.api_prefix),
                     "FLUXLIT_TESTS": "1",
                 }
             ),

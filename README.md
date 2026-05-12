@@ -69,7 +69,7 @@ In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Sec
 - **One app object:** `FluxLit` exposes `.api` for FastAPI and `@app.page(...)` for Streamlit pages.
 - **Gateway runtime:** `fluxlit dev` and `fluxlit run` start Uvicorn plus a managed Streamlit subprocess.
 - **Operational defaults:** health/readiness probes, request IDs, optional JSON logs, configurable gateway timeouts, body limits, concurrency, and graceful shutdown.
-- **Quality gate:** package tests enforce **100% coverage** for `src/fluxlit` without coverage pragmas.
+- **Quality gate:** package tests enforce **100% line coverage** for `src/fluxlit` in CI; a single internal import guard in the test helpers uses `# pragma: no cover` for an unreachable defensive branch.
 - **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests (strip-prefix, full-path, root, HTTPS, and **`/apps/my-app`**), and production TLS/proxy guidance.
 - **Optional auth:** JWT validation, OIDC/BFF helpers, Streamlit-safe API clients, and security docs via `fluxlit[auth]`.
 - **Testing and diagnostics:** `FluxLitTestClient`, `streamlit_main_path()`, AppTest recipes (including **`apptest_select_page`** / **`apptest_assert_no_errors`** for multipage and query params), URL-session test-mode defaults, optional **`?page=`** deep links before `st.navigation` with multipage apps, and expanded `fluxlit doctor` diagnostics for imports, proxy/config state, and optional extras.
@@ -137,7 +137,7 @@ python -m pytest -n auto --cov=fluxlit --cov-report=term-missing --cov-fail-unde
 
 ## Status
 
-FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and smoke coverage, deployment runbooks, and a 100% package coverage gate for `src/fluxlit`.
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly navigation and query-param helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, path-prefixed reverse-proxy documentation and smoke coverage, deployment runbooks, and a 100% package line-coverage gate for `src/fluxlit` in CI.
 
 See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 

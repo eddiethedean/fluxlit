@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from fluxlit.config.project import ProjectConfig
+from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.runtime.import_target import internal_api_base_url
 
 if TYPE_CHECKING:
@@ -165,8 +166,7 @@ def collect_configuration_warnings(
                         "doc": _DOCS_CONFIGURATION,
                     }
                 )
-            ap = s.api_mount_path if s.api_mount_path.startswith("/") else f"/{s.api_mount_path}"
-            ap = ap.rstrip("/") or "/"
+            ap = normalize_api_mount_path(s.api_mount_path)
             if public_path:
                 if ap != "/" and ap not in {(public_path + "/").rstrip("/"), public_path}:
                     if not public_path.endswith(ap.rstrip("/")):

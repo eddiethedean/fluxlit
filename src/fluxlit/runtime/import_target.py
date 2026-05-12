@@ -13,6 +13,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from fluxlit.api_mount import normalize_api_mount_path
+
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit as FluxLitType
 
@@ -51,8 +53,7 @@ def internal_api_base_url(*, bind_host: str, port: int, api_mount_path: str) -> 
     ``bind_host`` is the Uvicorn bind address; the URL uses a loopback-safe host when
     needed so :class:`~fluxlit.client.ApiClient` can connect from the sidecar process.
     """
-    path = api_mount_path if api_mount_path.startswith("/") else f"/{api_mount_path}"
-    path = path.rstrip("/") or "/"
+    path = normalize_api_mount_path(api_mount_path)
     netloc = f"{_loopback_http_host_for_client(bind_host)}:{port}"
     return urllib.parse.urlunparse(("http", netloc, path, "", "", ""))
 

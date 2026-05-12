@@ -21,6 +21,7 @@ from __future__ import annotations
 import httpx  # noqa: F401 — tests monkeypatch ``fluxlit.gateway.httpx.AsyncClient``
 import websockets  # noqa: F401 — tests monkeypatch ``fluxlit.gateway.websockets.connect``
 
+from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.gateway.builder import build_gateway
 from fluxlit.gateway.header_filter import filter_request_headers as _filter_request_headers
 from fluxlit.gateway.http_proxy import _proxy_http
@@ -58,6 +59,7 @@ from fluxlit.gateway.websocket_proxy import proxy_websocket as _proxy_websocket
 __all__ = [
     "GatewayProxyOptions",
     "build_gateway",
+    "normalize_api_mount_path",
     "normalize_root_mount",
     "split_gateway_paths",
     "_build_target_url",
