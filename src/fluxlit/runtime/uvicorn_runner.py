@@ -47,6 +47,7 @@ def run_unified(
     forwarded_allow_ips: str | None = None,
     pidfile: Path | None = None,
     write_pidfile: bool = True,
+    workbench_mode: bool = False,
 ) -> None:
     """Start Streamlit on a free localhost port and Uvicorn on ``host:port``.
 
@@ -69,6 +70,8 @@ def run_unified(
         pidfile: Optional explicit path for the PID file (see :func:`default_pidfile_path`).
         write_pidfile: If False, do not create a PID file (also skipped when
             ``FLUXLIT_NO_PIDFILE`` is ``1`` / ``true`` / ``yes``).
+        workbench_mode: If True, print a Workbench/Connect-oriented startup banner and
+            force ``proxy_headers`` on for Uvicorn (still merge ``forwarded_allow_ips``).
     """
     streamlit_port = find_free_port()
     runner = _STREAMLIT_MAIN
@@ -83,7 +86,7 @@ def run_unified(
     api_prefix = fl.settings.api_mount_path
     internal_api_base = internal_api_base_url(bind_host=host, port=port, api_mount_path=api_prefix)
     mount = normalize_root_mount(fl.settings.public_mount_path())
-    use_proxy = proxy_headers or fl.settings.trust_proxy
+    use_proxy = proxy_headers or fl.settings.trust_proxy or workbench_mode
     allow_ips = forwarded_allow_ips
     if use_proxy and allow_ips is None:
         allow_ips = fl.settings.forwarded_allow_ips or "*"
@@ -126,6 +129,22 @@ def run_unified(
             pidfile_path = default_pidfile_path(pidfile)
             _write_pidfile(pidfile_path)
             pidfile_written = True
+
+        if workbench_mode:
+            from fluxlit.runtime.workbench import format_workbench_startup_message
+
+            sys.stderr.write(
+                format_workbench_startup_message(
+                    app_title=fl.settings.title,
+                    bind_host=host,
+                    bind_port=port,
+                    root_mount_norm=mount,
+                    api_mount_path=api_prefix,
+                    public_base_url=fl.settings.public_base_url,
+                    proxy_headers_on=use_proxy,
+                )
+            )
+            sys.stderr.flush()
 
         if reload:
             if scope == "full":

@@ -292,6 +292,7 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 | Gateway correlation + `httpx` wiring | `tests/test_gateway_correlation_integration.py` (threaded upstream, `build_gateway` + `proxy_settings`) |
 | Gateway proxy edge cases | `tests/test_gateway_proxy_robust.py` (`_gateway_opts`, 502/413 paths, WebSocket connect kwargs) |
 | Gateway WebSocket | `tests/test_gateway_ws_echo.py` — echo proxy; **`slow`** repeated connect/disconnect stress |
+| Workbench / Posit-style CLI | `tests/test_workbench.py`, `tests/test_runtime_extra.py` (`workbench_mode` banner), `tests/test_gateway.py` (prefixed mount root → Streamlit proxy) |
 | JSON logging formatter | `tests/test_logging_json.py` |
 | Upstream state | `tests/test_runtime_upstream.py` |
 | Reload | `tests/test_streamlit_reload_watcher.py`, `tests/test_runtime_extra.py`, CLI tests for `--reload-scope` |

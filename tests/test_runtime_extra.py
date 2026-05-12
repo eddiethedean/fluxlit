@@ -517,6 +517,80 @@ def test_run_unified_plain_configures_gateway_and_cleans_up(
     assert kwargs["forwarded_allow_ips"] == "127.0.0.1"
 
 
+def test_run_unified_workbench_writes_banner_and_enables_proxy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import fluxlit.runtime.uvicorn_runner as runner
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FLUXLIT_NO_PIDFILE", "1")
+    monkeypatch.setattr(runner, "find_free_port", lambda: 8765)
+    monkeypatch.setattr(runner, "_invoke_wait_for_tcp", lambda *a, **k: None)
+    captures: dict[str, object] = {"terminated": 0, "kwargs": {}}
+
+    class Proc:
+        def wait(self) -> int:
+            return 0
+
+        def poll(self) -> None:
+            return None
+
+        def send_signal(self, sig: object) -> None:
+            return None
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            return None
+
+    def fake_popen(cmd: list[str], **kwargs: object) -> Proc:
+        return Proc()
+
+    class Config:
+        def __init__(self, app: object, **kwargs: object) -> None:
+            captures["kwargs"] = kwargs
+
+    class Server:
+        def __init__(self, config: Config) -> None:
+            self.config = config
+            self.should_exit = False
+
+        def run(self) -> None:
+            return None
+
+    class ImmediateThread:
+        def __init__(self, target, daemon: bool) -> None:
+            self.target = target
+
+        def start(self) -> None:
+            self.target()
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.uvicorn, "Config", Config)
+    monkeypatch.setattr(runner.uvicorn, "Server", Server)
+    monkeypatch.setattr(runner.threading, "Thread", ImmediateThread)
+    monkeypatch.setattr(
+        runner,
+        "_terminate_process",
+        lambda proc: captures.__setitem__("terminated", captures["terminated"] + 1),
+    )
+
+    run_unified(
+        "tests.e2e.minimal_app:app",
+        host="127.0.0.1",
+        port=8002,
+        proxy_headers=False,
+        workbench_mode=True,
+    )
+    err = capsys.readouterr().err
+    assert "Workbench/Connect mode" in err
+    assert ":8002" in err and "healthz" in err
+    kw = captures["kwargs"]
+    assert isinstance(kw, dict)
+    assert kw.get("proxy_headers") is True
+
+
 def test_run_unified_reload_full_restarts_streamlit_sidecar(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

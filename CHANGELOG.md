@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Workbench / Posit:** ``fluxlit workbench`` and ``--workbench`` on ``dev`` / ``run`` enable Uvicorn proxy headers and print a loopback browser URL hint; see platforms and CLI docs for Posit Connect / Workbench-style ``FLUXLIT_ROOT_PATH`` deployments.
+
 ## 0.8.0 - 2026-05-12
 
 - **CLI:** `fluxlit config` prints resolved binding, redacted effective settings, derived internal API base, and structured configuration warnings (with documentation links); supports `--json` and `--strict`.
