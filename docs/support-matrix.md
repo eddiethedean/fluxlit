@@ -1,6 +1,6 @@
 # Support matrix
 
-Published combinations for **FluxLit 0.5.x** on PyPI. Outside this matrix, installs may work but are **best-effort** until tested in CI.
+Published combinations for **FluxLit 0.7.x** on PyPI. Outside this matrix, installs may work but are **best-effort** until tested in CI.
 
 ## Python
 

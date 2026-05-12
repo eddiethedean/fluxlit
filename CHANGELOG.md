@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.7.0 - 2026-05-11
+
+- **Testing API:** `streamlit_main_path()` is now a public helper for supported `AppTest.from_file(...)` usage; `FluxLitTestClient.streamlit()` uses it and sets `FLUXLIT_TESTS=1` during AppTest runs.
+- **Testing docs:** `docs/testing.md` now includes an app-developer Pytest recipe, guidance for `FluxLitTestClient`, Streamlit `AppTest`, `ApiClient`, `st.data_editor`, dynamic widget keys, and multipage smoke tests. A new `examples/multipage_apptest/` demo shows stable multipage patterns.
+- **URL session test mode:** URL-session helpers no-op under `FLUXLIT_TESTS=1` unless `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1` is set. `FLUXLIT_DISABLE_URL_SESSION=1` remains an explicit disable switch in any environment.
+- **Doctor diagnostics:** `fluxlit doctor` reports additional import/config context, including `sys.path` head entries, ambiguous top-level import candidates, loaded module file paths, effective API prefix, URL-session state, proxy/public-base-url fields, and missing `auth` / `metrics` extras.
+- **Configuration:** `FLUXLIT_PUBLIC_BASE_URL` is the preferred public OAuth base URL. `PUBLIC_BASE_URL` is accepted as a compatibility fallback only when the namespaced value is unset; `fluxlit doctor` warns or fails on conflicting values depending on `FLUXLIT_STRICT_PUBLIC_BASE_URL`.
+- **Docs:** README, CLI, configuration, troubleshooting, URL-session, quickstart, testing, and roadmap docs were refreshed for the 0.7 testing and diagnostics work.
+
+**Upgrading from 0.6.1:** Prefer `FLUXLIT_PUBLIC_BASE_URL` over `PUBLIC_BASE_URL` in deployment configuration. If your AppTest suite intentionally exercises URL-session continuity, set `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1`; otherwise `FLUXLIT_TESTS=1` now keeps URL-session helpers inert during headless tests.
+
 ## 0.6.1 - 2026-05-11
 
 - **Runtime:** File-backed import targets now prepend the target module's directory to `sys.path` before execution, so top-level multi-file apps can use sibling imports with `main:app` and explicit `./path/main.py:app` targets without setting `PYTHONPATH`.

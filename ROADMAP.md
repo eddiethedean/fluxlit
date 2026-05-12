@@ -4,7 +4,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Current status (0.5.x)
+## Current status (0.7.x)
 
 **Done**
 
@@ -13,7 +13,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Gateway:** configurable API prefix (default `/api`); path prefix stripped for the inner FastAPI app; HTTP + WebSocket proxy to Streamlit for all other paths.
 - **App model:** `FluxLit` holds `FastAPI` on `.api`, `@app.page` registers Streamlit pages; `ApiClient` for server-side calls with `FLUXLIT_INTERNAL_API_BASE`.
 - **Scaffold:** `fluxlit new <name>` minimal app.
-- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client.
+- **Tests:** gateway routing / OpenAPI prefix, page registration, `load_fluxlit` validation, CLI tests, ApiClient tests, Streamlit AppTest, FluxLit-native test client, `streamlit_main_path()` helper, multipage AppTest smoke example, and URL-session test-mode defaults.
 - **Readiness:** `GET /api/readyz` probes the Streamlit upstream when `FLUXLIT_STREAMLIT_UPSTREAM` is set (Kubernetes-style readiness; hidden from OpenAPI).
 - **Dev reload:** `--reload-scope=gateway` (default) vs `--reload-scope=full` (Uvicorn reload plus Streamlit restart via `watchfiles`); invalid scope fails before spawning Streamlit.
 - **Observability (baseline):** optional structured gateway access logs (`enable_gateway_access_log`); log redaction helpers for sensitive headers; temp-file upstream state so reload workers and Streamlit restarts stay aligned.
@@ -21,21 +21,23 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - **Unified ASGI:** `FluxLit` as a normal ASGI entrypoint (`uvicorn app:app`); lifespan bridged to the inner FastAPI app; regression suite in `tests/test_asgi_unified.py` (lifespan + concurrent HTTP, streaming body, sidecar failure) — foundation for **Version 0.5** soak/chaos work.
 - **Production hardening:** JSON log formatter, request-id correlation to Streamlit HTTP/WebSocket hops, configurable gateway limits/timeouts, optional Prometheus metrics, Docker/Kubernetes references, runbooks, support matrix, security audit, and CycloneDX SBOM workflow.
 - **URL session continuity:** `fluxlit.url_session` helpers, `SessionStore` protocol, in-memory implementation, docs, tests, and gateway query redaction for `fluxlit_sid`.
+- **Developer diagnostics:** `fluxlit doctor` reports import shadowing candidates, loaded module files, `sys.path` summary, URL-session state, proxy/public-base-url configuration, and optional extras guidance.
+- **Configuration clarity:** `FLUXLIT_PUBLIC_BASE_URL` is the preferred namespaced OAuth public URL; `PUBLIC_BASE_URL` is a documented fallback with doctor warnings/failures for conflicting values.
 
 **Gaps vs “production”**
 
 - CI includes **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
-- **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain open.
-- **Browser refresh continuity** ships for cookie-free URL + server-store patterns; production multi-replica continuity still requires an app-provided external store such as Redis.
+- **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain ongoing.
+- **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
 
-**Next: Version 0.6**
+**Next: Version 0.8**
 
-- Version 0.6 should deepen production proof points: broader load/chaos coverage, external session-store recipes, OpenTelemetry hooks, dependency compatibility matrices, and any breaking-change cleanup needed before a future 1.0.
+- Version 0.8 should keep turning hardening into repeatable evidence: broader load/chaos coverage, more deployment recipes, deeper OpenTelemetry examples, compatibility signals, and any breaking-change cleanup needed before a future 1.0.
 
 ---
 
-## Version 0.5 — Production hardening & operations (planned)
+## Version 0.5 — Production hardening & operations (released)
 
 **Theme:** Close the gap between “runs well in dev/CI” and **operated production**: measurable reliability, defensible security posture, observable failure modes, and documented scale paths — without requiring a 1.0 semver freeze.
 
@@ -112,7 +114,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 ---
 
-## Version 0.6 — Production proof points & ecosystem hardening (planned)
+## Version 0.6 — Production proof points & ecosystem hardening (released)
 
 **Theme:** Turn the 0.5 production-hardening foundation into repeatable evidence: load/chaos results, richer tracing hooks, multi-replica state recipes, and compatibility signals that help teams adopt FluxLit with fewer bespoke decisions.
 
@@ -155,6 +157,8 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 | **Log schema reference** | Document stable field names for gateway access logs, JSON formatter extras, request IDs, redacted query strings, and error classes so teams can build dashboards safely. |
 | **Metrics contract** | Define which Prometheus metric names and labels are stable enough for alerts, and which remain experimental to avoid accidental cardinality or compatibility promises. |
 
+**Implemented in `main` (0.6 / 0.7):** canonical smoke app and richer local smoke/load scripts; Docker proxy smoke matrix; external URL-session store examples; platform docs; optional tracing hooks and OpenTelemetry recipe; stable gateway log and Prometheus metric contracts; scaffold profiles; expanded `fluxlit doctor --json`; public `streamlit_main_path()` testing helper; official Pytest/AppTest recipe; URL-session test-mode defaults; monorepo import diagnostics; public-base-url precedence checks; and a multipage AppTest example.
+
 ### Success criteria (0.6)
 
 - Operators can reproduce at least one load test, one chaos test, and one proxy smoke path locally or in CI-like automation.
@@ -162,6 +166,28 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 - Tracing and metrics guidance explains what FluxLit emits, what it intentionally does not emit, and how to correlate gateway, API, and Streamlit-side evidence.
 - New projects can choose a scaffold or example path that matches their deployment intent without reading the runtime source.
 - Release notes, upgrade guidance, and support-matrix changes make it clear what is stable, experimental, or intentionally deferred to 1.0.
+
+---
+
+## Version 0.7 — Testing and diagnostics polish (released)
+
+**Theme:** Make the 0.6 feature set easier to test, diagnose, and adopt in real app
+repositories, especially monorepos and Streamlit AppTest suites.
+
+### Shipped
+
+- **Testing API:** public `streamlit_main_path()` and `FluxLitTestClient.streamlit()` integration with `FLUXLIT_TESTS=1`.
+- **Official testing recipe:** app-developer Pytest docs for `FluxLitTestClient`, Streamlit `AppTest`, API-prefix expectations, `ApiClient`, `st.data_editor`, stable `key=`, and browser E2E boundaries.
+- **URL-session test mode:** helpers no-op under `FLUXLIT_TESTS=1` unless `FLUXLIT_FORCE_URL_SESSION_IN_TESTS=1`; explicit `FLUXLIT_DISABLE_URL_SESSION=1` remains available.
+- **Import hygiene:** conservative top-level target candidate diagnostics for `app` / `main` shadowing, plus monorepo troubleshooting guidance.
+- **Doctor/config DX:** additive doctor rows for loaded module file, `sys.path`, effective API/config state, URL-session state, public-base-url precedence, and missing `auth` / `metrics` extras.
+- **Multipage AppTest:** minimal example under `examples/multipage_apptest/` and docs for supported smoke-test patterns plus current navigation-heavy limitations.
+
+### Success criteria (0.7)
+
+- App authors can copy a Pytest recipe for API tests and thin Streamlit smoke tests without inspecting FluxLit internals.
+- Doctor output explains common import, proxy, URL-session, extras, and public-base-url mistakes before deployment.
+- URL-session continuity remains production-friendly while AppTest defaults avoid unstable browser-query behavior.
 
 ---
 

@@ -72,6 +72,7 @@ In Streamlit, use paths like **`client.get("/users")`**, not `"/api/users"`. Sec
 - **Quality gate:** package tests enforce **100% coverage** for `src/fluxlit` without coverage pragmas.
 - **Deployment paths:** `fluxlit build`, Docker Compose, Kubernetes manifests, proxy smoke tests, and production TLS/proxy guidance.
 - **Optional auth:** JWT validation, OIDC/BFF helpers, Streamlit-safe API clients, and security docs via `fluxlit[auth]`.
+- **Testing and diagnostics:** `FluxLitTestClient`, `streamlit_main_path()`, AppTest recipes, URL-session test-mode defaults, and expanded `fluxlit doctor` diagnostics for imports, proxy/config state, and optional extras.
 
 Start with the [Quick start](https://fluxlit.readthedocs.io/en/stable/quickstart.html), then see [Architecture](https://fluxlit.readthedocs.io/en/stable/architecture.html), [CLI](https://fluxlit.readthedocs.io/en/stable/cli.html), [Configuration](https://fluxlit.readthedocs.io/en/stable/configuration.html), and [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html).
 
@@ -135,7 +136,7 @@ python -m pytest -n auto --cov=fluxlit --cov-report=term-missing --cov-fail-unde
 
 ## Status
 
-FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, deployment runbooks, and a 100% package coverage gate for `src/fluxlit`.
+FluxLit is in the **0.x** line and actively hardening toward production use. Current releases include the unified gateway, page discovery, typed `ApiClient`, health/readiness probes, auth helpers, URL session utilities, AppTest-friendly testing helpers, expanded doctor diagnostics, gateway limits, structured logging helpers, Prometheus metrics, CI security audit/SBOM generation, Docker/Kubernetes examples, deployment runbooks, and a 100% package coverage gate for `src/fluxlit`.
 
 See the [changelog](https://fluxlit.readthedocs.io/en/stable/changelog.html), [support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html), and [roadmap](https://fluxlit.readthedocs.io/en/stable/roadmap.html) for release status and remaining work.
 
