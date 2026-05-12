@@ -10,6 +10,7 @@ import json
 import os
 import platform
 import socket
+import sys
 from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlparse
@@ -341,12 +342,35 @@ def run_cmd(
 def _doctor_checks(target: str) -> list[tuple[str, CheckStatus, str]]:
     """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``."""
     from fluxlit.runtime import load_fluxlit
+    from fluxlit.runtime.import_target import import_target_candidates
 
     rows: list[tuple[str, CheckStatus, str]] = []
 
     rows.append(("python_version", "PASS", platform.python_version()))
+    sys_path_head = ", ".join((p or ".") for p in sys.path[:3])
+    rows.append(("sys_path_head", "PASS", sys_path_head or "(empty)"))
 
     fl = None
+    mod_name = target.partition(":")[0]
+    candidates = import_target_candidates(mod_name)
+    if len(candidates) > 1:
+        shown = ", ".join(str(p) for p in candidates[:4])
+        more = f" (+{len(candidates) - 4} more)" if len(candidates) > 4 else ""
+        rows.append(
+            (
+                "import_shadowing",
+                "WARN",
+                f"multiple import candidates for {mod_name!r}: {shown}{more}; "
+                "run from the intended project root or trim PYTHONPATH",
+            )
+        )
+    elif candidates:
+        rows.append(("import_shadowing", "PASS", f"{mod_name!r} resolves from {candidates[0]}"))
+    else:
+        rows.append(
+            ("import_shadowing", "PASS", f"no top-level file/package candidates for {mod_name!r}")
+        )
+
     try:
         fl = load_fluxlit(target)
         rows.append(("import_target", "PASS", target))

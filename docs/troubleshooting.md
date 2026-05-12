@@ -15,6 +15,19 @@ Run **`fluxlit doctor`** (optionally with your `module:app` target). It reports 
 
 - Check the **`target`** string (`app:app`): module must be importable from the current working directory (`PYTHONPATH` / `pip install -e .`).
 - Run from the project root where `fluxlit.toml` or your package lives.
+- In monorepos, avoid putting sibling services with top-level `app` or `main` packages
+  on `PYTHONPATH` at the same time. `fluxlit doctor` warns when multiple importable
+  candidates are visible for the same top-level target.
+
+**Multiple `app` / `main` candidates**
+
+- Prefer an explicit package target such as `my_service.main:app`, or run tests with
+  only the intended project root prepended to `sys.path`.
+- If your entrypoint is a top-level file, FluxLit prefers `./main.py` or `./app.py`
+  from the current working directory and prepends that file's directory before
+  executing it, so sibling imports work without a global `PYTHONPATH`.
+- For Pytest, clear stale modules only when you intentionally swap project roots in
+  one process; most suites should use one project root per test session.
 
 **`ValueError` / `reload_scope`**
 

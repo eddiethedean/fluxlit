@@ -700,6 +700,32 @@ def test_doctor_checks_gateway_bind_failure(
     assert any(name == "gateway_bind" and status == "FAIL" for name, status, _ in rows)
 
 
+def test_doctor_checks_warns_on_ambiguous_import_candidates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "app.py").write_text(
+        "from fluxlit import FluxLit\napp = FluxLit()\n", encoding="utf-8"
+    )
+    app_pkg = second / "app"
+    app_pkg.mkdir()
+    (app_pkg / "__init__.py").write_text(
+        "from fluxlit import FluxLit\napp = FluxLit()\n", encoding="utf-8"
+    )
+    monkeypatch.syspath_prepend(str(second))
+    monkeypatch.syspath_prepend(str(first))
+
+    rows = cli_module._doctor_checks("app:app")  # noqa: SLF001
+    assert any(name == "sys_path_head" and status == "PASS" for name, status, _ in rows)
+    assert any(
+        name == "import_shadowing" and status == "WARN" and "multiple import candidates" in detail
+        for name, status, detail in rows
+    )
+
+
 def test_doctor_checks_internal_api_invalid_and_import_failed_pass(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

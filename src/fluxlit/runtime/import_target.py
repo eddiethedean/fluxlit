@@ -9,6 +9,7 @@ import os
 import socket
 import sys
 import urllib.parse
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -69,6 +70,36 @@ def _prepend_module_dir(path: Path) -> None:
     module_dir = str(path.parent.resolve())
     if module_dir not in sys.path:
         sys.path.insert(0, module_dir)
+
+
+def import_target_candidates(mod_name: str, *, paths: Sequence[str] | None = None) -> list[Path]:
+    """Return importable file/package candidates for a top-level target module.
+
+    This is intentionally conservative: dotted package paths and explicit file targets
+    are skipped because their resolution rules are more specific than the common
+    monorepo footgun of several top-level ``app`` or ``main`` modules on ``sys.path``.
+    """
+    if not mod_name or "." in mod_name:
+        return []
+    if Path(mod_name).suffix == ".py" or any(sep in mod_name for sep in (os.sep, os.altsep) if sep):
+        return []
+
+    found: list[Path] = []
+    seen: set[Path] = set()
+    for raw in sys.path if paths is None else paths:
+        base = Path(raw or ".")
+        for candidate in (base / f"{mod_name}.py", base / mod_name / "__init__.py"):
+            if not candidate.is_file():
+                continue
+            try:
+                resolved = candidate.resolve()
+            except OSError:
+                continue
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            found.append(resolved)
+    return found
 
 
 def _import_target_module(mod_name: str) -> object:

@@ -18,7 +18,7 @@ from fluxlit.runtime import (
     internal_api_base_url,
     load_fluxlit,
 )
-from fluxlit.runtime.import_target import _import_target_module
+from fluxlit.runtime.import_target import _import_target_module, import_target_candidates
 
 
 def test_load_fluxlit_rejects_bad_target() -> None:
@@ -227,6 +227,22 @@ def test_load_fluxlit_local_module_supports_sibling_imports(
     fl = load_fluxlit("main:app")
     assert fl.settings.title == "local-sibling"
     assert sys.path[0] == str(tmp_path)
+
+
+def test_import_target_candidates_find_files_and_packages(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    (first / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+    package = second / "app"
+    package.mkdir()
+    (package / "__init__.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+    candidates = import_target_candidates("app", paths=[str(first), str(second), str(first)])
+    assert candidates == [(first / "app.py").resolve(), (package / "__init__.py").resolve()]
+    assert import_target_candidates("pkg.app", paths=[str(first)]) == []
+    assert import_target_candidates("./app.py", paths=[str(first)]) == []
 
 
 def test_internal_api_base_url_maps_inaddr_any_to_loopback() -> None:
