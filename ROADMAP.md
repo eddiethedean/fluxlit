@@ -23,7 +23,7 @@ This document tracks **FluxLit** (`fluxlit` on PyPI): a unified FastAPI + Stream
 
 **Gaps vs “production”**
 
-- CI includes **`slow-tests`**, **`coverage`** (artifact), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
+- CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
 - **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain ongoing.
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes, and clearer 1.0 readiness criteria.
@@ -570,7 +570,7 @@ FastAPI, Starlette, Uvicorn, Streamlit, Pydantic Settings, Typer, AnyIO, httpx, 
 ### CI targets
 
 - **Linux** (required), **macOS** (recommended), **Windows** (recommended; subprocess + path quirks).
-- **Coverage** job (Linux / Python 3.12) uploads `coverage.xml`; **`slow-tests`** runs marked subprocess tests; **proxy-smoke** and **e2e** jobs cover Docker nginx and browser stacks.
+- **`docs`** job (Linux / Python 3.12) uploads `coverage.xml` and runs release-parity checks (Ruff, coverage gate, Mypy, generated snapshots, Sphinx **`-W`**); **`slow-tests`** runs marked subprocess tests; **proxy-smoke** and **e2e** jobs cover Docker nginx and browser stacks.
 
 ---
 

@@ -290,7 +290,7 @@ python -m pytest -n auto -m "not slow"
 
 ## Coverage
 
-Local HTML + terminal summary (same as the `coverage` CI job, without XML):
+Local HTML + terminal summary (same as the `docs` CI job’s pytest step, without XML):
 
 ```bash
 python -m pytest -n auto \
@@ -298,8 +298,8 @@ python -m pytest -n auto \
 open htmlcov/index.html
 ```
 
-The **`coverage`** CI job runs the same measurement with **`--cov-fail-under=100`**
-so merges cannot silently reduce the package coverage gate for `src/fluxlit`.
+The **`docs`** CI job runs the same measurement with **`--cov-fail-under=100`**
+(alongside Ruff, Mypy, generated-doc snapshots, and Sphinx **`-W`**) so merges cannot silently reduce the package coverage gate for `src/fluxlit`.
 Reproduce the gate locally:
 
 ```bash
