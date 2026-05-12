@@ -78,7 +78,7 @@ jobs:
               encoding="utf-8",
           )
           PY
-          COLUMNS=80 NO_COLOR=1 fluxlit --help > docs/_generated/fluxlit_help_entrypoint.txt
+          COLUMNS=80 NO_COLOR=1 fluxlit --help | python -c 'import re, sys; sys.stdout.write(re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", sys.stdin.read()))' > docs/_generated/fluxlit_help_entrypoint.txt
           git diff --exit-code -- docs/_generated
 
       - name: Sphinx (warnings as errors)
