@@ -15,6 +15,7 @@ Optional auth ergonomics (after ``pip install "fluxlit[auth]"``):
 """
 
 from fluxlit.app import FluxLit
+from fluxlit.application.public_urls import FluxLitPublicUrls
 from fluxlit.auth.jwt import (
     JWTAuthConfig,
     JWTBearer,
@@ -54,6 +55,7 @@ __all__ = [
     "FluxLitTestClient",
     "FluxlitSettings",
     "FluxLit",
+    "FluxLitPublicUrls",
     "JWTAuthConfig",
     "JWTBearer",
     "OIDCBFFConfig",
@@ -81,4 +83,4 @@ __all__ = [
     "trace_span",
     "__version__",
 ]
-__version__ = "0.8.0"
+__version__ = "0.8.1"

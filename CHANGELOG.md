@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.8.1 - 2026-05-12
+
+- **Public URLs:** `FluxLit.urls` exposes :class:`~fluxlit.application.public_urls.FluxLitPublicUrls` with `app_base`, `api_base`, `docs_url`, `redoc_url`, `openapi_url`, `health_url`, `ready_url`, and `for_page` (including `query=`) so links match `FLUXLIT_ROOT_PATH`, `FLUXLIT_API_MOUNT_PATH`, and `FLUXLIT_PUBLIC_BASE_URL` under the unified gateway.
+
 ## 0.8.0 - 2026-05-12
 
 - **CLI:** `fluxlit config` prints resolved binding, redacted effective settings, derived internal API base, and structured configuration warnings (with documentation links); supports `--json` and `--strict`.
