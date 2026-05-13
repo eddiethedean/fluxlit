@@ -24,9 +24,7 @@ def test_gateway_prometheus_names_match_charter() -> None:
     histogram_charter = next(
         m["name"] for m in GATEWAY_PROMETHEUS_METRICS if m["type"] == "histogram"
     )
-    counter_charter = next(
-        m["name"] for m in GATEWAY_PROMETHEUS_METRICS if m["type"] == "counter"
-    )
+    counter_charter = next(m["name"] for m in GATEWAY_PROMETHEUS_METRICS if m["type"] == "counter")
     assert histogram_series == {histogram_charter}
     assert counter_charter.endswith("_total")
     assert counter_charter.removesuffix("_total") in counter_series

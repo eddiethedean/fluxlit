@@ -11,6 +11,11 @@
 - **Stability charter in code:** module notes on metrics/manifest/logs/settings; ``MANIFEST_V1_*`` key sets; contract tests for Prometheus series names vs ``GATEWAY_PROMETHEUS_METRICS`` and manifest v1 keys.
 - **DX:** expanded ``fluxlit doctor --strict`` rows (OAuth subpath, proxy headers, upstream read timeout, rejected forward names, unlimited proxied body with ``trust_proxy``, CORS/security headers, conflicting public base URL envs); optional ``FLUXLIT_STRICT_STARTUP`` / ``strict_startup`` on :class:`~fluxlit.config.FluxlitSettings` to **raise** on the same class of misconfigurations at import time.
 - **Tracing:** nested ``fluxlit.gateway.upstream_http`` span (hook) around the gateway → Streamlit **HTTP** hop; observability docs updated for span names and **W3C traceparent** passthrough on the internal hop.
+- **Security / supply chain:** ``SECURITY.md`` supported-version policy aligned with the current **0.x** line and support matrix; **httpx** private typing imports called out with a contract test (``tests/test_httpx_import_contract.py``) and a contributor bump note in ``CONTRIBUTING.md``.
+- **Pages:** ``Cookie`` resolves from ``set_page_cookie_context`` and ``st.context.cookies`` (same precedence pattern as ``Header``); ``fluxlit doctor`` hints mention explicit header/cookie injection when HTTP forwarding is off.
+- **Ops:** ``GET /api/readyz`` Streamlit probe aggregates per-path HTTP statuses when every candidate URL is non-2xx (``upstream_http_failed`` detail with ``path:code`` segments).
+- **Gateway:** access-log query redaction treats ``query_string`` decode failures as ``UnicodeError`` only (custom ``decode`` implementations used in tests).
+- **Docs:** support matrix intro targets **0.13.x**; Streamlit pages typing documents ``Cookie`` resolution and async-``Depends`` timeout / daemon-thread caveat.
 
 **Upgrading from 0.12.x:** Bump pins to ``fluxlit>=0.13,<1.0``. Optional: set ``FLUXLIT_STRICT_STARTUP=1`` in containers where misconfiguration should fail the process early; expand ``fluxlit doctor --strict`` in CI if you rely on the new FAIL rows.
 

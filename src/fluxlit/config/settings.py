@@ -6,12 +6,11 @@ import json
 import os
 from collections.abc import Callable
 from typing import Any
-
-from typing_extensions import Self
 from urllib.parse import urlparse
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing_extensions import Self
 
 from fluxlit.api_mount import normalize_api_mount_path
 from fluxlit.config.json_types import JsonValue
