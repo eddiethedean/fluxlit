@@ -64,6 +64,7 @@ Full guide: **[docs/testing.md](docs/testing.md)** (coverage, `e2e` / `slow` mar
 
 - Report undisclosed vulnerabilities privately per [`SECURITY.md`](SECURITY.md) (GitHub Security Advisories), not via a public issue.
 - **CI** runs **`pip-audit`** on `pip install -e ".[auth]"` and uploads a **CycloneDX JSON** SBOM for the same environment (artifact **`cyclonedx-sbom`** on the `security-audit` workflow run). See **SECURITY.md** for download notes.
+- **`httpx` upgrades:** `ApiClient` mirrors `httpx.Client.request` types via `httpx._types` / `httpx._client`. After bumping **httpx**, run the full test suite; `tests/test_httpx_import_contract.py` fails early if those private modules no longer export the expected names.
 - Optional local dependency audit (**same scope as CI** — core + `auth`):
 
   ```bash

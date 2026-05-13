@@ -1,4 +1,8 @@
-"""HTTP client for calling the FastAPI app from Streamlit (server-side, same process host)."""
+"""HTTP client for calling the FastAPI app from Streamlit (server-side, same process host).
+
+Typing mirrors :class:`httpx.Client` via ``httpx._types`` / ``httpx._client`` (see
+``tests/test_httpx_import_contract.py``); re-run tests after **httpx** upgrades.
+"""
 
 from __future__ import annotations
 

@@ -897,7 +897,7 @@ def _doctor_collect(
                     "gateway_forward_client_headers",
                     "PASS",
                     "no browser→Streamlit HTTP header forwarding (default); "
-                    "set_page_header_context for explicit injection",
+                    "set_page_header_context / set_page_cookie_context for explicit injection",
                 )
             )
         rejected = tuple(getattr(fl.settings, "_rejected_forward_headers", ()))

@@ -51,21 +51,26 @@ Import {class}`~fluxlit.pages.di.Depends`, {class}`~fluxlit.pages.di.Header`, an
   FluxLit runs the coroutine on a **short-lived side thread** with its own loop (avoiding
   nested-loop errors). Keep async deps **fast** and **thread-safe**; do not assume you are on
   Streamlit’s main thread.
-- **Header / Cookie:** resolved in order: (1) ``FLUXLIT_TEST_PAGE_OVERRIDES`` / test kwargs,
+- **Header:** resolved in order: (1) ``FLUXLIT_TEST_PAGE_OVERRIDES`` / test kwargs,
   (2) the map from {func}`~fluxlit.pages.di.set_page_header_context`, (3) when present,
   ``st.context.headers`` from Streamlit (HTTP requests only). The gateway does **not** put
   browser headers into the Streamlit process by default.
+- **Cookie:** resolved in order: (1) overrides / ``FLUXLIT_TEST_PAGE_OVERRIDES``, (2)
+  {func}`~fluxlit.pages.di.set_page_cookie_context`, (3) ``st.context.cookies`` (Streamlit
+  1.30+). Cookie **names** are matched case-insensitively. The gateway does **not** merge
+  arbitrary browser cookies onto the internal hop unless your deployment forwards them and
+  Streamlit exposes them on ``st.context``.
 
-  **Optional HTTP forwarding:** set ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT``
-  to a comma-separated or JSON list of **lowercase** header names (for example ``traceparent``).
-  FluxLit copies **only** those names from the browser onto the gateway → Streamlit **HTTP**
-  hop so ``st.context.headers`` and ``Header()`` can read them. ``authorization``, ``cookie``,
-  and hop-by-hop / ``X-Forwarded-*`` names are **rejected**. WebSocket requests already forward
-  most browser headers on a curated path—see :mod:`fluxlit.gateway.websocket_proxy`.
+**Optional HTTP forwarding:** set ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT``
+to a comma-separated or JSON list of **lowercase** header names (for example ``traceparent``).
+FluxLit copies **only** those names from the browser onto the gateway → Streamlit **HTTP**
+hop so ``st.context.headers`` and ``Header()`` can read them. ``authorization``, ``cookie``,
+and hop-by-hop / ``X-Forwarded-*`` names are **rejected**. WebSocket requests already forward
+most browser headers on a curated path—see :mod:`fluxlit.gateway.websocket_proxy`.
 
-  **Explicit bridge:** for sensitive forward-auth patterns, prefer mapping trusted headers into
-  {func}`~fluxlit.pages.di.set_page_header_context` from code that runs in the Streamlit process,
-  with strict allowlists and redaction—never log raw ``Authorization`` or session cookies.
+**Explicit bridge:** for sensitive forward-auth patterns, prefer mapping trusted headers into
+{func}`~fluxlit.pages.di.set_page_header_context` from code that runs in the Streamlit process,
+with strict allowlists and redaction—never log raw ``Authorization`` or session cookies.
 
 **Claims-style models:** use ``Depends`` with a callable that returns a Pydantic model;
 pair with your FastAPI JWT stack on the API side—FluxLit does not parse JWTs in Streamlit
@@ -81,7 +86,9 @@ unless you supply the callable.
 | Async / awaitable deps, flag **on**, **running** loop on thread | Resolved on a **short-lived daemon thread** with its own ``asyncio.run`` so nested-loop errors are avoided. |
 
 Keep async deps idempotent and fast; they must not rely on thread-local state tied to
-Streamlit’s main script thread.
+Streamlit’s main script thread. If resolution exceeds the join limit, FluxLit raises
+:class:`TimeoutError`; the daemon thread may still run until the coroutine completes, so
+avoid unbounded work in async dependencies.
 
 ## Query and session state
 

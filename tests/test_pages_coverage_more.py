@@ -19,9 +19,11 @@ from fluxlit.pages.di import (
     Depends,
     Header,
     _call_kw_for_fn,
+    reset_page_cookie_context,
     reset_page_header_context,
     resolve_and_call_page,
     resolve_page_kwargs,
+    set_page_cookie_context,
     set_page_header_context,
 )
 from fluxlit.pages.flags import FluxlitFeatureFlags
@@ -527,6 +529,103 @@ def test_resolve_page_kwargs_cookie_param() -> None:
         del st, client, ck
 
     kw = resolve_page_kwargs(fn, st=0, client=c, app=app, overrides=None)
+    assert kw["ck"] is None
+
+
+def test_resolve_page_kwargs_cookie_from_context_var() -> None:
+    app = FluxLit()
+
+    def fn(st, client, ck: Annotated[str | None, Cookie("sid")]) -> None:
+        del st, client, ck
+
+    tok = set_page_cookie_context({"sid": "from-ctx"})
+    try:
+        kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+        assert kw["ck"] == "from-ctx"
+    finally:
+        reset_page_cookie_context(tok)
+
+
+def test_resolve_page_kwargs_cookie_from_streamlit_context() -> None:
+    app = FluxLit()
+
+    def fn(st, client, ck: Annotated[str | None, Cookie("sid")]) -> None:
+        del st, client, ck
+
+    cookies_obj = SimpleNamespace(
+        get=lambda name, default=None: "abc" if str(name).lower() == "sid" else default,
+        items=lambda: [("sid", "abc")],
+    )
+    st = SimpleNamespace(context=SimpleNamespace(cookies=cookies_obj))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["ck"] == "abc"
+
+
+def test_resolve_page_kwargs_cookie_context_var_beats_streamlit_context() -> None:
+    app = FluxLit()
+
+    def fn(st, client, ck: Annotated[str | None, Cookie("sid")]) -> None:
+        del st, client, ck
+
+    cookies_obj = SimpleNamespace(
+        get=lambda name, default=None: "from-st" if str(name).lower() == "sid" else default,
+        items=lambda: [],
+    )
+    st = SimpleNamespace(context=SimpleNamespace(cookies=cookies_obj))
+    tok = set_page_cookie_context({"sid": "from-ctxvar"})
+    try:
+        kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+        assert kw["ck"] == "from-ctxvar"
+    finally:
+        reset_page_cookie_context(tok)
+
+
+def test_resolve_page_kwargs_cookie_streamlit_items_when_get_misses() -> None:
+    app = FluxLit()
+
+    def fn(st, client, ck: Annotated[str | None, Cookie("sid")]) -> None:
+        del st, client, ck
+
+    class _Ck:
+        def get(self, name: str, default: object = None) -> object:
+            return default
+
+        def items(self) -> list[tuple[str, str]]:
+            return [("SID", "from-items")]
+
+    st = SimpleNamespace(context=SimpleNamespace(cookies=_Ck()))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["ck"] == "from-items"
+
+
+def test_resolve_page_kwargs_cookie_streamlit_context_exception_returns_none() -> None:
+    app = FluxLit()
+
+    def fn(st, client, ck: Annotated[str | None, Cookie("sid")]) -> None:
+        del st, client, ck
+
+    class _Ctx:
+        @property
+        def cookies(self) -> object:
+            raise RuntimeError("no cookies")
+
+    st = SimpleNamespace(context=_Ctx())
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
+    assert kw["ck"] is None
+
+
+def test_resolve_page_kwargs_cookie_no_match_returns_none() -> None:
+    app = FluxLit()
+
+    def fn(st, client, ck: Annotated[str | None, Cookie("missing")]) -> None:
+        del st, client, ck
+
+    class _Ck:
+        def get(self, name: str, default: object = None) -> object:
+            return default
+
+    st = SimpleNamespace(context=SimpleNamespace(cookies=_Ck()))
+    kw = resolve_page_kwargs(fn, st=st, client=app.get_client(), app=app, overrides=None)
     assert kw["ck"] is None
 
 

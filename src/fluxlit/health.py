@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
 import httpx
 
 from fluxlit.config import FluxlitSettings
@@ -31,23 +33,26 @@ async def probe_streamlit_ready(
     When ``FLUXLIT_STREAMLIT_UPSTREAM`` / file state is unset (typical in bare FastAPI
     tests), returns ``(True, "not_configured")``.
 
-    When configured, readiness requires an HTTP **2xx** response from ``GET`` on the
-    upstream root (``{upstream}/``). Other status codes (including 3xx/4xx) are treated
-    as not ready so Kubernetes-style probes reflect a healthy Streamlit app.
+    When configured, readiness requires an HTTP **2xx** response from ``GET`` on at least
+    one candidate URL (see :func:`_streamlit_readiness_urls`). Other status codes are treated
+    as not ready. When multiple URLs are probed and all fail, ``detail`` aggregates path and
+    status (for example ``upstream_http_failed /:404;/myapp/:503``).
     """
     resolved_upstream = read_streamlit_upstream_url() if upstream is None else upstream
     if not resolved_upstream:
         return True, "not_configured"
     try:
         async with httpx.AsyncClient(timeout=timeout_s) as client:
-            detail = ""
+            failures: list[str] = []
             for url in _streamlit_readiness_urls(resolved_upstream, settings=settings):
                 response = await client.get(url)
                 if 200 <= response.status_code < 300:
                     return True, "ok"
-                detail = f"upstream_http_{response.status_code}"
+                path = urlparse(url).path or "/"
+                failures.append(f"{path}:{response.status_code}")
+            joined = ";".join(failures)
+            return False, f"upstream_http_failed {joined}"
     except (httpx.HTTPError, OSError) as e:
         # Some Win32 socket errors stringify to "", but tests/ops want a non-empty reason.
         detail = str(e) or f"{type(e).__name__}: {e!r}"
         return False, detail
-    return False, detail

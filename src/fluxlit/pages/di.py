@@ -19,9 +19,14 @@ _header_context: contextvars.ContextVar[Mapping[str, str] | None] = contextvars.
     "fluxlit_page_headers",
     default=None,
 )
+_cookie_context: contextvars.ContextVar[Mapping[str, str] | None] = contextvars.ContextVar(
+    "fluxlit_page_cookies",
+    default=None,
+)
 
 
 _HeaderCtxToken = contextvars.Token[Mapping[str, str] | None]
+_CookieCtxToken = contextvars.Token[Mapping[str, str] | None]
 
 
 def set_page_header_context(headers: Mapping[str, str] | None) -> _HeaderCtxToken:
@@ -31,6 +36,15 @@ def set_page_header_context(headers: Mapping[str, str] | None) -> _HeaderCtxToke
 
 def reset_page_header_context(token: _HeaderCtxToken) -> None:
     _header_context.reset(token)
+
+
+def set_page_cookie_context(cookies: Mapping[str, str] | None) -> _CookieCtxToken:
+    """Set optional cookie map for :class:`Cookie` injection (tests or trusted hooks)."""
+    return _cookie_context.set(cookies)
+
+
+def reset_page_cookie_context(token: _CookieCtxToken) -> None:
+    _cookie_context.reset(token)
 
 
 class Depends:
@@ -54,7 +68,10 @@ class Header:
 
 
 class Cookie:
-    """Reserved for future cookie-based injection (same resolution path as :class:`Header`)."""
+    """Inject a cookie value by name.
+
+    Values come from overrides, :func:`set_page_cookie_context`, or ``st.context.cookies``.
+    """
 
     def __init__(self, name: str) -> None:
         self.name = name.lower()
@@ -143,6 +160,28 @@ def _header_from_streamlit_context(st: Any, name_lc: str) -> str | None:
     return None
 
 
+def _cookie_from_streamlit_context(st: Any, name_lc: str) -> str | None:
+    """Best-effort read from ``st.context.cookies`` (Streamlit 1.30+)."""
+    try:
+        proxy = getattr(st, "context", None)
+        cookies = getattr(proxy, "cookies", None) if proxy is not None else None
+        if cookies is None:
+            return None
+        get = getattr(cookies, "get", None)
+        if get is not None and callable(get):
+            v = get(name_lc)
+            if v is not None:
+                return str(v)
+        items = getattr(cookies, "items", None)
+        if callable(items):
+            for k, val in items():
+                if str(k).lower() == name_lc:
+                    return str(val)
+    except Exception:
+        return None
+    return None
+
+
 def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> Any:
     allow_async = bool(getattr(app.settings, "async_page_depends", False))
 
@@ -159,6 +198,9 @@ def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> An
 
         Avoids ``RuntimeError`` when Streamlit (or another caller) already has a running
         loop on this thread while ``anyio.run`` / ``asyncio.run`` cannot nest.
+
+        If :class:`TimeoutError` is raised after the join limit, cooperative cancellation
+        is not applied; the daemon thread may still complete the coroutine in the background.
         """
         result: list[Any] = []
         error: list[BaseException] = []
@@ -177,6 +219,8 @@ def _resolve_depends_callable(dependency: Callable[..., Any], *, app: Any) -> An
         th.start()
         th.join(timeout=300.0)
         if th.is_alive():
+            # The worker keeps running on its own event loop until the coroutine finishes;
+            # the thread is a daemon. Avoid unbounded work inside async deps.
             msg = "async Depends resolution timed out"
             raise TimeoutError(msg)
         if error:
@@ -244,7 +288,14 @@ def resolve_page_kwargs(
             continue
         ck = _unwrap_cookie(param, hints, name)
         if ck is not None:
-            kwargs[name] = merged.get(name)
+            if name in merged:
+                kwargs[name] = merged[name]
+            else:
+                ctx = _cookie_context.get() or {}
+                val = ctx.get(ck.name)
+                if val is None:
+                    val = _cookie_from_streamlit_context(st, ck.name)
+                kwargs[name] = val
             continue
         if name == "st":
             kwargs[name] = st
@@ -342,8 +393,10 @@ __all__ = [
     "Depends",
     "Header",
     "env_page_overrides",
+    "reset_page_cookie_context",
     "reset_page_header_context",
     "resolve_and_call_page",
     "resolve_page_kwargs",
+    "set_page_cookie_context",
     "set_page_header_context",
 ]

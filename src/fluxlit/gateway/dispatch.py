@@ -123,7 +123,7 @@ def make_gateway_app(
             qs_raw = scope.get("query_string", b"") or b""
             try:
                 qs_dec = qs_raw.decode("latin-1")
-            except Exception:
+            except UnicodeError:
                 qs_dec = ""
             log_extra = {
                 "request_id": rid,

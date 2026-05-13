@@ -73,6 +73,22 @@ class _MountedOkHandler(BaseHTTPRequestHandler):
         return
 
 
+class _DualPathFailHandler(BaseHTTPRequestHandler):
+    """Root and mount paths return different non-2xx codes (readiness detail aggregation)."""
+
+    def do_GET(self) -> None:
+        if self.path in {"/", ""}:
+            self.send_response(404)
+        elif self.path == "/myapp/":
+            self.send_response(503)
+        else:
+            self.send_error(400)
+        self.end_headers()
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
+
+
 @pytest.fixture
 def http_root_ok() -> Generator[str, None, None]:
     port = find_free_port()
@@ -138,6 +154,19 @@ def http_mounted_ok() -> Generator[str, None, None]:
         thread.join(timeout=10)
 
 
+@pytest.fixture
+def http_dual_path_fail() -> Generator[str, None, None]:
+    port = find_free_port()
+    server = HTTPServer(("127.0.0.1", port), _DualPathFailHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=10)
+
+
 @pytest.mark.asyncio
 async def test_probe_ready_when_upstream_returns_200(
     http_root_ok: str,
@@ -193,6 +222,20 @@ async def test_probe_not_ready_on_upstream_302(
     ok, detail = await probe_streamlit_ready(timeout_s=2.0)
     assert ok is False
     assert "302" in detail
+
+
+@pytest.mark.asyncio
+async def test_probe_not_ready_aggregates_multiple_probe_urls(
+    http_dual_path_fail: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_STREAMLIT_UPSTREAM", http_dual_path_fail)
+    monkeypatch.delenv("FLUXLIT_STREAMLIT_UPSTREAM_FILE", raising=False)
+    monkeypatch.setenv("FLUXLIT_ROOT_PATH", "/myapp")
+    ok, detail = await probe_streamlit_ready(timeout_s=2.0)
+    assert ok is False
+    assert "upstream_http_failed" in detail
+    assert "404" in detail and "503" in detail
 
 
 @pytest.mark.asyncio

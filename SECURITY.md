@@ -2,18 +2,15 @@
 
 ## Supported versions
 
-Security fixes are applied to the **current release line** on [PyPI](https://pypi.org/project/fluxlit/). Older versions may not receive backports; upgrade when possible.
+Security fixes are applied to the **current minor release line** on [PyPI](https://pypi.org/project/fluxlit/) (for example **0.13.x** while that line is current). Older minors may receive **best-effort** fixes only; upgrade to the latest patch on the current line when reporting or consuming fixes.
 
-| Version   | Support note                                      |
-| --------- | ------------------------------------------------- |
-| **0.8.x** | Active                                            |
-| **0.7.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
-| **0.6.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
-| **0.5.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
-| **0.4.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
-| **0.3.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
-| **0.2.x** | Best-effort fixes; upgrade to 0.8.x recommended   |
-| **< 0.2** | Upgrade recommended; limited backporting        |
+There is **no separate LTS branch** for **0.x**; policy matches [Support matrix](https://fluxlit.readthedocs.io/en/stable/support-matrix.html) (long-term support section).
+
+| Version line | Support note |
+| ------------ | ------------ |
+| **Current minor** on PyPI (e.g. **0.13.x**) | **Active** — security-relevant fixes target this line first. |
+| **Previous minors** (e.g. **0.12.x**, **0.11.x**) | **Best-effort** — upgrade to the current minor when practical. |
+| **Older 0.x** | **Upgrade recommended** — limited backporting; same best-effort stance as previous minors. |
 
 Pre-release installs (e.g. from `main`) should track the latest commit for fixes.
 
@@ -39,6 +36,8 @@ Include affected versions, component (gateway, `ApiClient`, JWT/OIDC helpers, et
   ```
 
   To scan a contributor environment (tests, docs, Streamlit stack), install `".[dev,auth,docs]"` and run `pip-audit`; expect more transitive packages and possible advisories outside FluxLit’s direct control.
+
+- **httpx bumps:** `ApiClient` imports a few **typing-only** symbols from `httpx._types` and `httpx._client` (see `src/fluxlit/client.py`). After any **httpx** upgrade, run the full test suite; `tests/test_httpx_import_contract.py` fails early if those private modules no longer export the symbols FluxLit expects.
 
 ## Hardening references
 
