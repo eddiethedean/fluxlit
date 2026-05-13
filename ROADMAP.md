@@ -43,7 +43,7 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 - **Evidence:** publish or extend scripted **load / soak / chaos** scenarios with expected signals (metrics, logs, `readyz`); align outcomes with [runbooks](docs/runbooks.md).
 - **Scale:** first-class docs for **multi-replica** Streamlit + gateway: sticky sessions, external `SessionStore` (e.g. Redis), rollout/drain — building on existing examples and URL-session guides.
 - **Stability charter:** classify **Prometheus metric names/labels**, **page manifest** fields (`manifest_version` 1), log field names, and experimental settings (`experimental_yield_pages`, etc.) into **stable for 1.0** vs **experimental** in docs; adjust code comments/README if needed so CI and operators share one vocabulary.
-- **DX:** clearer startup and CLI errors for invalid combinations (unsafe `forwarded_allow_ips`, `public_base_url` / `root_path` mismatch, multi-worker unified mode).
+- **DX:** clearer startup and CLI errors for invalid combinations (unsafe `forwarded_allow_ips`, `public_base_url` / `root_path` mismatch). **0.11.0** ships lifespan fail-fast for unified Uvicorn ``workers`` > 1 (see [docs/deployment.md](docs/deployment.md)); remaining DX items are follow-ups.
 
 **Exit criteria (enter Phase 3)**
 
@@ -99,6 +99,13 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 - **Diagnostics:** ``fluxlit doctor`` / ``fluxlit config`` warn when gateway header allowlists request **rejected** credential-style names (never forwarded); warn when ``trust_proxy`` is on with **unlimited** proxied upload size; ``fluxlit doctor --verbose`` ``gateway_proxy`` JSON includes max body bytes and concurrent upstream cap; :class:`~fluxlit.config.FluxlitSettings` records rejected forward-header names for those warnings.
 - **Roadmap tracking:** Phase 2 “suggested PR slices” subsection (implementation tracking) under **[Phase 2 — delivery checklist](#phase-2--delivery-checklist-track-as-issuesmilestones)**.
 
+**Release & CI (0.11.0 verification, May 2026)**
+
+- **`main` / `v0.11.0`:** `main` includes the consolidated **CHANGELOG** / **ROADMAP** edits plus doc alignment for the multi-worker lifespan guard and Prometheus **DEBUG** observe logging; the annotated git tag **`v0.11.0`** points at that tip so the tag matches the repository’s canonical 0.11.0 narrative.
+- **Default CI ([`ci.yml`](.github/workflows/ci.yml)):** **green** on `main` for those commits (OS × Python matrix, Ruff, **`pytest -n auto -m "not slow"`**, Mypy on `src/fluxlit`).
+- **Release workflow ([`release.yml`](.github/workflows/release.yml)):** reruns complete **Ruff**, **pytest** with **`--cov-fail-under=100`**, **Mypy**, regenerated **`docs/_generated`** snapshot check, **Sphinx** **`-W`**, **`pip-audit`** on **`.[auth]`**, **build**, **twine check**, and a **wheel smoke install**. One run hit a **spurious cancel** during the test step after tests had already passed; **rerun** finished **checks** successfully — treat as a flake to watch; consider documenting “rerun Release if checks cancel mid-step.”
+- **PyPI immutability:** **`fluxlit==0.11.0`** files on PyPI came from the **first** successful **`v0.11.0`** publish; **uploads cannot be replaced**. After moving the git tag forward, **PyPI wheels/sdists** are still byte-identical to that first publish. Need artifacts that include **commits after that upload** → ship **0.11.1** (or later) with a new tag.
+
 **Done (0.10.0)**
 
 - **Gateway header bridge:** optional ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` / :class:`~fluxlit.config.FluxlitSettings.gateway_forward_client_headers_to_streamlit` allowlists browser header names onto the gateway → Streamlit **HTTP** hop (rejects credentials / hop-by-hop); :class:`~fluxlit.pages.di.Header` also reads ``st.context.headers`` after :func:`~fluxlit.pages.di.set_page_header_context`.
@@ -138,7 +145,7 @@ Split Phase 2 work so each change stays reviewable and bisectable:
 
 **Gaps vs “production”**
 
-- CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time.
+- CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time. **Release** workflow parity with the **`docs`** job on tag pushes is exercised for **0.11.0** (see **Release & CI** above); align future tags with PyPI before upload or bump **patch** when artifacts must change.
 - **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain ongoing.
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes — **1.0 readiness** is now spelled out in **[Path to 1.0](#path-to-1-0)** above.
@@ -156,6 +163,7 @@ Split Phase 2 work so each change stays reviewable and bisectable:
 | Multi-replica + external ``SessionStore`` as first-class ops narrative | Examples + URL-session docs | **0.12.x** — expanded playbooks |
 | Stability charter (metric/manifest field classes) | — | **0.12.x** |
 | Per-push min/max dependency matrix | — | Optional / **post-1.0** cost tradeoff (see support matrix) |
+| Git **`v0.11.0`** vs first PyPI **0.11.0** upload | Tag updated post-publish for docs/changelog/guard alignment | **0.11.1+** on PyPI if wheel/sdist must match newer commits |
 
 ---
 
