@@ -10,7 +10,7 @@ The ``fluxlit`` console script (see :mod:`fluxlit.cli`) runs the combined dev/pr
 
 **Stable surface:** symbols in ``__all__`` below are the primary supported imports for
 applications and tests; treat other submodules as internal unless documented in
-:doc:`support-matrix` or API reference.
+:doc:`/support-matrix` or API reference.
 
 Optional auth ergonomics (after ``pip install "fluxlit[auth]"``):
 :meth:`fluxlit.app.FluxLit.make_jwt_bearer`,
