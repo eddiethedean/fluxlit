@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import types
 from collections.abc import Awaitable, Callable, MutableMapping
 from contextlib import contextmanager
@@ -824,6 +825,429 @@ async def test_proxy_websocket_options_and_bidirectional_bytes_text(
     assert {"type": "websocket.accept"} in sent
     assert {"type": "websocket.send", "bytes": b"from-upstream"} in sent
     assert {"type": "websocket.send", "text": "text-upstream"} in sent
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_upstream_recv_failure_after_accept_closes_client(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Relay errors after ``websocket.accept`` must not escape ASGI; client gets 1011."""
+
+    client_recv_q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            return None
+
+        async def recv(self) -> bytes:
+            raise OSError("simulated upstream read failure")
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "fluxlit.gateway.websocket_proxy.websockets.connect", lambda *_a, **_k: _FakeConnectCM()
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    connect_handshake_done = False
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        nonlocal connect_handshake_done
+        if not connect_handshake_done:
+            connect_handshake_done = True
+            return {"type": "websocket.connect"}
+        return await client_recv_q.get()
+
+    caplog.set_level("WARNING", logger="fluxlit.gateway")
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"example")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-recv-fail",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert {"type": "websocket.accept", "subprotocol": "streamlit"} in sent
+    assert sent[-1] == {"type": "websocket.close", "code": 1011}
+    assert any(
+        "upstream_to_client failed" in r.message for r in caplog.records if r.levelname == "WARNING"
+    )
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_upstream_send_failure_after_accept_closes_client(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """If forwarding client frames upstream raises, close the browser socket with 1011."""
+
+    upstream_recv_block: asyncio.Queue[bytes] = asyncio.Queue()
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+        _send_n = 0
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            self._send_n += 1
+            raise OSError("simulated upstream write failure")
+
+        async def recv(self) -> bytes:
+            return await upstream_recv_block.get()
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "fluxlit.gateway.websocket_proxy.websockets.connect", lambda *_a, **_k: _FakeConnectCM()
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    async def receive() -> dict[str, Any]:
+        return await q.get()
+
+    await q.put({"type": "websocket.connect"})
+    await q.put({"type": "websocket.receive", "bytes": b"from-browser"})
+
+    caplog.set_level("WARNING", logger="fluxlit.gateway")
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"example")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-send-fail",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert {"type": "websocket.accept", "subprotocol": "streamlit"} in sent
+    assert sent[-1] == {"type": "websocket.close", "code": 1011}
+    assert any(
+        "client_to_upstream failed" in r.message for r in caplog.records if r.levelname == "WARNING"
+    )
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_asgi_send_failure_after_accept_closes_client(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """If forwarding upstream bytes to the ASGI client raises, emit one server close."""
+
+    client_recv_q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            return None
+
+        async def recv(self) -> bytes:
+            return b"payload"
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "fluxlit.gateway.websocket_proxy.websockets.connect", lambda *_a, **_k: _FakeConnectCM()
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    connect_handshake_done = False
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        if msg.get("type") == "websocket.send":
+            raise RuntimeError("simulated ASGI send failure")
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        nonlocal connect_handshake_done
+        if not connect_handshake_done:
+            connect_handshake_done = True
+            return {"type": "websocket.connect"}
+        return await client_recv_q.get()
+
+    caplog.set_level("WARNING", logger="fluxlit.gateway")
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"example")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-asgi-send-fail",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert {"type": "websocket.accept", "subprotocol": "streamlit"} in sent
+    assert sent[-1] == {"type": "websocket.close", "code": 1011}
+    assert any(
+        "upstream_to_client failed" in r.message for r in caplog.records if r.levelname == "WARNING"
+    )
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_both_relays_fail_try_close_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When both relay tasks error, the second ``_try_close`` path is a no-op (dedup)."""
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            return None
+
+        async def recv(self) -> bytes:
+            raise OSError("upstream recv boom")
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "fluxlit.gateway.websocket_proxy.websockets.connect", lambda *_a, **_k: _FakeConnectCM()
+    )
+
+    sent: list[dict[str, Any]] = []
+    recv_calls = {"n": 0}
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        c = recv_calls["n"]
+        recv_calls["n"] += 1
+        if c == 0:
+            return {"type": "websocket.connect"}
+        raise OSError("client receive boom")
+
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"example")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-dual-fail",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert {"type": "websocket.accept", "subprotocol": "streamlit"} in sent
+    assert [m for m in sent if m.get("type") == "websocket.close" and m.get("code") == 1011] == [
+        {"type": "websocket.close", "code": 1011}
+    ]
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_try_close_client_send_raises_logs_debug(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """If ``websocket.close`` cannot be sent after a relay error, log at DEBUG."""
+
+    client_recv_q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            return None
+
+        async def recv(self) -> bytes:
+            return b"payload"
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "fluxlit.gateway.websocket_proxy.websockets.connect", lambda *_a, **_k: _FakeConnectCM()
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    connect_handshake_done = False
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        mtype = msg.get("type")
+        if mtype == "websocket.send":
+            raise RuntimeError("simulated ASGI send failure")
+        if mtype == "websocket.close":
+            raise RuntimeError("simulated ASGI close failure")
+        sent.append(dict(msg))
+
+    async def receive() -> dict[str, Any]:
+        nonlocal connect_handshake_done
+        if not connect_handshake_done:
+            connect_handshake_done = True
+            return {"type": "websocket.connect"}
+        return await client_recv_q.get()
+
+    caplog.set_level(logging.DEBUG, logger="fluxlit.gateway")
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"example")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-close-send-fail",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert any("could not send client close after relay error" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_proxy_websocket_connection_closed_on_upstream_send_from_client_relay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``websockets.ConnectionClosed`` from ``upstream_ws.send`` cancels without server 1011."""
+
+    upstream_recv_block: asyncio.Queue[bytes] = asyncio.Queue()
+
+    class _FakeUpstreamWs:
+        subprotocol = "streamlit"
+
+        async def send(self, *_a: object, **_kw: object) -> None:
+            raise websockets.ConnectionClosed(rcvd=Close(1000, ""), sent=None)
+
+        async def recv(self) -> bytes:
+            return await upstream_recv_block.get()
+
+        async def close(self) -> None:
+            return None
+
+    class _FakeConnectCM:
+        async def __aenter__(self) -> _FakeUpstreamWs:
+            return _FakeUpstreamWs()
+
+        async def __aexit__(self, *_exc: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "fluxlit.gateway.websocket_proxy.websockets.connect", lambda *_a, **_k: _FakeConnectCM()
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    q: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+    await q.put({"type": "websocket.connect"})
+    await q.put({"type": "websocket.receive", "bytes": b"x"})
+
+    async def receive() -> dict[str, Any]:
+        return await q.get()
+
+    scope: dict[str, Any] = {
+        "type": "websocket",
+        "path": "/_stcore/stream",
+        "headers": [(b"host", b"example")],
+        "query_string": b"",
+        "subprotocols": ["streamlit"],
+        "scheme": "http",
+        "client": ("1.2.3.4", 1),
+    }
+    await _proxy_websocket(
+        scope,
+        receive,
+        send,
+        "http://127.0.0.1:8501",
+        "/_stcore/stream",
+        request_id="ws-connclosed-send",
+        proxy_options=GatewayProxyOptions(),
+    )
+    assert {"type": "websocket.accept", "subprotocol": "streamlit"} in sent
+    assert not any(m.get("type") == "websocket.close" for m in sent)
 
 
 @pytest.mark.asyncio

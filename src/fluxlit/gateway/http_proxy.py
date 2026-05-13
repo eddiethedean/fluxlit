@@ -4,6 +4,13 @@ Responses are read with ``stream=False`` and the full body buffered before retur
 to the client; very large upstream payloads can use significant memory. For limits on
 **request** bodies proxied to Streamlit, see ``gateway_max_proxy_request_body_bytes``.
 
+**Streaming upstream responses (not implemented):** a future ``httpx`` ``stream=True``
+path could forward ``http.response.body`` chunks as they arrive, cutting peak memory
+for large HTML/asset responses at the cost of more complex hop-by-hop header handling,
+tighter coupling to upstream ``Content-Length`` / chunking semantics, and new timeout
+edges (slow-byte stalls). Until that ships, size-sensitive downloads should go through
+the FastAPI mount (not the Streamlit proxy) or be served from a CDN/object store.
+
 **Wire headers (HTTP hop):** Upstream headers start from the client ASGI scope after
 :func:`fluxlit.gateway.header_filter.filter_request_headers` (drops hop-by-hop lines,
 client ``Host``, and client ``X-Forwarded-*``). **Most remaining client headers are

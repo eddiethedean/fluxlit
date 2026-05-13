@@ -32,7 +32,9 @@ from fluxlit.auth.jwt import (
 from fluxlit.auth.oidc import (
     GenericOIDCClient,
     GenericOIDCClientConfig,
+    InMemoryOIDCBFFTokenStore,
     OIDCBFFConfig,
+    OIDCBFFTokenStore,
     OIDCProvider,
     pkce_pair,
     register_oidc_bff_routes,
@@ -97,6 +99,7 @@ __all__ = [
     "OIDCProvider",
     "GenericOIDCClient",
     "GenericOIDCClientConfig",
+    "InMemoryOIDCBFFTokenStore",
     "RequireRoles",
     "RequireScopes",
     "StandardClaims",
@@ -106,6 +109,7 @@ __all__ = [
     "issue_hs256_access_token",
     "pkce_pair",
     "register_oidc_bff_routes",
+    "OIDCBFFTokenStore",
     "SessionStore",
     "InMemorySessionStore",
     "match_nav_page",
@@ -122,4 +126,4 @@ __all__ = [
     "trace_span",
     "__version__",
 ]
-__version__ = "0.13.0"
+__version__ = "0.13.1"

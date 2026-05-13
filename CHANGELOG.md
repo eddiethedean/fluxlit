@@ -4,6 +4,13 @@
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 
+## 0.13.1 - 2026-05-14
+
+- **Gateway (WebSocket):** After ``websocket.accept``, relay failures log, issue a single best-effort ``websocket.close`` (code **1011**) on generic errors, and ignore duplicate close attempts; cover ``ConnectionClosed`` from upstream ``send`` without treating it as a relay ``Exception``.
+- **CI:** ``scripts/smoke_fluxlit_run.sh`` probes ``fluxlit run`` on the smoke app (``/api/healthz`` then ``/api/readyz``); new ``fluxlit-run-smoke`` GitHub Actions job.
+- **Docs:** ``http_proxy`` module docstring on a possible future streaming upstream hop and tradeoffs (memory vs complexity).
+- **Auth (OIDC BFF):** :class:`~fluxlit.auth.oidc.OIDCBFFTokenStore` protocol, :class:`~fluxlit.auth.oidc.InMemoryOIDCBFFTokenStore`, and :attr:`~fluxlit.auth.oidc.OIDCBFFConfig.bff_token_store` for shared PKCE / exchange storage across API replicas; ``SECURITY.md`` and ``examples/oidc_bff_pluggable_store/README.md`` updated.
+
 ## 0.13.0 - 2026-05-13
 
 - **Phase 2 follow-through:** ``scripts/soak_metrics.sh`` and soak methodology in {doc}`runbooks` / {doc}`testing`; weekly **informational** FluxLit soak job in ``soak-scheduled.yml``; ``soak-fluxlit-dispatch`` runs metrics soak when metrics are enabled.

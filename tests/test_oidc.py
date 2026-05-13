@@ -8,7 +8,11 @@ import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
-from fluxlit.auth.oidc import OIDCBFFConfig, register_oidc_bff_routes
+from fluxlit.auth.oidc import (
+    InMemoryOIDCBFFTokenStore,
+    OIDCBFFConfig,
+    register_oidc_bff_routes,
+)
 
 
 def _unsigned_id_token(sub: str) -> str:
@@ -134,3 +138,37 @@ def test_register_oidc_bff_warns_when_public_base_url_empty() -> None:
     )
     with pytest.warns(UserWarning, match="public_base_url is empty"):
         register_oidc_bff_routes(app, cfg)
+
+
+def test_oidc_bff_explicit_in_memory_token_store() -> None:
+    """``bff_token_store`` can be injected (shared-store pattern for HA deployments)."""
+    app = FastAPI()
+    store = InMemoryOIDCBFFTokenStore(state_ttl_seconds=120.0, otc_ttl_seconds=60.0)
+    cfg = OIDCBFFConfig(
+        oidc=_StubOIDC(),
+        first_party_secret="bff-first-party-secret-32bytes-x",
+        token_issuer="bff",
+        token_audience="app",
+        access_token_ttl_seconds=600,
+        public_base_url="http://testserver",
+        allow_unverified_id_token_for_custom_oidc=True,
+        bff_token_store=store,
+    )
+    register_oidc_bff_routes(app, cfg)
+    client = TestClient(app)
+
+    r1 = client.get("/auth/login", follow_redirects=False)
+    assert r1.status_code == 302
+    state = parse_qs(urlparse(r1.headers["location"]).query)["state"][0]
+
+    r2 = client.get(
+        "/auth/callback",
+        params={"code": "from-idp", "state": state},
+        follow_redirects=False,
+    )
+    assert r2.status_code == 302
+    auth_code = parse_qs(urlparse(r2.headers["location"]).query)["auth_code"][0]
+
+    r3 = client.post("/auth/exchange", json={"code": auth_code})
+    assert r3.status_code == 200
+    assert r3.json().get("token_type") == "bearer"

@@ -61,6 +61,22 @@ def pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
+class OIDCBFFTokenStore(Protocol):
+    """Storage for OIDC BFF PKCE ``state`` and one-time ``auth_code`` exchange payloads.
+
+    Defaults to :class:`InMemoryOIDCBFFTokenStore` (process memory). Multi-replica API
+    deployments should inject a shared implementation (for example Redis with TTL).
+    """
+
+    def save_pkce_verifier(self, state: str, code_verifier: str, *, now: float) -> None: ...
+
+    def pop_pkce_verifier(self, state: str, *, now: float) -> str | None: ...
+
+    def save_exchange_token(self, auth_code: str, access_token: str, *, now: float) -> None: ...
+
+    def pop_exchange_token(self, auth_code: str, *, now: float) -> str | None: ...
+
+
 @dataclass
 class GenericOIDCClientConfig:
     issuer: str
@@ -165,9 +181,6 @@ class OIDCBFFConfig:
     streamlit_redirect_path: str = "/"
     """Browser path to send the user to with a one-time ``auth_code`` query param."""
 
-    _state_store: dict[str, tuple[str, float]] = field(default_factory=dict)
-    _otc_store: dict[str, tuple[str, float]] = field(default_factory=dict)
-
     state_ttl_seconds: int = 600
     otc_ttl_seconds: int = 120
 
@@ -188,11 +201,46 @@ class OIDCBFFConfig:
     tokens before returning them, or for tests.
     """
 
+    bff_token_store: OIDCBFFTokenStore | None = None
+    """Optional shared storage for PKCE ``state`` and one-time ``auth_code`` values.
+
+    When ``None``, :func:`register_oidc_bff_routes` uses :class:`InMemoryOIDCBFFTokenStore`
+    with :attr:`state_ttl_seconds` and :attr:`otc_ttl_seconds` (single replica).
+    """
+
 
 def _purge_expired(store: dict[str, tuple[str, float]], ttl: float, now: float) -> None:
     expired = [k for k, (_, t0) in store.items() if now - t0 > ttl]
     for k in expired:
         del store[k]
+
+
+@dataclass
+class InMemoryOIDCBFFTokenStore:
+    """Process-local PKCE and exchange storage (default for :class:`OIDCBFFConfig`)."""
+
+    _pkce: dict[str, tuple[str, float]] = field(default_factory=dict)
+    _exchange: dict[str, tuple[str, float]] = field(default_factory=dict)
+    state_ttl_seconds: float = 600.0
+    otc_ttl_seconds: float = 120.0
+
+    def save_pkce_verifier(self, state: str, code_verifier: str, *, now: float) -> None:
+        _purge_expired(self._pkce, self.state_ttl_seconds, now)
+        self._pkce[state] = (code_verifier, now)
+
+    def pop_pkce_verifier(self, state: str, *, now: float) -> str | None:
+        _purge_expired(self._pkce, self.state_ttl_seconds, now)
+        entry = self._pkce.pop(state, None)
+        return None if entry is None else entry[0]
+
+    def save_exchange_token(self, auth_code: str, access_token: str, *, now: float) -> None:
+        _purge_expired(self._exchange, self.otc_ttl_seconds, now)
+        self._exchange[auth_code] = (access_token, now)
+
+    def pop_exchange_token(self, auth_code: str, *, now: float) -> str | None:
+        _purge_expired(self._exchange, self.otc_ttl_seconds, now)
+        entry = self._exchange.pop(auth_code, None)
+        return None if entry is None else entry[0]
 
 
 class ExchangeBody(BaseModel):
@@ -216,6 +264,10 @@ def register_oidc_bff_routes(
             stacklevel=2,
         )
     router = APIRouter(prefix=router_prefix, tags=["auth"])
+    token_store = config.bff_token_store or InMemoryOIDCBFFTokenStore(
+        state_ttl_seconds=float(config.state_ttl_seconds),
+        otc_ttl_seconds=float(config.otc_ttl_seconds),
+    )
 
     def redirect_uri(request: Request) -> str:
         base = (config.public_base_url or str(request.base_url)).rstrip("/")
@@ -230,8 +282,7 @@ def register_oidc_bff_routes(
         verifier, challenge = pkce_pair()
         state = secrets.token_urlsafe(32)
         now = time.monotonic()
-        _purge_expired(config._state_store, float(config.state_ttl_seconds), now)
-        config._state_store[state] = (verifier, now)
+        token_store.save_pkce_verifier(state, verifier, now=now)
         url = config.oidc.authorization_url(
             redirect_uri=redirect_uri(request),
             state=state,
@@ -247,11 +298,9 @@ def register_oidc_bff_routes(
         if not code or not state:
             raise HTTPException(status_code=400, detail="Missing code or state")
         now = time.monotonic()
-        _purge_expired(config._state_store, float(config.state_ttl_seconds), now)
-        entry = config._state_store.pop(state, None)
-        if entry is None:
+        verifier = token_store.pop_pkce_verifier(state, now=now)
+        if verifier is None:
             raise HTTPException(status_code=400, detail="Invalid or expired state")
-        verifier, _ = entry
         tokens = config.oidc.exchange_code(
             code=code,
             code_verifier=verifier,
@@ -269,8 +318,8 @@ def register_oidc_bff_routes(
             ttl_seconds=config.access_token_ttl_seconds,
         )
         otc = secrets.token_urlsafe(32)
-        _purge_expired(config._otc_store, float(config.otc_ttl_seconds), now)
-        config._otc_store[otc] = (access, now)
+        now = time.monotonic()
+        token_store.save_exchange_token(otc, access, now=now)
         dest = _with_query(
             base=(config.public_base_url or str(request.base_url)).rstrip("/"),
             path=config.streamlit_redirect_path,
@@ -281,11 +330,9 @@ def register_oidc_bff_routes(
     @router.post(config.exchange_path)
     def exchange(body: ExchangeBody) -> dict[str, str]:
         now = time.monotonic()
-        _purge_expired(config._otc_store, float(config.otc_ttl_seconds), now)
-        entry = config._otc_store.pop(body.code, None)
-        if entry is None:
+        token = token_store.pop_exchange_token(body.code, now=now)
+        if token is None:
             raise HTTPException(status_code=401, detail="Invalid or expired auth code")
-        token, _ = entry
         return {"access_token": token, "token_type": "bearer"}
 
     app.include_router(router)
@@ -379,7 +426,9 @@ def _subject_from_id_token_parse_only(id_token: str) -> str:
 __all__ = [
     "GenericOIDCClient",
     "GenericOIDCClientConfig",
+    "InMemoryOIDCBFFTokenStore",
     "OIDCBFFConfig",
+    "OIDCBFFTokenStore",
     "OIDCProvider",
     "pkce_pair",
     "register_oidc_bff_routes",

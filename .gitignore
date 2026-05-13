@@ -51,5 +51,6 @@ htmlcov/
 .streamlit/secrets.toml
 
 # FluxLit local dev artifacts
+.fluxlit-dev.pid
 .fluxlit-dev*.log
 .fluxlit-nohup.pid

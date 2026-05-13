@@ -93,22 +93,51 @@ async def proxy_websocket(
             else:
                 await send({"type": "websocket.accept"})
 
+            relay_close_sent = False
+
+            async def _try_close_client_after_relay_error() -> None:
+                """Best-effort server close after the relay hits a non-protocol error."""
+                nonlocal relay_close_sent
+                if relay_close_sent:
+                    return
+                relay_close_sent = True
+                try:
+                    await send({"type": "websocket.close", "code": 1011})
+                except Exception as close_exc:
+                    gateway_log.debug(
+                        "gateway websocket: could not send client close after relay error "
+                        "request_id=%s: %s",
+                        request_id,
+                        close_exc,
+                    )
+
             async with anyio.create_task_group() as tg:
 
                 async def client_to_upstream() -> None:
-                    while True:
-                        message = await receive()
-                        mtype = message["type"]
-                        if mtype == "websocket.receive":
-                            if message.get("bytes") is not None:
-                                await upstream_ws.send(message["bytes"])
-                            elif message.get("text") is not None:
-                                await upstream_ws.send(message["text"])
-                        elif mtype == "websocket.disconnect":
-                            with anyio.move_on_after(0.1):
-                                await upstream_ws.close()
-                            tg.cancel_scope.cancel()
-                            return
+                    try:
+                        while True:
+                            message = await receive()
+                            mtype = message["type"]
+                            if mtype == "websocket.receive":
+                                if message.get("bytes") is not None:
+                                    await upstream_ws.send(message["bytes"])
+                                elif message.get("text") is not None:
+                                    await upstream_ws.send(message["text"])
+                            elif mtype == "websocket.disconnect":
+                                with anyio.move_on_after(0.1):
+                                    await upstream_ws.close()
+                                tg.cancel_scope.cancel()
+                                return
+                    except websockets.ConnectionClosed:
+                        tg.cancel_scope.cancel()
+                    except Exception as exc:
+                        gateway_log.warning(
+                            "gateway websocket client_to_upstream failed request_id=%s: %s",
+                            request_id,
+                            exc,
+                        )
+                        await _try_close_client_after_relay_error()
+                        tg.cancel_scope.cancel()
 
                 async def upstream_to_client() -> None:
                     try:
@@ -119,6 +148,14 @@ async def proxy_websocket(
                             else:
                                 await send({"type": "websocket.send", "text": msg})
                     except websockets.ConnectionClosed:
+                        tg.cancel_scope.cancel()
+                    except Exception as exc:
+                        gateway_log.warning(
+                            "gateway websocket upstream_to_client failed request_id=%s: %s",
+                            request_id,
+                            exc,
+                        )
+                        await _try_close_client_after_relay_error()
                         tg.cancel_scope.cancel()
 
                 tg.start_soon(client_to_upstream)
