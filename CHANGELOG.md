@@ -11,6 +11,8 @@
 - **Docs:** ``http_proxy`` module docstring on a possible future streaming upstream hop and tradeoffs (memory vs complexity).
 - **Auth (OIDC BFF):** :class:`~fluxlit.auth.oidc.OIDCBFFTokenStore` protocol, :class:`~fluxlit.auth.oidc.InMemoryOIDCBFFTokenStore`, and :attr:`~fluxlit.auth.oidc.OIDCBFFConfig.bff_token_store` for shared PKCE / exchange storage across API replicas; ``SECURITY.md`` and ``examples/oidc_bff_pluggable_store/README.md`` updated.
 
+**Upgrading from 0.13.0:** No breaking changes for default apps. Optional: inject ``bff_token_store`` for multi-replica OIDC BFF; keep pins on ``fluxlit>=0.13,<1.0`` or bump to ``fluxlit==0.13.1`` in lockfiles.
+
 ## 0.13.0 - 2026-05-13
 
 - **Phase 2 follow-through:** ``scripts/soak_metrics.sh`` and soak methodology in {doc}`runbooks` / {doc}`testing`; weekly **informational** FluxLit soak job in ``soak-scheduled.yml``; ``soak-fluxlit-dispatch`` runs metrics soak when metrics are enabled.
