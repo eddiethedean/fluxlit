@@ -15,7 +15,7 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 | Phase | Target line | Primary goal |
 |-------|-------------|--------------|
 | **1** | **0.10.1 → 0.11.x** | Close operational and documentation gaps without growing unstable API surface. |
-| **2** | **0.12.x** | Evidence-backed production contracts (multi-replica, load/chaos, stability charter for metrics/manifest/settings). |
+| **2** | **0.12.x → 0.13.x** | Evidence-backed production contracts (multi-replica, load/chaos, stability charter for metrics/manifest/settings). **Delivered through 0.13.0;** Phase 2 exit criteria met — see **Current status** below. |
 | **3** | **1.0.0rc*** | Release candidate: freeze intentional breaking changes; migration guides; RC-blocker triage only. |
 | **4** | **1.0.0** | General availability: semver promise + published support matrix as the compatibility contract. |
 
@@ -34,7 +34,7 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 - No open **P0/P1** defects on golden paths; remaining issues are **documented limitations** with workarounds, or scheduled for Phase 2 with an issue link.
 - **Gaps vs “production”** (in **Current status** below) reviewed: each item is either **done**, **scoped to Phase 2**, or **explicitly out of scope for 1.0** (called out in this file).
 
-### Phase 2 — 0.12.x: Evidence, multi-replica clarity, and stability charter
+### Phase 2 — 0.12.x → 0.13.x: Evidence, multi-replica clarity, and stability charter
 
 **Goal:** Replace “we believe it scales” with **repeatable evidence** and a clear **what is stable for 1.0** story.
 
@@ -51,13 +51,15 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 - Support matrix includes a concise **1.0 compatibility commitment** (Python, Streamlit, core deps) and **deprecation policy** for the 1.x line.
 - No **hidden** public API that downstreams rely on without docs — either document and freeze, or mark internal.
 
+**Status:** Met as of **0.13.0** (May 2026): methodology and emissions notes in [docs/runbooks.md](docs/runbooks.md) / [docs/observability.md](docs/observability.md); [docs/support-matrix.md](docs/support-matrix.md) **1.0 compatibility** section; stable surface called out in `src/fluxlit/__init__.py` and contract tests in `tests/test_stability_charter.py` / `tests/test_settings_strict_startup.py`.
+
 ### Phase 3 — 1.0.0rc*: Release candidate and migration freeze
 
 **Goal:** Validate real upgrades and freeze breaking changes except agreed RC fixes.
 
 **Workstreams**
 
-- Ship **`1.0.0rcN`** to PyPI; gather feedback on upgrade paths from **last 0.12.x** (or last pre-1.0 minor).
+- Ship **`1.0.0rcN`** to PyPI; gather feedback on upgrade paths from **last 0.13.x** (or last pre-1.0 minor).
 - **CHANGELOG** and **migration guide**: list behavior changes, removed shims, and config renames since the last stable 0.x.
 - **API audit:** resolve deprecations; remove or shim with a clear removal version in 1.x.
 - **Security / supply chain:** maintain or improve SBOM, `pip-audit`, and container baseline from last 0.x.
@@ -90,14 +92,14 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 
 ## Current status (0.13.x)
 
-**Shipped (0.13.0) — Phase 2 complete**
+**Shipped (0.13.0) — Phase 2 complete** (PyPI / git tag **0.13.0**)
 
-- **Evidence baselines:** ``scripts/soak_metrics.sh``, soak methodology in {doc}`runbooks` / {doc}`testing`, weekly **informational** FluxLit soak in [`.github/workflows/soak-scheduled.yml`](.github/workflows/soak-scheduled.yml) (**`continue-on-error: true`**), ``soak-fluxlit-dispatch`` extended with metrics soak when enabled.
-- **Multi-replica depth:** external-store **failure modes** and ingress **engine pointer** table ({doc}`url-session`, {doc}`deployment`, {doc}`production-tls`).
-- **Stability charter in code:** drift notes on metrics/manifest/logs/settings; ``MANIFEST_V1_*`` contracts; pytest coverage vs ``GATEWAY_PROMETHEUS_METRICS`` and manifest v1 keys.
-- **DX / startup:** expanded ``fluxlit doctor --strict``; ``FLUXLIT_STRICT_STARTUP`` / ``strict_startup`` fail-fast on the same misconfiguration class.
-- **Tracing:** ``fluxlit.gateway.upstream_http`` hook span; observability docs for **W3C traceparent** passthrough on the gateway → Streamlit HTTP hop.
-- **Phase 2 exit criteria:** support-matrix **1.0 compatibility** subsection promoted from “draft-only” wording; public API scope called out on the **`fluxlit`** package docstring.
+- **Evidence baselines:** ``scripts/soak_metrics.sh``; soak methodology (what to record, emissions vs non-emissions, gateway vs Streamlit correlation) in [docs/runbooks.md](docs/runbooks.md) and [docs/testing.md](docs/testing.md); weekly **informational** FluxLit soak job in [`.github/workflows/soak-scheduled.yml`](.github/workflows/soak-scheduled.yml) (**`continue-on-error: true`**); [`.github/workflows/soak-fluxlit-dispatch.yml`](.github/workflows/soak-fluxlit-dispatch.yml) runs ``soak_readyz`` + ``soak_metrics`` with metrics enabled.
+- **Multi-replica depth:** external-store **failure modes** (Redis / shared ``SessionStore``) in [docs/url-session.md](docs/url-session.md); **ingress engine** pointer table in [docs/deployment.md](docs/deployment.md) with cross-link from [docs/production-tls.md](docs/production-tls.md).
+- **Stability charter in code:** stability notes on metrics, manifest, log schema, and settings; exported ``MANIFEST_V1_ROOT_KEYS`` / ``MANIFEST_V1_PAGE_ALLOWED_KEYS``; [tests/test_stability_charter.py](tests/test_stability_charter.py) guards Prometheus series names vs ``GATEWAY_PROMETHEUS_METRICS`` and manifest v1 keys.
+- **DX / startup:** expanded ``fluxlit doctor --strict`` rows; ``FLUXLIT_STRICT_STARTUP`` / ``strict_startup`` on ``FluxlitSettings``; [tests/test_settings_strict_startup.py](tests/test_settings_strict_startup.py).
+- **Tracing:** ``fluxlit.gateway.upstream_http`` ``trace_span`` around the gateway → Streamlit HTTP hop; [docs/observability.md](docs/observability.md) documents span names/attributes and **W3C traceparent** passthrough on that hop.
+- **Phase 2 exit criteria:** [docs/support-matrix.md](docs/support-matrix.md) **1.0 compatibility** subsection set as the 1.x contract (no longer framed as draft-only); **``fluxlit``** package docstring documents stable exports vs internal submodules.
 
 **Shipped (0.12.0) — Phase 2 baseline**
 
@@ -159,6 +161,7 @@ Post–Phase 2 work is now **Phase 3 / 1.x** unless noted otherwise:
 | Topic | Status | Notes |
 |-------|--------|-------|
 | Phase 2 exit criteria (runbooks, charter, public API scope) | **Met (0.13.0)** | Voluntary numeric SLO baselines still optional |
+| Runbooks ↔ chaos scripts (expected signals + recovery) | **Done (0.12–0.13)** | Table in [docs/runbooks.md](docs/runbooks.md) lists ``soak_*`` / ``chaos_*`` scripts |
 | OpenTelemetry | **Partial** | Hooks + spans + docs; full auto-instrumentation remains **post-1.0** |
 | Per-push min/max dependency matrix | **Deferred** | **post-1.0** tradeoff (see support matrix) |
 | Git tag vs PyPI byte identity | Documented | Bump **patch** when wheel/sdist must change |
@@ -337,7 +340,7 @@ repositories, especially monorepos and Streamlit AppTest suites.
 
 ## Version 0.9 — Typed Streamlit pages & developer contracts (released)
 
-**Status:** Shipped on PyPI as **0.9.0**. Follow-on work (async `Depends` when an asyncio loop is already running, optional allowlisted gateway → Streamlit **HTTP** headers, richer `fluxlit doctor` / cookbook docs) is in **0.10.0** — see **Current status (0.12.x)** above.
+**Status:** Shipped on PyPI as **0.9.0**. Follow-on work (async `Depends` when an asyncio loop is already running, optional allowlisted gateway → Streamlit **HTTP** headers, richer `fluxlit doctor` / cookbook docs) is in **0.10.0** — see **Current status (0.13.x)** above.
 
 **Theme:** Bring **optional**, FastAPI-style **type annotations** and **Pydantic (or `TypedDict`) models** to Streamlit integrations so teams can express page metadata, inputs, and shared dependencies explicitly — without breaking existing `(st, client) -> None` handlers.
 
