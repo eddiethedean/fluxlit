@@ -103,7 +103,9 @@ and redacted settings. **0.11+** examples that surface as warnings include
 ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT``),
 ``gateway_max_body_unlimited_trust_proxy`` when ``trust_proxy`` is on with an unlimited
 proxied upload cap, and broad ``forwarded_allow_ips`` when trusting proxies — combine
-with your real ``FLUXLIT_*`` matrix in CI.
+with your real ``FLUXLIT_*`` matrix in CI. **0.12+:** use ``fluxlit doctor --strict`` when
+you want selected rows (for example broad ``forwarded_allow_ips`` and ``public_base_url``
+path vs mount) to **FAIL** instead of **WARN**; see {doc}`cli`.
 
 ## Cap uploads proxied to Streamlit (``413``)
 

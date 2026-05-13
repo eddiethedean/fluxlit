@@ -147,7 +147,9 @@ Set **`FLUXLIT_PUBLIC_BASE_URL`** to the public origin (e.g. `https://server.exa
 ```{note}
 Some platforms set a generic `PUBLIC_BASE_URL`. FluxLit accepts it as a fallback for
 OAuth redirects, but the namespaced `FLUXLIT_PUBLIC_BASE_URL` wins when both are set.
-Run `fluxlit doctor --json` in deployment CI to catch mismatches before release.
+Run `fluxlit doctor --json` in deployment CI to catch mismatches before release; add
+`--strict` when you want obvious proxy-trust and public-URL path mistakes to **FAIL**
+the command (see {doc}`cli`).
 ```
 
 ## API clients in tests
