@@ -5,7 +5,7 @@ Generated from docstrings with Sphinx autodoc. Public modules:
 ```{eval-rst}
 .. automodule:: fluxlit
    :members:
-   :exclude-members: ApiClient, FluxLit, FluxlitSettings, FluxLitTestClient, GenericOIDCClient, GenericOIDCClientConfig, OIDCBFFConfig, OIDCProvider, JWTAuthConfig, JWTBearer, RequireRoles, RequireScopes, StandardClaims, issue_hs256_access_token, pkce_pair, register_oidc_bff_routes, bearer_headers_from_session, exchange_auth_code_from_query, prepare_streamlit_api_client, match_nav_page, query_params
+   :exclude-members: ApiClient, FluxLit, FluxlitSettings, FluxLitTestClient, GenericOIDCClient, GenericOIDCClientConfig, InMemoryOIDCBFFTokenStore, OIDCBFFConfig, OIDCBFFTokenStore, OIDCProvider, JWTAuthConfig, JWTBearer, RequireRoles, RequireScopes, StandardClaims, issue_hs256_access_token, pkce_pair, register_oidc_bff_routes, bearer_headers_from_session, exchange_auth_code_from_query, prepare_streamlit_api_client, match_nav_page, query_params
    :show-inheritance:
 
 .. automodule:: fluxlit.app
