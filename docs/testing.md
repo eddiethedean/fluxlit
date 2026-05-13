@@ -435,7 +435,7 @@ The default CI/local command (`-m "not slow"`, no E2E) still exercises a broad s
 | Upstream state | `tests/test_runtime_upstream.py` |
 | Reload | `tests/test_streamlit_reload_watcher.py`, `tests/test_runtime_extra.py`, CLI tests for `--reload-scope` |
 | Log redaction | `tests/test_logging_redact.py` |
-| Doctor / auth env | `tests/test_cli.py`, `tests/test_cli_doctor_verbose.py` (`doctor`, `--verbose`, PyJWT / JWT env) |
+| Doctor / auth env | `tests/test_cli.py`, `tests/test_cli_doctor_verbose.py` (`doctor`, `--verbose`, PyJWT / JWT env), `tests/test_uvicorn_multiworker.py` (unified stack vs Uvicorn `workers` > 1) |
 
 ## Conventions
 

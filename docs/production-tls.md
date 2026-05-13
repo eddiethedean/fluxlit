@@ -89,7 +89,7 @@ In Python, prefer **`FluxLit.urls`** ({attr}`~fluxlit.app.FluxLit.urls`) so link
 
 ### Troubleshooting with `fluxlit doctor` and debug
 
-1. Run **`fluxlit doctor app:app`** (or your import path) **inside the same image/env** as production. Inspect **WARN**/**FAIL** rows for `forwarded_allow_ips`, `public_base_url`, `proxy_headers`, and `import_shadowing`.
+1. Run **`fluxlit doctor app:app`** (or your import path) **inside the same image/env** as production. Inspect **WARN**/**FAIL** rows for `forwarded_allow_ips`, `public_base_url`, `proxy_headers`, `import_shadowing`, **`gateway_forward_rejected_names`** (when the allowlist names credential-style headers that are never forwarded), and related **`fluxlit config`** warnings you can reproduce with **`fluxlit config app:app --json`**.
 2. With **`FLUXLIT_DEBUG=1`**, use **`GET …/__fluxlit/debug`** (when not shadowed by `api_mount_path`) for a redacted view of effective settings and recent gateway dispatches—see {doc}`configuration` and {doc}`troubleshooting`.
 3. If **`GET …/api/readyz`** is **503**, Streamlit is not reachable from the gateway; see {doc}`runbooks` and {doc}`deployment` readiness notes.
 

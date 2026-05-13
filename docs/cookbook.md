@@ -98,7 +98,12 @@ fluxlit config app:app --strict
 ```
 
 Exit code **1** if any warning is emitted (errors always fail). See {doc}`cli` for ``--json``
-and redacted settings.
+and redacted settings. **0.11+** examples that surface as warnings include
+``gateway_forward_blocked_names`` (credential-style entries in
+``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT``),
+``gateway_max_body_unlimited_trust_proxy`` when ``trust_proxy`` is on with an unlimited
+proxied upload cap, and broad ``forwarded_allow_ips`` when trusting proxies — combine
+with your real ``FLUXLIT_*`` matrix in CI.
 
 ## Cap uploads proxied to Streamlit (``413``)
 

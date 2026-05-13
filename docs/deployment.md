@@ -37,7 +37,7 @@ uvicorn fluxlit.runtime:create_unified_app --factory --host 0.0.0.0 --port 8000
 
 Notes:
 
-- Uvicorn `--workers` > 1 is **not supported** for the unified stack.
+- Uvicorn **`--workers` > 1** is **not supported** for the unified stack; **lifespan startup fails** if Uvicorn’s worker count is greater than one (unless **`FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`**, which is explicitly unsupported). Prefer one process per replica — see {ref}`scaling-and-workers` below.
 - Lifespan follows the ASGI spec; the inner FastAPI app’s lifespan runs after the
   Streamlit sidecar starts.
 
@@ -118,6 +118,7 @@ PUBLIC_PREFIX=/myapp BASE_URL=http://127.0.0.1:8085 ./smoke-test.sh
 
 The parent process sets variables for the Streamlit child and for gateway code that reads upstream state. You normally **do not** set these by hand when using `fluxlit run`; see {ref}`runtime-env`.
 
+(scaling-and-workers)=
 ## Scaling and workers
 
 ### Single process (default)

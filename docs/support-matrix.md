@@ -20,7 +20,7 @@ CI installs **`pip install -e ".[dev]"`** from `pyproject.toml` pins and the res
 | **FastAPI** / **Starlette** | Lower bounds in `pyproject.toml` (`fastapi>=0.111`, `starlette>=0.37`); CI resolves within those ranges. |
 | **httpx** / **anyio** | `httpx>=0.27`, `anyio>=4.0` — gateway proxy and async tests. |
 | **Streamlit** | `streamlit>=1.36` at runtime; gateway proxies HTTP + WebSockets to Streamlit’s server. You **do not** need `streamlit[starlette]` for FluxLit: the public ASGI app is FastAPI/Starlette; Streamlit runs as a managed sidecar. |
-| **Uvicorn** | `uvicorn[standard]>=0.29` — unified entry uses Uvicorn’s HTTP stack; `workers` > 1 unsupported for one FluxLit process. |
+| **Uvicorn** | `uvicorn[standard]>=0.29` — unified entry uses Uvicorn’s HTTP stack; **`workers` > 1** is unsupported for one FluxLit process. When you mount the unified {class}`~fluxlit.app.FluxLit` ASGI app under Uvicorn with multiple workers, **lifespan startup fails** unless **`FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`** (explicitly unsupported — use one worker per replica and scale out). See {doc}`deployment`. |
 | **Pydantic Settings** | `pydantic-settings>=2.0` — `FluxlitSettings` and env loading. |
 
 ## Pinning in production apps

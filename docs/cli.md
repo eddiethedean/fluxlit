@@ -89,8 +89,14 @@ module file path, the first few `sys.path` entries, ambiguous `app` / `main` can
 gateway bind availability, effective API prefix, URL-session test/disable state, proxy
 fields, public-base-url precedence, optional auth/metrics extras, Streamlit upstream
 state when available, readiness route shape, WebSocket upgrade expectations, gateway
-upstream timeout hints, async page-depends posture, optional client-header forwarding,
-and (with **`--verbose`**) a compact **`gateway_proxy`** summary block.
+upstream timeout hints, async page-depends posture, optional client-header forwarding
+(including **`gateway_forward_rejected_names`** when the allowlist names headers that
+are never forwarded), and (with **`--verbose`**) a compact **`gateway_proxy`** summary
+block (timeouts, max proxied body bytes, max concurrent upstream HTTP, forward-header list).
+
+**`fluxlit config`** mirrors related **WARN** rows (for example rejected forward-header
+names and **`trust_proxy`** with an unlimited proxied upload body cap); use **`--strict`**
+in CI to fail on warnings — see {doc}`cookbook`.
 
 ## Reload (`dev` only)
 

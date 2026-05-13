@@ -27,7 +27,7 @@ This matches Streamlit’s supported deployment model, avoids unsupported deep e
 
 | Role | Process | Listens on |
 |------|---------|------------|
-| Gateway | Uvicorn worker(s) | Public `host:port` (e.g. `0.0.0.0:8000`) |
+| Gateway | One Uvicorn process (single worker for unified stack) | Public `host:port` (e.g. `0.0.0.0:8000`) |
 | Streamlit | Child of the runtime | Ephemeral **localhost** port (not exposed directly) |
 
 The runtime sets **`FLUXLIT_*`** variables so Streamlit’s entry script knows the import target, API prefix, internal API base URL, and (from the parent) where to reach the Streamlit HTTP server for readiness checks. See {ref}`runtime-env`.

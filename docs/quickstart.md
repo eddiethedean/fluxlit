@@ -94,6 +94,8 @@ uvicorn app:app --host 127.0.0.1 --port 8000
 
 A :class:`~fluxlit.app.FluxLit` instance is an ASGI application: Uvicorn calls it directly, with no `--factory` and no `FLUXLIT_APP` env var required when your file is `app.py` and the variable is `app`. If your module is named differently, set `target = "main:app"` in `fluxlit.toml`, pass `import_target="main:app"` to :class:`~fluxlit.app.FluxLit`, or set `FLUXLIT_APP`.
 
+Use **a single Uvicorn worker** (`--workers` defaults to 1). The unified stack **fails lifespan startup** when `workers` > 1 unless you set **`FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`** (unsupported — see {doc}`deployment`).
+
 Put `gateway_port` in `fluxlit.toml` or `FLUXLIT_GATEWAY_PORT` when the gateway is not on `8000`, so the Streamlit sidecar can reach the API.
 
 Advanced / legacy: `uvicorn fluxlit.runtime:create_unified_app --factory` with `FLUXLIT_APP` still works; prefer `uvicorn app:app` for clarity.

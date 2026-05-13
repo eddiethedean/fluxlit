@@ -132,6 +132,8 @@ When **`FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1`** and **`prometheus-client`
 - **`fluxlit_gateway_requests_total`** — labels **`dispatch`** (`api` vs `streamlit`) and **`method_kind`** (HTTP method or `WEBSOCKET`).
 - **`fluxlit_gateway_request_duration_seconds`** — histogram by **`dispatch`** (wall time for one gateway request; scrape path responses are excluded).
 
+If the histogram **observe** step raises (for example a client or label mismatch), the gateway logs a **DEBUG** line on the **`fluxlit.gateway`** logger with the dispatch label and exception context, then continues serving the request (metrics for that hop may be missing).
+
 The path must **not** be under your **`api_mount_path`** or it will shadow API routes (the runtime logs a warning and disables metrics). Secure the endpoint at your ingress (allow only Prometheus scrapers) or keep metrics disabled in untrusted networks.
 
 **USE-style saturation** (CPU, memory, file descriptors) is not emitted by FluxLit core; scrape the node or cAdvisor / kube-state-metrics alongside these application counters.
