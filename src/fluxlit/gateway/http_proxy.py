@@ -41,6 +41,7 @@ from fluxlit.gateway.upstream_http import (
     public_host_from_scope,
 )
 from fluxlit.logging import REQUEST_ID_HEADER
+from fluxlit.tracing import trace_span
 
 
 class _GatewayPayloadTooLarge(Exception):
@@ -192,7 +193,13 @@ async def proxy_http_inner(
             req = client.build_request(method, url, headers=headers)
         else:
             req = client.build_request(method, url, headers=headers, content=content)
-        response = await client.send(req, stream=False)
+        span_attrs = {
+            "http.request.method": method,
+            "url.full": url,
+            "fluxlit.request_id": request_id,
+        }
+        with trace_span("fluxlit.gateway.upstream_http", span_attrs):
+            response = await client.send(req, stream=False)
     except _GatewayPayloadTooLarge:
         await respond_413_payload_too_large(send)
         return

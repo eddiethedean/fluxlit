@@ -97,7 +97,7 @@ def _dockerfile_body(target: str) -> str:
         f"# python:3.12-slim @ {_py_slim_digest}\n"
         f"FROM python@{_py_slim_digest}\n"
         "WORKDIR /app\n"
-        'RUN pip install --no-cache-dir "fluxlit>=0.12,<1.0"\n'
+        'RUN pip install --no-cache-dir "fluxlit>=0.13,<1.0"\n'
         "COPY . .\n"
         "RUN useradd --create-home --uid 1000 appuser \\\n"
         "    && chown -R appuser:appuser /app\n"
@@ -730,11 +730,13 @@ def _doctor_collect(
         legacy_public = os.environ.get("PUBLIC_BASE_URL", "").strip()
         fluxlit_public = os.environ.get("FLUXLIT_PUBLIC_BASE_URL", "").strip()
         if legacy_public and fluxlit_public and legacy_public != fluxlit_public:
-            status: CheckStatus = "FAIL" if fl.settings.strict_public_base_url else "WARN"
+            precedence_status: CheckStatus = (
+                "FAIL" if (fl.settings.strict_public_base_url or strict) else "WARN"
+            )
             rows.append(
                 (
                     "public_base_url_precedence",
-                    status,
+                    precedence_status,
                     "PUBLIC_BASE_URL and FLUXLIT_PUBLIC_BASE_URL differ; "
                     "FluxLit uses FLUXLIT_PUBLIC_BASE_URL",
                 )
@@ -749,10 +751,11 @@ def _doctor_collect(
         and fl.settings.public_mount_path()
         and not fl.settings.public_base_url.strip()
     ):
+        oauth_status: CheckStatus = "FAIL" if strict else "WARN"
         rows.append(
             (
                 "oauth_public_base_url",
-                "WARN",
+                oauth_status,
                 "subpath set but public_base_url empty — set FLUXLIT_PUBLIC_BASE_URL for correct "
                 "OAuth redirect_uri behind a reverse proxy (see docs/configuration.html)",
             )
@@ -768,10 +771,11 @@ def _doctor_collect(
                 )
             )
         else:
+            ph_status: CheckStatus = "FAIL" if strict else "WARN"
             rows.append(
                 (
                     "proxy_headers",
-                    "WARN",
+                    ph_status,
                     "subpath/root_path set but trust_proxy false — behind Posit Connect/nginx set "
                     "FLUXLIT_TRUST_PROXY=1 or pass --proxy-headers",
                 )
@@ -791,6 +795,21 @@ def _doctor_collect(
             )
         else:
             rows.append(("forwarded_allow_ips", "PASS", allow))
+
+    if (
+        fl is not None
+        and fl.settings.trust_proxy
+        and fl.settings.gateway_max_proxy_request_body_bytes == 0
+    ):
+        mb_status: CheckStatus = "FAIL" if strict else "WARN"
+        rows.append(
+            (
+                "gateway_max_proxy_body",
+                mb_status,
+                "trust_proxy enabled but gateway_max_proxy_request_body_bytes is 0 (unlimited); "
+                "set FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES for production",
+            )
+        )
 
     if fl is not None and fl.settings.public_base_url.strip():
         parsed_public = urlparse(fl.settings.public_base_url.strip())
@@ -827,10 +846,11 @@ def _doctor_collect(
             )
         )
         if fl.settings.gateway_upstream_read_timeout_s < 5.0:
+            to_status: CheckStatus = "FAIL" if strict else "WARN"
             rows.append(
                 (
                     "gateway_upstream_timeouts",
-                    "WARN",
+                    to_status,
                     "gateway_upstream_read_timeout_s is very low; "
                     "long Streamlit responses may fail",
                 )
@@ -882,10 +902,11 @@ def _doctor_collect(
             )
         rejected = tuple(getattr(fl.settings, "_rejected_forward_headers", ()))
         if rejected:
+            rej_status: CheckStatus = "FAIL" if strict else "WARN"
             rows.append(
                 (
                     "gateway_forward_rejected_names",
-                    "WARN",
+                    rej_status,
                     f"allowlist contained rejected names {list(rejected)} — never forwarded; "
                     "see docs/security.html",
                 )
@@ -911,10 +932,11 @@ def _doctor_collect(
     cors_on = fl is not None and bool(fl.settings.cors_allow_origins)
     sec_off = fl is not None and not fl.settings.enable_security_headers
     if cors_on and sec_off:
+        sec_status: CheckStatus = "FAIL" if strict else "WARN"
         rows.append(
             (
                 "security_headers",
-                "WARN",
+                sec_status,
                 "CORS on, security headers off — consider FLUXLIT_ENABLE_SECURITY_HEADERS=1",
             )
         )

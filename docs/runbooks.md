@@ -96,8 +96,19 @@ Repeatable scripts live under **`scripts/`** in the repository:
 | **`chaos_graceful_shutdown.sh`** | SIGTERM → gateway exits within a bounded window. |
 | **`chaos_streamlit_kill.sh`** | Kill Streamlit child → parent exits. |
 | **`chaos_slow_upstream.sh`**, **`chaos_oversized_body.sh`**, **`chaos_dropped_websocket.sh`** | Timeout, **413**, and WebSocket drop behaviors. |
+| **`soak_metrics.sh`** | Many GETs on **`/__fluxlit/metrics`** (or `FLUXLIT_GATEWAY_PROMETHEUS_METRICS_PATH`); expects **200** and Prometheus text with **`fluxlit_gateway_requests_total`**. Requires **`FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1`** and `prometheus-client`. |
 
 Run **`./scripts/run_smoke_app.sh`** (or your app) in one terminal, then point **`BASE_URL`** at it. For CI-style signals, pair with {doc}`observability` (metrics, gateway logs) and {doc}`deployment` (readiness).
+
+### Soak methodology and baselines
+
+Soak scripts are **relative** measurements: they report request counts, HTTP status mix (for `soak_readyz.sh`), and **p50/p95/p99** latency in milliseconds over **`COUNT`** iterations. They do **not** assert absolute SLOs — operators should compare runs on the **same machine class** (for example the same Kubernetes node pool or CI `runs-on` label) and record **commit SHA + date** when publishing reference numbers.
+
+**What to record:** `COUNT`, `BASE_URL`, `PATH_SUFFIX`, relevant `FLUXLIT_*` flags (metrics, proxy trust), CPU/memory snapshot if available, and the script’s final summary line or `OUTPUT_FORMAT=json` payload.
+
+**Under load, FluxLit emits:** gateway access log extras (when enabled) with stable keys listed in {doc}`support-matrix`; gateway **RED** metrics (when `FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1`); **DEBUG** lines on `fluxlit.gateway` for histogram observe failures (request still completes). **Not emitted:** USE-style host saturation metrics from FluxLit core — scrape the node or cAdvisor ({doc}`observability`).
+
+**Correlation limits:** `request_id` ties gateway access logs to the internal hop; Streamlit runs in a **separate process**, so its logs use the same id only where the runtime forwards it — see {doc}`observability` correlation section.
 
 ## Related
 

@@ -87,11 +87,11 @@ FluxLit sits between **FastAPI**, **Streamlit**, **Uvicorn**, **Starlette**, **h
 Minimal **`requirements.in`** sketch (adjust pins to your policy):
 
 ```text
-fluxlit>=0.12,<1.0
+fluxlit>=0.13,<1.0
 streamlit>=1.36
 ```
 
-After each FluxLit PyPI release, align this sketch with the current minor (for example ``fluxlit>=0.12,<1.0`` until you adopt **0.13**).
+After each FluxLit PyPI release, align this sketch with the current minor (for example ``fluxlit>=0.13,<1.0`` until you adopt **0.14**).
 
 Then `pip-compile requirements.in -o requirements.txt` and install from **`requirements.txt`** in containers.
 
@@ -117,11 +117,11 @@ Then `pip-compile requirements.in -o requirements.txt` and install from **`requi
 
 There is **no LTS branch** for **0.x** today; security and fixes land on the **current minor** on PyPI. If you need extended support for an older line, open a discussion with maintainers.
 
-## 1.0 compatibility and deprecation (draft)
+## 1.0 compatibility and deprecation
 
-This subsection is a **draft** until **1.0.0rc** ships; it sets expectations for the 1.x line.
+This subsection is the **compatibility contract** for the **1.x** line after **1.0.0**; it is updated when release candidates ship. Until **1.0.0rc1**, treat numbered pre-releases as **draft** if they differ from this text.
 
-- **Semver:** After **1.0.0**, FluxLit follows **semver** for the documented stable surface (CLI, `FLUXLIT_*` keys called out in {doc}`configuration`, and public Python APIs in the package root and guides). **Experimental** settings and **internal** debug logs remain exempt until promoted.
+- **Semver:** After **1.0.0**, FluxLit follows **semver** for the documented stable surface (CLI, `FLUXLIT_*` keys called out in {doc}`configuration`, and public Python APIs exported from :mod:`fluxlit` and described in guides). **Experimental** settings and **internal** debug logs remain exempt until promoted.
 - **Python / Streamlit / core deps:** The [Python](#python) and [Core dependencies](#core-dependencies-approximate) tables become the **compatibility commitment** for 1.x minors unless a release explicitly widens or narrows them.
 - **Deprecations:** behavior or config removals will be announced in {doc}`changelog` with a **deprecation window** where practical (at least one minor when feasible).
 - **Metrics and manifests:** Gateway metric **names** and **manifest_version** **1** top-level keys above stay stable across 1.x unless a major documents a migration (for example a new manifest version).

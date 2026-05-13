@@ -369,7 +369,17 @@ chmod +x scripts/soak_readyz.sh
 COUNT=120 BASE_URL=http://127.0.0.1:8000 ./scripts/soak_readyz.sh
 ```
 
-**Manual CI recipe:** the scheduled workflow [`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml) only validates `soak_http.sh` against `http.server`. For a short FluxLit-backed soak on demand, use [`.github/workflows/soak-fluxlit-dispatch.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-fluxlit-dispatch.yml) (**`workflow_dispatch`** only): it installs the package, starts the smoke app in the background, runs **`soak_readyz.sh`** with a small **`COUNT`**, then tears down.
+**Metrics soak:** with **`FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1`** and `prometheus-client` installed, **`scripts/soak_metrics.sh`** repeats **`GET`** on the metrics scrape path (default **`/__fluxlit/metrics`**) and checks the body for **`fluxlit_gateway_requests_total`**. Use the same `COUNT` / `OUTPUT_FORMAT` conventions as `soak_http.sh`.
+
+```bash
+chmod +x scripts/soak_metrics.sh
+FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1 ./scripts/run_smoke_app.sh   # terminal 1
+COUNT=60 BASE_URL=http://127.0.0.1:8000 ./scripts/soak_metrics.sh
+```
+
+**Baselines:** see the **Soak methodology and baselines** subsection in {doc}`runbooks` for how to record reproducible numbers (hardware class, env, commit).
+
+**Manual CI recipe:** the scheduled workflow [`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml) validates `soak_http.sh` against `python -m http.server` weekly and runs an **informational** FluxLit **`soak_readyz`** job (**`continue-on-error: true`**) so regressions surface without blocking merges. For an on-demand FluxLit + metrics check, use [`.github/workflows/soak-fluxlit-dispatch.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-fluxlit-dispatch.yml) (**`workflow_dispatch`**): it installs the package, starts the smoke app with metrics enabled, runs **`soak_readyz.sh`** and **`soak_metrics.sh`** with a small **`COUNT`**, then tears down.
 
 ## Chaos checks (local)
 
@@ -392,7 +402,7 @@ Additional local/manual checks:
 Keep chaos scripts local/manual unless they are explicitly marked slow in CI; they
 intentionally manipulate subprocesses.
 
-The **[`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml)** workflow runs **weekly** (and **`workflow_dispatch`**) against `python -m http.server` to ensure `scripts/soak_http.sh` still works; it does **not** start FluxLit.
+The **[`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml)** workflow runs **weekly** (and **`workflow_dispatch`**): the first job validates `scripts/soak_http.sh` against `python -m http.server`; a second **informational** job starts FluxLit smoke with metrics and runs **`soak_readyz.sh`** + **`soak_metrics.sh`** (**`continue-on-error: true`**).
 
 ## Upgrade matrix (latest deps)
 

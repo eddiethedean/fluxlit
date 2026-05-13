@@ -1,5 +1,6 @@
 # Minimal smoke for scripts/soak_http.sh (does not start FluxLit).
-# Weekly signal that the script still works; use workflow_dispatch for ad-hoc runs.
+# Second job: short FluxLit soak_readyz (informational; may flake on runner load).
+# Weekly signal; use workflow_dispatch for ad-hoc runs.
 name: soak-http-script
 
 on:
@@ -35,3 +36,39 @@ jobs:
           PY
           chmod +x scripts/soak_http.sh
           COUNT=40 BASE_URL=http://127.0.0.1:19876 PATH_SUFFIX=/ ./scripts/soak_http.sh
+
+  soak-fluxlit-readyz-weekly:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install and soak readyz on smoke app
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          export FLUXLIT_NO_PIDFILE=1
+          export FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1
+          fluxlit run examples.smoke_app.app:app --host 127.0.0.1 --port 8765 --no-pidfile &
+          gw_pid=$!
+          cleanup() {
+            if kill -0 "$gw_pid" 2>/dev/null; then
+              kill "$gw_pid" 2>/dev/null || true
+              wait "$gw_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:8765/api/healthz" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS "http://127.0.0.1:8765/api/healthz" >/dev/null
+          chmod +x scripts/soak_readyz.sh scripts/soak_metrics.sh
+          COUNT=30 BASE_URL=http://127.0.0.1:8765 ./scripts/soak_readyz.sh
+          COUNT=25 BASE_URL=http://127.0.0.1:8765 ./scripts/soak_metrics.sh

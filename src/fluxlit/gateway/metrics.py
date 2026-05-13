@@ -1,4 +1,10 @@
-"""Lazy Prometheus metrics for the ASGI gateway."""
+"""Lazy Prometheus metrics for the ASGI gateway.
+
+**Stability:** Metric and label names chartered for operators live in
+:data:`GATEWAY_PROMETHEUS_METRICS` and are mirrored in ``docs/observability`` /
+``docs/support-matrix``. Changing histogram buckets or removing a documented series
+is a **semver-visible** contract change.
+"""
 
 from __future__ import annotations
 

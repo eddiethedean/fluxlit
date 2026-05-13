@@ -118,7 +118,16 @@ Production notes:
 - Add monitoring for store latency and errors because page hydration now depends on it.
 - Pair the shared store with rollout/drain guidance in {doc}`deployment`; sticky sessions alone do not protect users when a replica restarts.
 
-## Related
+## Multi-replica failure modes (shared `SessionStore`)
+
+When **Redis** (or another networked store) backs {class}`~fluxlit.url_session.SessionStore`:
+
+- **Cold Redis / timeouts:** if `get` fails or times out, helpers may start a **new** session id — users lose continuity until the store recovers. Monitor Redis latency and error rates; consider short timeouts plus user-visible “reconnecting” states.
+- **Partial writes:** prefer a **single JSON blob** per sid (as in the sketch above) or use transactions so `hydrate` never sees torn multi-key state.
+- **Eviction vs TTL:** memory pressure and `maxmemory-policy` can evict sid keys early; align **TTL** with your security model (see {doc}`url-session-token-security`).
+- **Affinity is still useful:** a shared store fixes **F5 to another replica** for URL-bound data, but **WebSocket** lifetimes and CPU caches may still behave better with optional stickiness — see {doc}`deployment`.
+
+**OIDC BFF:** URL-session continuity does **not** replace BFF **login `state`** storage; multi-replica BFF still needs externalized state or affinity — see {doc}`security`.
 
 - {doc}`url-session-token-security` — query tokens, invites, logging, and debug mode.
 - Roadmap **Phase 2 follow-on** in {doc}`roadmap`.

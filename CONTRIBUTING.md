@@ -86,7 +86,7 @@ For a **PyPI / tag** release of FluxLit itself:
 4. **Tag** — `git tag vX.Y.Z` after merge to the release branch / `main` per your workflow.
 5. **Read the Docs** — confirm the **stable** build points at the new tag when applicable.
 
-6. **Examples lockfile** — bump **`examples/docker_compose/requirements.in`** (for example `fluxlit>=0.12,<1.0`) and run **`uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt`** so the pinned example matches installable releases. If that range is not on PyPI yet, run **`uv build -o /tmp/fluxlit-wheels`** and add **`--find-links /tmp/fluxlit-wheels`** to the compile command (see the comment block in **`requirements.in`**).
+6. **Examples lockfile** — bump **`examples/docker_compose/requirements.in`** (for example `fluxlit>=0.13,<1.0`) and run **`uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt`** so the pinned example matches installable releases. If that range is not on PyPI yet, run **`uv build -o /tmp/fluxlit-wheels`** and add **`--find-links /tmp/fluxlit-wheels`** to the compile command (see the comment block in **`requirements.in`**).
 
 Before tagging, run the canonical smoke app once locally when runtime or deployment behavior
 changed:

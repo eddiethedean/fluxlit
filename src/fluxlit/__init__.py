@@ -8,6 +8,10 @@ in tests (with :func:`~fluxlit.testing.apptest_select_page` and
 
 The ``fluxlit`` console script (see :mod:`fluxlit.cli`) runs the combined dev/prod stack.
 
+**Stable surface:** symbols in ``__all__`` below are the primary supported imports for
+applications and tests; treat other submodules as internal unless documented in
+:doc:`support-matrix` or API reference.
+
 Optional auth ergonomics (after ``pip install "fluxlit[auth]"``):
 :meth:`fluxlit.app.FluxLit.make_jwt_bearer`,
 :meth:`fluxlit.app.FluxLit.attach_oidc_login`, and
@@ -118,4 +122,4 @@ __all__ = [
     "trace_span",
     "__version__",
 ]
-__version__ = "0.12.0"
+__version__ = "0.13.0"

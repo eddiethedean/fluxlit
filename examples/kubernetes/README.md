@@ -5,7 +5,7 @@ Minimal **Deployment** and **Service** for running FluxLit behind a cluster load
 ## Before you apply
 
 1. **Build and push an image** that contains your app (not only `fluxlit` from PyPI). Start from `fluxlit build` output or `examples/docker_compose/Dockerfile` patterns: digest-pinned base, `USER appuser`, lockfile installs.
-2. Edit **`deployment.yaml`**: replace `YOUR_REGISTRY/fluxlit-app:0.12.0` (or your tag) with your image; set `FLUXLIT_*` and secrets via `ConfigMap` / `Secret` (do not commit real secrets).
+2. Edit **`deployment.yaml`**: replace `YOUR_REGISTRY/fluxlit-app:0.13.0` (or your tag) with your image; set `FLUXLIT_*` and secrets via `ConfigMap` / `Secret` (do not commit real secrets).
 
 ## Optional manifests (examples only)
 

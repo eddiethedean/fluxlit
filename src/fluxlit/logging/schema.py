@@ -1,4 +1,9 @@
-"""Documented logging field contracts."""
+"""Documented logging field contracts.
+
+**Stability:** :data:`JSON_LOG_BASE_FIELDS` and :data:`GATEWAY_ACCESS_LOG_FIELDS` are
+chartered in ``docs/support-matrix`` / ``docs/observability`` for JSON formatters and
+gateway access ``extra`` keys.
+"""
 
 from __future__ import annotations
 

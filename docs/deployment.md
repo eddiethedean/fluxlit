@@ -166,6 +166,16 @@ For multi-replica deployments:
 - **Split topology** (advanced): run Streamlit and the API on different hosts and point `FLUXLIT_STREAMLIT_UPSTREAM` at the Streamlit origin—only if your platform requires separate services and you accept operational complexity.
 - **Multiple Uvicorn workers for API-only** does not apply to `FluxLit` unified mode; use plain FastAPI + separate Streamlit hosting if you truly need multi-worker HTTP for the API only.
 
+### Ingress engines: affinity, WebSockets, strip-prefix (pointers)
+
+| Engine | Affinity / stickiness | WebSockets / `/_stcore/stream` | Strip-prefix vs full path |
+|--------|----------------------|--------------------------------|---------------------------|
+| **nginx** | `ip_hash` or commercial sticky modules; verify your build’s directives. | Pass **`Upgrade`** / **`Connection`**; raise **`proxy_read_timeout`** for long-lived streams. | References: **`docker/proxy-deployment/nginx.conf`**, **`nginx-apps-prefix.conf`**. |
+| **Traefik** | Sticky sessions on routers/services (cookie-based); see Traefik version docs. | Treat WebSocket like HTTP **Upgrade**; avoid buffering middleware on WS routes. | Repo: **`docker/proxy-deployment/`** Traefik merge compose (see commands earlier in this page). |
+| **Caddy** | `reverse_proxy` **lb_policy** / cookie selection (syntax varies by Caddy 2 minor). | Tune **flush** / **timeouts** for long streams; see Caddy compose under **`docker/proxy-deployment/`**. | Align **`handle_path`** / URI rewrites with **`FLUXLIT_ROOT_PATH`**. |
+
+Always match **`FLUXLIT_TRUST_PROXY`**, **`FLUXLIT_ROOT_PATH`**, and **`FLUXLIT_PUBLIC_BASE_URL`** to what the edge forwards — details in {doc}`production-tls`.
+
 ### Reference: Kubernetes
 
 A minimal **Deployment + Service** that matches the hardened image contract (probes, graceful shutdown, non-root) lives in **`examples/kubernetes/`** in the repository. Copy and adjust image name, resources, and `ConfigMap` / `Secret` wiring for your cluster.

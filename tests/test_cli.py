@@ -537,6 +537,46 @@ def test_doctor_strict_fails_on_public_base_url_path_mismatch(
     assert "FAIL" in res.stdout
 
 
+def test_doctor_strict_fails_on_oauth_public_base_url_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_oauth_subpath_strict.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings("
+        f"root_path='/apps/demo', gateway_port={port}))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_oauth_subpath_strict:app", "--strict"])
+    assert res.exit_code == 1
+    assert "oauth_public_base_url" in res.stdout
+    assert "FAIL" in res.stdout
+
+
+def test_doctor_strict_fails_on_low_read_timeout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_low_timeout_strict.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        f"app = FluxLit(settings=FluxlitSettings(gateway_port={port}, "
+        "gateway_upstream_read_timeout_s=1.0))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_low_timeout_strict:app", "--strict"])
+    assert res.exit_code == 1
+    assert "gateway_upstream_timeouts" in res.stdout
+    assert "FAIL" in res.stdout
+
+
 def test_doctor_fails_missing_streamlit_upstream_state_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -4,6 +4,16 @@
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 
+## 0.13.0 - 2026-05-13
+
+- **Phase 2 follow-through:** ``scripts/soak_metrics.sh`` and soak methodology in {doc}`runbooks` / {doc}`testing`; weekly **informational** FluxLit soak job in ``soak-scheduled.yml``; ``soak-fluxlit-dispatch`` runs metrics soak when metrics are enabled.
+- **Scale docs:** multi-replica **Redis / shared store** failure modes in {doc}`url-session`; **ingress engine** pointer table in {doc}`deployment` and cross-link in {doc}`production-tls`.
+- **Stability charter in code:** module notes on metrics/manifest/logs/settings; ``MANIFEST_V1_*`` key sets; contract tests for Prometheus series names vs ``GATEWAY_PROMETHEUS_METRICS`` and manifest v1 keys.
+- **DX:** expanded ``fluxlit doctor --strict`` rows (OAuth subpath, proxy headers, upstream read timeout, rejected forward names, unlimited proxied body with ``trust_proxy``, CORS/security headers, conflicting public base URL envs); optional ``FLUXLIT_STRICT_STARTUP`` / ``strict_startup`` on :class:`~fluxlit.config.FluxlitSettings` to **raise** on the same class of misconfigurations at import time.
+- **Tracing:** nested ``fluxlit.gateway.upstream_http`` span (hook) around the gateway → Streamlit **HTTP** hop; observability docs updated for span names and **W3C traceparent** passthrough on the internal hop.
+
+**Upgrading from 0.12.x:** Bump pins to ``fluxlit>=0.13,<1.0``. Optional: set ``FLUXLIT_STRICT_STARTUP=1`` in containers where misconfiguration should fail the process early; expand ``fluxlit doctor --strict`` in CI if you rely on the new FAIL rows.
+
 ## 0.12.0 - 2026-05-13
 
 - **Stability charter:** documented gateway **Prometheus** metric names/labels/bucket policy, **page manifest** ``manifest_version`` 1 fields, structured log field contracts, and **experimental** ``FluxlitSettings`` flags in {doc}`support-matrix` and expanded {doc}`observability`; draft **1.0 compatibility & deprecation** subsection.

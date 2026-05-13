@@ -198,20 +198,31 @@ def otel_trace_hook(name, attributes):
 set_trace_hook(otel_trace_hook)
 ```
 
-Gateway dispatch emits spans named `fluxlit.gateway.request` with low-cardinality
-attributes including `fluxlit.dispatch`, `http.method_or_type`, `url.path`, and
-`request_id`. Because the browser hits a **single port**, ingress spans should
+Gateway dispatch wraps each request in a span named **`fluxlit.gateway.request`** with
+low-cardinality attributes including `fluxlit.dispatch`, `http.method_or_type`, `url.path`, and
+`request_id`. The gateway → Streamlit **HTTP** hop adds **`fluxlit.gateway.upstream_http`**
+with `http.request.method`, `url.full`, and `fluxlit.request_id` (**experimental** attribute
+names; treat as diagnostic until 1.0 charter tightens).
+
+Because the browser hits a **single port**, ingress spans should
 label whether work happened on the API (`/api/...`) or the Streamlit proxy path.
 
 For a fuller deployment, also consider:
 
 1. **FastAPI:** use `opentelemetry-instrumentation-fastapi` on `app.api`.
-2. **Outbound HTTP:** instrument `httpx` if you propagate traces to upstreams.
+2. **Outbound HTTP:** instrument `httpx` if you propagate traces to upstreams beyond FluxLit’s hop.
 3. **Streamlit subprocess:** treat it as its own service unless you add custom propagation.
 
 ### Trace context (W3C `traceparent`)
 
-The gateway already forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets. For **OpenTelemetry** or other tracers, you can additionally propagate **`traceparent`** / **`tracestate`** from your edge if your proxy injects them; ensure your Streamlit and FastAPI instrumentation agree on the same trace ID format.
+The gateway already forwards **`X-Request-ID`** to Streamlit on proxied HTTP and WebSockets.
+
+**`traceparent` / `tracestate`:** when present on the **incoming browser request**, they pass
+through :func:`fluxlit.gateway.header_filter.filter_request_headers` and are copied onto the
+gateway → Streamlit **HTTP** hop (same as other non–hop-by-hop client headers). FluxLit does
+**not** synthesize W3C trace IDs from `request_id`; inject them at your edge or in middleware
+if you need OTel interoperability. For **OpenTelemetry**, map the FluxLit hook spans above
+onto your tracer and align IDs with headers your mesh already emits.
 
 ## Correlation limits (gateway vs Streamlit)
 

@@ -122,6 +122,10 @@ Practical guidance:
 
 Enabling **`securityContext.readOnlyRootFilesystem: true`** is compatible in principle but requires **writable mounts** for anything the process must write at runtime (for example **`TMPDIR`**, Streamlit cache directories under the user home, pidfile paths if used, and uploaded temp files). Start with a **tmpfs** mount for `/tmp` and an **`emptyDir`** for a dedicated cache path; validate with your exact image and `fluxlit run` flags before rolling out cluster-wide.
 
+## Multi-engine ingress (with deployment)
+
+For **affinity**, **WebSocket** upgrades on `/_stcore/stream`, and **strip-prefix** alignment with **`FLUXLIT_ROOT_PATH`**, see the **Ingress engines** table in {doc}`deployment` (nginx, Traefik, Caddy pointers into `docker/proxy-deployment/`).
+
 ## Related
 
 - {doc}`configuration` — `FLUXLIT_TRUST_PROXY`, `FLUXLIT_FORWARDED_ALLOW_IPS`, `FLUXLIT_ENABLE_SECURITY_HEADERS`, `FLUXLIT_PUBLIC_BASE_URL`.

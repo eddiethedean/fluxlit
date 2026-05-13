@@ -7,6 +7,9 @@ import os
 from collections.abc import Callable
 from typing import Any
 
+from typing_extensions import Self
+from urllib.parse import urlparse
+
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -52,6 +55,8 @@ class FluxlitSettings(BaseSettings):
     - ``streamlit_run_cli_args`` — extra ``streamlit run`` CLI tokens (JSON list in env).
     - ``streamlit_page_config`` — keys forwarded to ``st.set_page_config`` (JSON object in env).
     - ``cors_middleware_kwargs`` — extra kwargs for ``CORSMiddleware`` when CORS is enabled.
+    - ``experimental_yield_pages`` / ``async_page_depends`` — **experimental**; semantics
+      and promotion criteria are in ``docs/support-matrix`` (Experimental ``FluxlitSettings``).
     """
 
     model_config = SettingsConfigDict(
@@ -330,6 +335,16 @@ class FluxlitSettings(BaseSettings):
             "``Depends``, etc.)."
         ),
     )
+    strict_startup: bool = Field(
+        default=False,
+        description=(
+            "If True, reject settings combinations at model construction that "
+            "``fluxlit doctor --strict`` would flag (broad ``forwarded_allow_ips`` with "
+            "``trust_proxy``, unlimited proxied body with ``trust_proxy``, subpath without "
+            "``public_base_url`` / ``trust_proxy``, rejected gateway forward-header names, "
+            "``public_base_url`` path vs mount mismatch). Env: ``FLUXLIT_STRICT_STARTUP``."
+        ),
+    )
     experimental_yield_pages: bool = Field(
         default=False,
         description=(
@@ -399,12 +414,65 @@ class FluxlitSettings(BaseSettings):
             model._rejected_forward_headers = rejected_gateway_forward_header_allowlist(raw_list)
         return model
 
-    def __init__(self, **data: Any) -> None:
-        super().__init__(**data)
+    @model_validator(mode="after")
+    def _apply_legacy_public_base_url(self) -> Self:
+        """Match ``PUBLIC_BASE_URL`` fallback after field validation (see prior ``__init__``)."""
         legacy = os.environ.get("PUBLIC_BASE_URL", "").strip()
         namespaced = os.environ.get("FLUXLIT_PUBLIC_BASE_URL", "").strip()
         if legacy and not namespaced and not self.public_base_url.strip():
             self.public_base_url = legacy
+        return self
+
+    @model_validator(mode="after")
+    def _strict_startup_validate(self) -> Self:
+        if not self.strict_startup:
+            return self
+        if self.trust_proxy:
+            allow = (self.forwarded_allow_ips or "").strip()
+            if not allow or allow == "*":
+                msg = (
+                    "strict_startup: set FLUXLIT_FORWARDED_ALLOW_IPS to a non-wildcard value "
+                    "when FLUXLIT_TRUST_PROXY is enabled"
+                )
+                raise ValueError(msg)
+            if self.gateway_max_proxy_request_body_bytes == 0:
+                msg = (
+                    "strict_startup: set FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES when "
+                    "FLUXLIT_TRUST_PROXY is enabled (unlimited proxied body is rejected)"
+                )
+                raise ValueError(msg)
+        mount = self.public_mount_path()
+        if mount and not self.public_base_url.strip():
+            msg = (
+                "strict_startup: set FLUXLIT_PUBLIC_BASE_URL when using a subpath "
+                "(root_path / streamlit_public_path)"
+            )
+            raise ValueError(msg)
+        if mount and not self.trust_proxy:
+            msg = (
+                "strict_startup: enable FLUXLIT_TRUST_PROXY (or pass --proxy-headers) when "
+                "using a subpath behind a reverse proxy"
+            )
+            raise ValueError(msg)
+        rejected = tuple(getattr(self, "_rejected_forward_headers", ()))
+        if rejected:
+            msg = f"strict_startup: remove rejected gateway forward header names: {list(rejected)}"
+            raise ValueError(msg)
+        pb = self.public_base_url.strip()
+        if pb:
+            parsed = urlparse(pb)
+            root = mount.rstrip("/")
+            public_path = (parsed.path or "").rstrip("/")
+            if root and public_path and public_path != root:
+                msg = (
+                    "strict_startup: public_base_url path does not match public mount "
+                    f"({public_path!r} vs {root!r})"
+                )
+                raise ValueError(msg)
+        return self
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(**data)
 
     def public_mount_path(self) -> str:
         """Browser-visible path prefix (``root_path``, else ``streamlit_public_path``)."""

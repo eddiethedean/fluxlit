@@ -69,7 +69,7 @@ On **Windows**, **`--force` runs ``taskkill /T /F``** (POSIX uses ``SIGKILL``). 
 
 - Exits **`1`** if any check is **FAIL**, unless **`--warnings-only`** is set (then always **0**).
 - **WARN** does not fail the run; fix when practical (Streamlit version, proxy trust on subpaths, etc.).
-- **`--strict`** upgrades selected **WARN** checks to **FAIL**: **`forwarded_allow_ips`** when `trust_proxy` is on but **`FLUXLIT_FORWARDED_ALLOW_IPS`** is unset or **`*`**, and **`public_base_url`** when its URL path does not match **`root_path`** / public mount. Use in CI when you want production-style gates without treating every advisory as blocking.
+- **`--strict`** upgrades selected **WARN** checks to **FAIL**: **`forwarded_allow_ips`** when `trust_proxy` is on but **`FLUXLIT_FORWARDED_ALLOW_IPS`** is unset or **`*`**, **`public_base_url`** when its URL path does not match **`root_path`** / public mount, **`public_base_url_precedence`** when both `PUBLIC_BASE_URL` and `FLUXLIT_PUBLIC_BASE_URL` differ, **`oauth_public_base_url`** when a subpath is set without `public_base_url`, **`proxy_headers`** when a subpath is set without `trust_proxy`, **`gateway_max_proxy_body`** when `trust_proxy` is on with unlimited proxied body size, **`gateway_upstream_timeouts`** when the HTTP read timeout is very low, **`gateway_forward_rejected_names`** when the forward allowlist contains rejected names, and **CORS + security headers** mismatch. Use in CI when you want production-style gates without treating every advisory as blocking.
 - Use **`--json`** in CI or deployment scripts for a stable machine-readable shape:
 
 ```bash

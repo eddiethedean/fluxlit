@@ -1,4 +1,10 @@
-"""JSON-serializable page manifest for docs, codegen, and link checkers."""
+"""JSON-serializable page manifest for docs, codegen, and link checkers.
+
+**Stability:** Top-level and per-page keys for ``manifest_version`` **1** are listed in
+:data:`MANIFEST_V1_ROOT_KEYS` and :data:`MANIFEST_V1_PAGE_ALLOWED_KEYS` (see
+``docs/support-matrix``). :func:`build_page_manifest` output must stay aligned with those
+sets unless the manifest version or support matrix is bumped together.
+"""
 
 from __future__ import annotations
 
@@ -40,6 +46,23 @@ def _depends_qualnames(fn: Callable[..., Any]) -> list[str]:
     return out
 
 
+MANIFEST_V1_ROOT_KEYS: frozenset[str] = frozenset(
+    {"manifest_version", "manifest_stability", "title", "pages"}
+)
+MANIFEST_V1_PAGE_ALLOWED_KEYS: frozenset[str] = frozenset(
+    {
+        "path",
+        "title",
+        "tags",
+        "description",
+        "icon",
+        "parameters",
+        "dependencies",
+        "children",
+    }
+)
+
+
 def build_page_manifest(app: FluxLit[Any], *, version: int = 1) -> dict[str, Any]:
     """Return a versioned manifest dict (``manifest_version`` **1**, stability **stable**).
 
@@ -75,4 +98,8 @@ def build_page_manifest(app: FluxLit[Any], *, version: int = 1) -> dict[str, Any
     }
 
 
-__all__ = ["build_page_manifest"]
+__all__ = [
+    "MANIFEST_V1_PAGE_ALLOWED_KEYS",
+    "MANIFEST_V1_ROOT_KEYS",
+    "build_page_manifest",
+]

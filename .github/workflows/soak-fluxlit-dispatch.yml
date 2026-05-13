@@ -23,6 +23,7 @@ jobs:
         run: |
           set -euo pipefail
           export FLUXLIT_NO_PIDFILE=1
+          export FLUXLIT_ENABLE_GATEWAY_PROMETHEUS_METRICS=1
           fluxlit run examples.smoke_app.app:app --host 127.0.0.1 --port 8765 --no-pidfile &
           gw_pid=$!
           cleanup() {
@@ -39,5 +40,6 @@ jobs:
             sleep 0.5
           done
           curl -fsS "http://127.0.0.1:8765/api/healthz" >/dev/null
-          chmod +x scripts/soak_readyz.sh
+          chmod +x scripts/soak_readyz.sh scripts/soak_metrics.sh
           COUNT=40 BASE_URL=http://127.0.0.1:8765 ./scripts/soak_readyz.sh
+          COUNT=30 BASE_URL=http://127.0.0.1:8765 ./scripts/soak_metrics.sh

@@ -88,7 +88,16 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 
 ---
 
-## Current status (0.12.x)
+## Current status (0.13.x)
+
+**Shipped (0.13.0) — Phase 2 complete**
+
+- **Evidence baselines:** ``scripts/soak_metrics.sh``, soak methodology in {doc}`runbooks` / {doc}`testing`, weekly **informational** FluxLit soak in [`.github/workflows/soak-scheduled.yml`](.github/workflows/soak-scheduled.yml) (**`continue-on-error: true`**), ``soak-fluxlit-dispatch`` extended with metrics soak when enabled.
+- **Multi-replica depth:** external-store **failure modes** and ingress **engine pointer** table ({doc}`url-session`, {doc}`deployment`, {doc}`production-tls`).
+- **Stability charter in code:** drift notes on metrics/manifest/logs/settings; ``MANIFEST_V1_*`` contracts; pytest coverage vs ``GATEWAY_PROMETHEUS_METRICS`` and manifest v1 keys.
+- **DX / startup:** expanded ``fluxlit doctor --strict``; ``FLUXLIT_STRICT_STARTUP`` / ``strict_startup`` fail-fast on the same misconfiguration class.
+- **Tracing:** ``fluxlit.gateway.upstream_http`` hook span; observability docs for **W3C traceparent** passthrough on the gateway → Streamlit HTTP hop.
+- **Phase 2 exit criteria:** support-matrix **1.0 compatibility** subsection promoted from “draft-only” wording; public API scope called out on the **`fluxlit`** package docstring.
 
 **Shipped (0.12.0) — Phase 2 baseline**
 
@@ -117,25 +126,25 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 - **0.8.x foundation** (gateway, URL session, testing client, observability, docs) remains as documented in prior roadmap sections.
 - **Pins:** Optional env-driven features and supported Python / Streamlit ranges are summarized in [docs/support-matrix.md](docs/support-matrix.md).
 
-**Next: 0.13.x / Phase 2 follow-through** — evidence **baselines** (published numbers, optional CI expansion), OpenTelemetry depth, stability-charter **enforcement** in code where drift-prone, and remaining DX hard-errors. Phase 3 (**1.0.0rc***) gates remain in **[Path to 1.0](#path-to-1-0)**.
+**Next: Phase 3 — 1.0.0rc** — release candidates, migration freeze, and API audit per **[Path to 1.0](#path-to-1-0)**.
 
 ### Phase 2 — delivery checklist (track as issues/milestones)
 
 Use your issue tracker or release milestones to burn these down; this list mirrors Phase 2 in **[Path to 1.0](#path-to-1-0)** above.
 
-- [x] **Evidence:** scripted load/soak/chaos runs with expected signals (metrics, logs, `readyz`) aligned with [docs/runbooks.md](docs/runbooks.md) — **0.12.0** ships ``soak_readyz``, script/runbook alignment, and optional **workflow_dispatch** soak; broader baselines / scheduled FluxLit soak remain follow-on.
-- [x] **Multi-replica:** first-class docs for horizontal scale (sticky sessions, external `SessionStore`, rollout/drain) building on URL-session and examples — **0.12.0** checklist + K8s examples + runbook.
-- [x] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs (and code comments where it prevents drift) — **0.12.0** tables in {doc}`support-matrix` / {doc}`observability`.
-- [x] **DX / misconfiguration:** clearer diagnostics for ``forwarded_allow_ips`` / ``public_base_url`` vs mount — **0.12.0** adds ``fluxlit doctor --strict`` (plus **0.11.0** lifespan fail-fast for Uvicorn ``workers`` > 1); further hard-errors and richer hints remain for **0.13.x**.
+- [x] **Evidence:** scripted load/soak/chaos runs with expected signals (metrics, logs, `readyz`) aligned with [docs/runbooks.md](docs/runbooks.md) — **0.12.0** baseline + **0.13.0** metrics soak, methodology text, scheduled informational FluxLit soak.
+- [x] **Multi-replica:** first-class docs for horizontal scale (sticky sessions, external `SessionStore`, rollout/drain) building on URL-session and examples — **0.12.0** checklist + K8s + **0.13.0** external-store failure modes + ingress pointers.
+- [x] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs **and** code/tests — **0.12.0** tables + **0.13.0** enforcement.
+- [x] **DX / misconfiguration:** clearer diagnostics for ``forwarded_allow_ips`` / ``public_base_url`` vs mount — **0.12.0** ``fluxlit doctor --strict`` + **0.13.0** expanded strict rows and ``FLUXLIT_STRICT_STARTUP``.
 
 ### Suggested PR slices (implementation tracking)
 
-Split Phase 2 work so each change stays reviewable and bisectable:
+Post–Phase 2 work is now **Phase 3 / 1.x** unless noted otherwise:
 
-- **Evidence / load:** **0.12.0:** ``soak_readyz``, runbook/testing alignment, ``soak-fluxlit-dispatch`` workflow — extend with published SLO numbers / optional scheduled FluxLit soak.
-- **Multi-replica:** **0.12.0** checklist + examples — deepen external ``SessionStore`` recipes and engine-specific ingress notes as needed.
-- **Stability charter:** **0.12.0** docs tables — mirror into code comments / settings docstrings where operators grep.
-- **DX / misconfiguration:** **0.12.0** ``doctor --strict`` for proxy allowlist + public URL path; **0.11.0** lifespan guard for multi-worker — follow-ups: hard errors for additional combos, richer ``fluxlit config`` overlap.
+- **Evidence / load:** optional published **SLO** numbers in docs or CI (voluntary; not a merge gate).
+- **Multi-replica:** deeper per-engine cookbooks as real deployments surface patterns.
+- **Stability charter:** optional stricter manifest/metrics codegen checks in **1.0rc** if needed.
+- **DX / misconfiguration:** richer ``fluxlit config`` overlap with ``doctor`` as operators request it.
 - **Dependency hygiene:** when bumping **httpx**, re-audit private imports in [`src/fluxlit/client.py`](src/fluxlit/client.py) (`httpx._types`, `httpx._client`) against the release’s public typing surface (noting intentional use in [docs/support-matrix.md](docs/support-matrix.md)).
 
 **Gaps vs “production”**
@@ -145,18 +154,14 @@ Split Phase 2 work so each change stays reviewable and bisectable:
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes — **1.0 readiness** is now spelled out in **[Path to 1.0](#path-to-1-0)** above.
 
-**Triage: 0.12.0 vs deferred (0.13.x / Phase 2 follow-on)**
+**Triage: Phase 2 complete — follow-on**
 
-| Topic | 0.12.0 | Deferred |
-|-------|--------|----------|
-| Stability charter (docs) | **Done** (support-matrix + observability + draft 1.0 text) | Code-comment mirroring, enforcement tests |
-| Multi-replica ops narrative | **Done** (checklist, runbook, K8s examples, url-session links) | Deeper engine-specific ingress / external store cookbooks |
-| Evidence scripts + runbook alignment | **Done** (``soak_readyz``, headers, runbooks table, manual workflow) | Published numeric baselines, optional scheduled FluxLit soak in CI |
-| ``fluxlit doctor --strict`` (proxy / public URL path) | **Done** | Additional FAIL rows, startup-time hard errors |
-| Broader load/chaos **evidence** | Partially | **0.13.x** — SLO numbers, longer soak jobs |
-| OpenTelemetry depth | Hooks + docs recipes | **0.13.x** — fuller propagation story |
-| Per-push min/max dependency matrix | — | Optional / **post-1.0** cost tradeoff (see support matrix) |
-| Git tag vs PyPI byte identity | Documented practice | Bump **patch** when artifacts must change |
+| Topic | Status | Notes |
+|-------|--------|-------|
+| Phase 2 exit criteria (runbooks, charter, public API scope) | **Met (0.13.0)** | Voluntary numeric SLO baselines still optional |
+| OpenTelemetry | **Partial** | Hooks + spans + docs; full auto-instrumentation remains **post-1.0** |
+| Per-push min/max dependency matrix | **Deferred** | **post-1.0** tradeoff (see support matrix) |
+| Git tag vs PyPI byte identity | Documented | Bump **patch** when wheel/sdist must change |
 
 ---
 
