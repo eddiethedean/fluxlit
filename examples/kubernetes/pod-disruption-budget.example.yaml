@@ -1,0 +1,17 @@
+# Optional: PodDisruptionBudget for voluntary evictions (node drain, cluster upgrade).
+# Tune minAvailable vs replicas in your Deployment; keep readiness aligned with
+# docs/deployment.md (kubernetes-graceful-shutdown).
+#
+# Not applied by default.
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fluxlit-app
+  labels:
+    app: fluxlit-app
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: fluxlit-app

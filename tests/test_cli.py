@@ -496,6 +496,47 @@ def test_doctor_warns_when_public_base_url_path_mismatches_root_path(
     assert "does not match public mount" in res.stdout
 
 
+def test_doctor_strict_fails_on_broad_forwarded_allow_ips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_proxy_broad_strict.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings("
+        f"trust_proxy=True, forwarded_allow_ips='*', gateway_port={port}))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_proxy_broad_strict:app", "--strict"])
+    assert res.exit_code == 1
+    assert "forwarded_allow_ips" in res.stdout
+    assert "FAIL" in res.stdout
+
+
+def test_doctor_strict_fails_on_public_base_url_path_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = find_free_port()
+    module_path = tmp_path / "doc_public_base_mismatch_strict.py"
+    module_path.write_text(
+        "from fluxlit import FluxLit\n"
+        "from fluxlit.config import FluxlitSettings\n\n"
+        "app = FluxLit(settings=FluxlitSettings("
+        "root_path='/apps/demo', public_base_url='https://example.com/wrong', "
+        f"gateway_port={port}))\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    runner = CliRunner()
+    res = runner.invoke(app, ["doctor", "doc_public_base_mismatch_strict:app", "--strict"])
+    assert res.exit_code == 1
+    assert "public_base_url" in res.stdout
+    assert "FAIL" in res.stdout
+
+
 def test_doctor_fails_missing_streamlit_upstream_state_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

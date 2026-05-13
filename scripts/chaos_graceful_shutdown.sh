@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Local chaos check: verify the gateway exits after SIGTERM.
+#
+# Expected: /api/healthz returns 200 while up; after SIGTERM the parent exits within
+# TIMEOUT_S (default 20s). Logs in LOG_FILE — look for graceful drain / lifespan.
+# Pair with docs/runbooks.md (Kubernetes graceful shutdown) and docs/deployment.md.
 set -euo pipefail
 
 PORT="${PORT:-8000}"

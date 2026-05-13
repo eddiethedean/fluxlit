@@ -97,7 +97,7 @@ def _dockerfile_body(target: str) -> str:
         f"# python:3.12-slim @ {_py_slim_digest}\n"
         f"FROM python@{_py_slim_digest}\n"
         "WORKDIR /app\n"
-        'RUN pip install --no-cache-dir "fluxlit>=0.11,<1.0"\n'
+        'RUN pip install --no-cache-dir "fluxlit>=0.12,<1.0"\n'
         "COPY . .\n"
         "RUN useradd --create-home --uid 1000 appuser \\\n"
         "    && chown -R appuser:appuser /app\n"
@@ -520,6 +520,7 @@ def _doctor_collect(
     *,
     verbose: bool,
     check_pages: bool = False,
+    strict: bool = False,
 ) -> tuple[list[tuple[str, CheckStatus, str]], dict[str, object] | None]:
     """Run static checks; each row is ``(name, PASS|WARN|FAIL, message)``.
 
@@ -779,10 +780,11 @@ def _doctor_collect(
     if fl is not None and fl.settings.trust_proxy:
         allow = (fl.settings.forwarded_allow_ips or "").strip()
         if not allow or allow == "*":
+            allow_status: CheckStatus = "FAIL" if strict else "WARN"
             rows.append(
                 (
                     "forwarded_allow_ips",
-                    "WARN",
+                    allow_status,
                     "trust_proxy enabled but forwarded_allow_ips is broad; set "
                     "FLUXLIT_FORWARDED_ALLOW_IPS to your proxy IP/CIDR in production",
                 )
@@ -795,10 +797,11 @@ def _doctor_collect(
         root = fl.settings.public_mount_path().rstrip("/")
         public_path = (parsed_public.path or "").rstrip("/")
         if root and public_path and public_path != root:
+            pub_status: CheckStatus = "FAIL" if strict else "WARN"
             rows.append(
                 (
                     "public_base_url",
-                    "WARN",
+                    pub_status,
                     f"path {public_path!r} does not match public mount {root!r}",
                 )
             )
@@ -959,11 +962,15 @@ def _doctor_collect(
 
 
 def _doctor_checks(
-    target: str, *, verbose: bool = False, check_pages: bool = False
+    target: str, *, verbose: bool = False, check_pages: bool = False, strict: bool = False
 ) -> list[tuple[str, CheckStatus, str]]:
     """Backward-compatible wrapper used by tests."""
     rows, _ = _doctor_collect(
-        target, load_project_config(), verbose=verbose, check_pages=check_pages
+        target,
+        load_project_config(),
+        verbose=verbose,
+        check_pages=check_pages,
+        strict=strict,
     )
     return rows
 
@@ -1022,6 +1029,11 @@ def doctor(
         "--check-pages",
         help="Run ``fluxlit pages validate``-style checks (manifest + signatures per settings).",
     ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Treat broad forwarded_allow_ips and public_base_url path mismatch as FAIL.",
+    ),
 ) -> None:
     """Print PASS/WARN/FAIL diagnostics (imports, deps, bind, env).
 
@@ -1031,7 +1043,11 @@ def doctor(
     resolved_target = resolve_target(target, pc)
 
     rows, verbose_detail = _doctor_collect(
-        resolved_target, pc, verbose=verbose, check_pages=check_pages
+        resolved_target,
+        pc,
+        verbose=verbose,
+        check_pages=check_pages,
+        strict=strict,
     )
     if json_output:
         typer.echo(

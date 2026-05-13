@@ -4,6 +4,15 @@
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 
+## 0.12.0 - 2026-05-13
+
+- **Stability charter:** documented gateway **Prometheus** metric names/labels/bucket policy, **page manifest** ``manifest_version`` 1 fields, structured log field contracts, and **experimental** ``FluxlitSettings`` flags in {doc}`support-matrix` and expanded {doc}`observability`; draft **1.0 compatibility & deprecation** subsection.
+- **Multi-replica:** operations checklist in {doc}`deployment`; new runbook **Multi-replica: new Streamlit session after refresh**; optional Kubernetes **PDB** and **Service sessionAffinity** examples under ``examples/kubernetes/``; cross-links from {doc}`url-session`.
+- **Evidence:** new ``scripts/soak_readyz.sh`` for ``/api/readyz`` soak summaries; chaos/soak script headers aligned with expected signals; {doc}`runbooks` scripted load table; manual **GitHub Actions** workflow ``soak-fluxlit-dispatch.yml``; {doc}`testing` recipe.
+- **DX:** ``fluxlit doctor --strict`` treats broad ``forwarded_allow_ips`` (with ``trust_proxy``) and ``public_base_url`` path vs public mount mismatch as **FAIL** (use with ``--warnings-only`` or fix config).
+
+**Upgrading from 0.11.x:** Bump pins to ``fluxlit>=0.12,<1.0``. CI or release gates may use ``fluxlit doctor --strict`` alongside ``fluxlit config --strict`` for proxy hardening. Re-read {doc}`support-matrix` stability tables when pinning dashboards or manifest consumers.
+
 ## 0.11.0 - 2026-05-12
 
 - **Runtime:** unified ``FluxLit`` ASGI lifespan fails fast when Uvicorn runs with ``workers`` > 1 (detected via ``uvicorn.lifespan.on.LifespanOn``); set ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`` to override (unsupported). See {doc}`deployment` and {doc}`configuration`.

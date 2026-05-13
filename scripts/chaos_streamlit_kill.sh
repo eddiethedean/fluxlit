@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Local chaos check: kill the Streamlit sidecar and confirm the gateway exits.
+#
+# Expected: healthz is 200 before kill; gateway process exits after sidecar death
+# (unified runtime tears down). /api/readyz would be 503 while sidecar is wedged —
+# see docs/runbooks.md (503 on readyz).
 set -euo pipefail
 
 PORT="${PORT:-8000}"

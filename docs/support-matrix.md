@@ -1,6 +1,6 @@
 # Support matrix
 
-Published combinations for **FluxLit 0.11.x** on PyPI. Outside this matrix, installs may work but are **best-effort** until tested in CI.
+Published combinations for **FluxLit 0.12.x** on PyPI. Outside this matrix, installs may work but are **best-effort** until tested in CI.
 
 ## Python
 
@@ -18,10 +18,61 @@ CI installs **`pip install -e ".[dev]"`** from `pyproject.toml` pins and the res
 | Package | Notes |
 |---------|--------|
 | **FastAPI** / **Starlette** | Lower bounds in `pyproject.toml` (`fastapi>=0.111`, `starlette>=0.37`); CI resolves within those ranges. |
-| **httpx** / **anyio** | `httpx>=0.27`, `anyio>=4.0` — gateway proxy and async tests. |
+| **httpx** / **anyio** | `httpx>=0.27`, `anyio>=4.0` — gateway proxy and async tests. `ApiClient` imports a few **typing-only** symbols from `httpx._types` / `httpx._client` to mirror ``Client.request`` annotations; treat these as **intentional** until httpx exposes stable public aliases — re-audit on httpx minor bumps (see roadmap dependency hygiene). |
 | **Streamlit** | `streamlit>=1.36` at runtime; gateway proxies HTTP + WebSockets to Streamlit’s server. You **do not** need `streamlit[starlette]` for FluxLit: the public ASGI app is FastAPI/Starlette; Streamlit runs as a managed sidecar. |
 | **Uvicorn** | `uvicorn[standard]>=0.29` — unified entry uses Uvicorn’s HTTP stack; **`workers` > 1** is unsupported for one FluxLit process. When you mount the unified {class}`~fluxlit.app.FluxLit` ASGI app under Uvicorn with multiple workers, **lifespan startup fails** unless **`FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`** (explicitly unsupported — use one worker per replica and scale out). See {doc}`deployment`. |
 | **Pydantic Settings** | `pydantic-settings>=2.0` — `FluxlitSettings` and env loading. |
+
+## Stability charter (operator contract)
+
+FluxLit **0.12.x** documents which emitted names and fields operators may rely on for dashboards, alerts, and CI **without** treating every patch as a breaking change. Anything marked **experimental** may change behavior or shape in a minor release with changelog notice.
+
+### Gateway Prometheus metrics
+
+The canonical list is {data}`fluxlit.gateway.metrics.GATEWAY_PROMETHEUS_METRICS` in code and the **Metrics contract** table in {doc}`observability`.
+
+| Name | Type | Labels | Stability |
+|------|------|--------|-----------|
+| `fluxlit_gateway_requests_total` | Counter | `dispatch`, `method_kind` | **Stable** (0.x). |
+| `fluxlit_gateway_request_duration_seconds` | Histogram | `dispatch` | **Stable** name and labels; bucket changes are semver-visible (see observability). |
+
+### Page manifest (`manifest_version` 1)
+
+Produced by :func:`~fluxlit.pages.manifest.build_page_manifest` (and ``fluxlit pages manifest``). Top-level keys:
+
+| Key | Stability | Notes |
+|-----|-----------|-------|
+| `manifest_version` | **Stable** | Currently `1`. A future `2` would be a deliberate migration. |
+| `manifest_stability` | **Stable** | Declared **stable** for v1 output. |
+| `title` | **Stable** | From `FluxlitSettings.title`. |
+| `pages` | **Stable** (array shape) | List of page objects; **fields inside each page** below. |
+
+Per **page** object (stable keys; **values** reflect your app):
+
+| Key | Stability | Notes |
+|-----|-----------|-------|
+| `path`, `title`, `tags`, `description`, `icon` | **Stable** | Registration-time metadata. |
+| `parameters` | **Stable** | `{name, annotation}` entries from signatures. |
+| `dependencies` | **Stable** | Qualnames of `Depends` targets; no code objects. |
+| `children` | **May evolve** | Optional list from `PageMeta.children`; ordering/display rules may gain keys in minors—check changelog when upgrading. |
+
+### Structured log field contracts
+
+| Export | Fields | Stability |
+|--------|--------|-----------|
+| {data}`fluxlit.logging.JSON_LOG_BASE_FIELDS` | `time`, `level`, `logger`, `message` | **Stable** for JSON formatter output. |
+| {data}`fluxlit.logging.GATEWAY_ACCESS_LOG_FIELDS` | `request_id`, `fluxlit_dispatch`, `http_method_or_type`, `path`, `query` | **Stable** for gateway access `extra` when those lines are emitted. |
+
+Header redaction helpers in {mod}`fluxlit.logging.redact` are **behavior-stable** for security (values may show `<redacted>`); exact log **wording** of debug lines is **not** chartered.
+
+### Experimental `FluxlitSettings` fields
+
+| Field / env | Stability | Notes |
+|-------------|-----------|-------|
+| `experimental_yield_pages` / `FLUXLIT_EXPERIMENTAL_YIELD_PAGES` | **Experimental** | Generator pages run an extra `next()` per script run; may change or be removed after feedback. |
+| `async_page_depends` / `FLUXLIT_ASYNC_PAGE_DEPENDS` | **Experimental** | Async `Depends` resolution paths (thread offload when a loop is running) may be refined. |
+
+Promotion to **stable for 1.0** requires: documented semantics, tests, and an explicit roadmap/CHANGELOG decision (no longer gated behind experimental flags).
 
 ## Pinning in production apps
 
@@ -36,11 +87,11 @@ FluxLit sits between **FastAPI**, **Streamlit**, **Uvicorn**, **Starlette**, **h
 Minimal **`requirements.in`** sketch (adjust pins to your policy):
 
 ```text
-fluxlit>=0.11,<1.0
+fluxlit>=0.12,<1.0
 streamlit>=1.36
 ```
 
-After each FluxLit PyPI release, align this sketch with the current minor (for example ``fluxlit>=0.11,<1.0`` until you adopt **0.12**).
+After each FluxLit PyPI release, align this sketch with the current minor (for example ``fluxlit>=0.12,<1.0`` until you adopt **0.13**).
 
 Then `pip-compile requirements.in -o requirements.txt` and install from **`requirements.txt`** in containers.
 
@@ -65,6 +116,15 @@ Then `pip-compile requirements.in -o requirements.txt` and install from **`requi
 ## Long-term support (LTS)
 
 There is **no LTS branch** for **0.x** today; security and fixes land on the **current minor** on PyPI. If you need extended support for an older line, open a discussion with maintainers.
+
+## 1.0 compatibility and deprecation (draft)
+
+This subsection is a **draft** until **1.0.0rc** ships; it sets expectations for the 1.x line.
+
+- **Semver:** After **1.0.0**, FluxLit follows **semver** for the documented stable surface (CLI, `FLUXLIT_*` keys called out in {doc}`configuration`, and public Python APIs in the package root and guides). **Experimental** settings and **internal** debug logs remain exempt until promoted.
+- **Python / Streamlit / core deps:** The [Python](#python) and [Core dependencies](#core-dependencies-approximate) tables become the **compatibility commitment** for 1.x minors unless a release explicitly widens or narrows them.
+- **Deprecations:** behavior or config removals will be announced in {doc}`changelog` with a **deprecation window** where practical (at least one minor when feasible).
+- **Metrics and manifests:** Gateway metric **names** and **manifest_version** **1** top-level keys above stay stable across 1.x unless a major documents a migration (for example a new manifest version).
 
 ## Related
 

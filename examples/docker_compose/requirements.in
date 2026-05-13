@@ -2,4 +2,4 @@
 #   uv pip compile examples/docker_compose/requirements.in -o examples/docker_compose/requirements.txt
 # If the requested FluxLit range is not on PyPI yet, build wheels first (`uv build -o /tmp/fluxlit-wheels`)
 # and add `--find-links /tmp/fluxlit-wheels` to the compile command.
-fluxlit>=0.11,<1.0
+fluxlit>=0.12,<1.0

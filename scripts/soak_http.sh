@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Lightweight soak: repeated HTTP GETs against a running FluxLit server.
+# Uses curl -f: only HTTP 2xx counts as success (good for /api/healthz, /api/smoke).
+#
+# For readiness (/api/readyz) where 503 is meaningful, use scripts/soak_readyz.sh
+# instead — see docs/runbooks.md and docs/deployment.md.
+#
 # Usage:
 #   ./scripts/run_smoke_app.sh
 #   BASE_URL=http://127.0.0.1:8000 PATH_SUFFIX=/api/smoke COUNT=500 ./scripts/soak_http.sh

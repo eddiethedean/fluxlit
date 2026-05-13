@@ -68,6 +68,37 @@ Short **symptom → check → mitigate** notes for common production incidents. 
 - Fix issuer/audience/JWKS URL; rotate secrets per {doc}`secrets`.
 - For subpath deployments, set **`FLUXLIT_ROOT_PATH`** and **`FLUXLIT_PUBLIC_BASE_URL`** to the public origin.
 
+## Multi-replica: new Streamlit session after refresh
+
+**Symptom:** Users report losing UI state or “starting over” after **F5** or intermittent **503** / reconnects, only when **more than one** FluxLit replica is behind the load balancer.
+
+**Meaning:** Each replica has its own Streamlit process and **in-memory** `st.session_state`. Without **sticky routing** or a **shared store** (URL session + external `SessionStore`, or app-level persistence), the next request may hit a different replica.
+
+**Checks**
+
+1. Confirm replica count > 1 and whether the LB uses **affinity** (cookie / IP / connection).
+2. If using FluxLit **URL-session** helpers, verify the store is **shared** across replicas (not `InMemorySessionStore` per pod).
+3. For **OIDC BFF**, confirm you are not relying on single-replica in-memory `state` without affinity — see {doc}`security`.
+
+**Mitigations**
+
+- Add **session affinity** on the Service or ingress (see `examples/kubernetes/service-session-affinity.example.yaml` in the repo), **or**
+- Move continuity data to an **external `SessionStore`** or database — see {doc}`url-session` and {doc}`deployment` (scaling checklist).
+
+## Scripted load and chaos (repository)
+
+Repeatable scripts live under **`scripts/`** in the repository:
+
+| Script | Role |
+|--------|------|
+| **`soak_http.sh`** | Many GETs with **`curl -f`** (2xx only) — default `PATH_SUFFIX=/api/healthz`. |
+| **`soak_readyz.sh`** | Many GETs on **`/api/readyz`** without `-f`; counts **2xx vs 503** and latency percentiles (`REQUIRE_2XX=0` to investigate flaky readyz). |
+| **`chaos_graceful_shutdown.sh`** | SIGTERM → gateway exits within a bounded window. |
+| **`chaos_streamlit_kill.sh`** | Kill Streamlit child → parent exits. |
+| **`chaos_slow_upstream.sh`**, **`chaos_oversized_body.sh`**, **`chaos_dropped_websocket.sh`** | Timeout, **413**, and WebSocket drop behaviors. |
+
+Run **`./scripts/run_smoke_app.sh`** (or your app) in one terminal, then point **`BASE_URL`** at it. For CI-style signals, pair with {doc}`observability` (metrics, gateway logs) and {doc}`deployment` (readiness).
+
 ## Related
 
 - {doc}`troubleshooting` — doctor, ports, API path mistakes.

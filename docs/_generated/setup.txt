@@ -1,1 +1,1 @@
-fluxlit version: 0.11.0
+fluxlit version: 0.12.0

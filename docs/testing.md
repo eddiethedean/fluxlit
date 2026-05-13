@@ -362,6 +362,15 @@ report-friendly summary with approximate p50/p95/p99 latency in milliseconds.
 Adjust `PATH_SUFFIX` (default `/api/healthz`) or `COUNT` for longer runs. Watch
 gateway CPU and logs; pair with {doc}`observability` if you enable access logs.
 
+**Readiness soak:** `scripts/soak_readyz.sh` repeats **`GET /api/readyz`** without `curl -f`, so **503** responses are counted (useful for reproducing probe flakiness). By default **`REQUIRE_2XX=1`** fails the script if any response is not 2xx; set **`REQUIRE_2XX=0`** to only print the HTTP code histogram and latency percentiles.
+
+```bash
+chmod +x scripts/soak_readyz.sh
+COUNT=120 BASE_URL=http://127.0.0.1:8000 ./scripts/soak_readyz.sh
+```
+
+**Manual CI recipe:** the scheduled workflow [`.github/workflows/soak-scheduled.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-scheduled.yml) only validates `soak_http.sh` against `http.server`. For a short FluxLit-backed soak on demand, use [`.github/workflows/soak-fluxlit-dispatch.yml`](https://github.com/eddiethedean/fluxlit/blob/main/.github/workflows/soak-fluxlit-dispatch.yml) (**`workflow_dispatch`** only): it installs the package, starts the smoke app in the background, runs **`soak_readyz.sh`** with a small **`COUNT`**, then tears down.
+
 ## Chaos checks (local)
 
 The sidecar-failure check starts the canonical smoke app, kills the Streamlit child

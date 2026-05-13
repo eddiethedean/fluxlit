@@ -53,6 +53,8 @@ dashboards and alert routing:
 | `path` | Stable | Raw ASGI path; consider route normalization in your own log pipeline if paths include user IDs. |
 | `query` | Stable, redacted | Sensitive query values are redacted, including URL-session keys. |
 
+**Internal / debug-only (not part of the stable access-log contract):** when **debug mode** is on, the gateway may emit additional **DEBUG** lines (for example path-split hints and dispatch diagnostics). Do not build alerts or SLO dashboards on those lines; they can change without a semver note in patch releases. The **DEBUG** line emitted when a Prometheus histogram **observe** fails is similarly diagnostic-only (see **Metrics contract** below).
+
 ### JSON log lines (Loki / Datadog-style)
 
 Use {class}`~fluxlit.logging.JsonLogFormatter` so each log record is a **single JSON object** with at least `time`, `level`, `logger`, `message`, plus any attributes from ``logger.info(..., extra={...})`` (for example `request_id`, `fluxlit_dispatch`, `path` from gateway access logs).
@@ -141,11 +143,20 @@ The path must **not** be under your **`api_mount_path`** or it will shadow API r
 ### Metrics contract
 
 The current metric catalog is exported as
-{data}`fluxlit.gateway.metrics.GATEWAY_PROMETHEUS_METRICS`. The names above and
-their labels are stable for 0.x dashboards. Keep labels low-cardinality:
+{data}`fluxlit.gateway.metrics.GATEWAY_PROMETHEUS_METRICS` (each entry includes a
+machine-readable **`stability`** field mirrored here):
 
-- `dispatch`: `api` or `streamlit`.
-- `method_kind`: HTTP method or `WEBSOCKET`.
+| Metric | Type | Labels | Stability |
+|--------|------|--------|-------------|
+| `fluxlit_gateway_requests_total` | Counter | `dispatch`, `method_kind` | **Stable** for 0.x dashboards. |
+| `fluxlit_gateway_request_duration_seconds` | Histogram | `dispatch` | **Stable** name and labels; see bucket policy below. |
+
+**Label semantics** (low cardinality by design):
+
+- **`dispatch`:** `api` or `streamlit` — see {mod}`fluxlit.gateway.dispatch` for when each applies.
+- **`method_kind`:** upper-case HTTP method (for example `GET`) or `WEBSOCKET` for WebSocket upgrades.
+
+**Histogram buckets:** changing default **bucket boundaries** in FluxLit is treated as a **semver-visible** change (minor or major), because it affects histogram compatibility in Prometheus and Grafana heatmaps. Adding *new* buckets without removing old ones is less disruptive but still note it in the changelog.
 
 FluxLit intentionally does **not** label by raw path, status code, exception type,
 user, tenant, or query string in core metrics. Add those in your own app metrics

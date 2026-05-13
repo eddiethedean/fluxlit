@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Local chaos check: verify oversized proxied bodies fail with 413.
+#
+# Expected: HTTP 413 when body exceeds FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES
+# (or configured limit). See docs/cookbook.md and docs/configuration.md.
 set -euo pipefail
 
 PORT="${PORT:-8000}"

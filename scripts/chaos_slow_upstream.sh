@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Local chaos check: a slow Streamlit-like upstream should produce a 502 timeout.
+#
+# Expected: proxied requests exceed gateway read timeout → 502 or error response;
+# gateway logs show upstream timing. Align with FLUXLIT_GATEWAY_* timeout env docs.
 set -euo pipefail
 
 PORT="${PORT:-8010}"

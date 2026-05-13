@@ -5,15 +5,24 @@ Minimal **Deployment** and **Service** for running FluxLit behind a cluster load
 ## Before you apply
 
 1. **Build and push an image** that contains your app (not only `fluxlit` from PyPI). Start from `fluxlit build` output or `examples/docker_compose/Dockerfile` patterns: digest-pinned base, `USER appuser`, lockfile installs.
-2. Edit **`deployment.yaml`**: replace `YOUR_REGISTRY/fluxlit-app:0.11.0` (or your tag) with your image; set `FLUXLIT_*` and secrets via `ConfigMap` / `Secret` (do not commit real secrets).
+2. Edit **`deployment.yaml`**: replace `YOUR_REGISTRY/fluxlit-app:0.12.0` (or your tag) with your image; set `FLUXLIT_*` and secrets via `ConfigMap` / `Secret` (do not commit real secrets).
+
+## Optional manifests (examples only)
+
+These files are **not** applied by `kubectl apply -f deployment.yaml` alone. Copy or merge when you need multi-replica hardening:
+
+| File | Purpose |
+|------|---------|
+| **`service-session-affinity.example.yaml`** | `sessionAffinity: ClientIP` on the Service — see [Deployment](https://fluxlit.readthedocs.io/en/stable/deployment.html) and [Runbooks](https://fluxlit.readthedocs.io/en/stable/runbooks.html) before enabling. |
+| **`pod-disruption-budget.example.yaml`** | PDB with `minAvailable: 1` during node drains / upgrades. |
+
+For **Ingress** (host, TLS, WebSocket-friendly timeouts), see `ingress.example.yaml` in this directory (not applied by default).
 
 ## Apply
 
 ```bash
 kubectl apply -f examples/kubernetes/deployment.yaml
 ```
-
-For an **Ingress** sketch (host, TLS, WebSocket-friendly timeouts), see `ingress.example.yaml` in this directory (not applied by default).
 
 Port-forward for a quick smoke test:
 

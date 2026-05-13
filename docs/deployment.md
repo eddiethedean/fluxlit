@@ -132,7 +132,19 @@ Behind a **Layer 7 load balancer** or Kubernetes **Service** with multiple endpo
 
 - Each replica runs **its own** gateway + Streamlit pair. **Streamlit’s default session** is tied to the server-side script run and WebSocket; after a hard refresh or new connection, users may land on a **different replica** and see a **new session** unless you add **affinity**.
 - **Sticky sessions** (session affinity / cookie-based or IP-hash) route the same browser to the same replica for a period. That improves continuity for interactive UIs but is **not** a full multi-replica session store: long-lived affinity tables, draining nodes, and failures still drop local state.
-- **When to add an external session store:** if you need **consistent application state across replicas** without sticky sessions (or in addition to them), persist state outside the process (database, Redis, etc.). FluxLit’s URL-session helpers provide the cookie-free binding pattern; production multi-replica continuity still depends on the store you choose.
+- **When to add an external session store:** if you need **consistent application state across replicas** without sticky sessions (or in addition to them), persist state outside the process (database, Redis, etc.). FluxLit’s URL-session helpers provide the cookie-free binding pattern; production multi-replica continuity still depends on the store you choose. See {doc}`url-session` for `SessionStore` recipes and **External store recipes**.
+
+### Multi-replica operations checklist
+
+Use this when `replicas` > 1 (Kubernetes) or multiple VMs/containers sit behind one load balancer:
+
+| Decision | Guidance |
+|----------|----------|
+| **Sticky sessions** | Prefer **cookie-based** or **connection** affinity from your ingress/LB when you need Streamlit’s in-process `st.session_state` to survive refreshes without an external store. **IP-hash** is simple but breaks for mobile/NAT and during node drains. |
+| **OIDC BFF / in-memory auth** | The bundled BFF patterns use **process-local** state for some flows; multiple replicas require you to externalize `state`/session or accept affinity-only routing. See {doc}`security` (auth / BFF sections) and {doc}`runbooks` (**Auth misconfig**). |
+| **URL-session continuity** | `InMemorySessionStore` is **per replica**. For cookie-free continuity across replicas, implement a shared {class}`~fluxlit.url_session.SessionStore` (Redis, SQL, etc.); see {doc}`url-session`. |
+| **Rollouts** | Keep **readiness** on `/api/readyz`, use **PodDisruptionBudget** during voluntary disruptions, and align `preStop` + `terminationGracePeriodSeconds` with Uvicorn drain — see {ref}`kubernetes-graceful-shutdown` and **`examples/kubernetes/pod-disruption-budget.example.yaml`** / **`service-session-affinity.example.yaml`**. |
+| **Observability** | Correlate gateway `request_id` across replicas in your log stack; see {doc}`observability`. |
 
 ### Rollout and drain playbook
 

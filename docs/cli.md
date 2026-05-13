@@ -69,6 +69,7 @@ On **Windows**, **`--force` runs ``taskkill /T /F``** (POSIX uses ``SIGKILL``). 
 
 - Exits **`1`** if any check is **FAIL**, unless **`--warnings-only`** is set (then always **0**).
 - **WARN** does not fail the run; fix when practical (Streamlit version, proxy trust on subpaths, etc.).
+- **`--strict`** upgrades selected **WARN** checks to **FAIL**: **`forwarded_allow_ips`** when `trust_proxy` is on but **`FLUXLIT_FORWARDED_ALLOW_IPS`** is unset or **`*`**, and **`public_base_url`** when its URL path does not match **`root_path`** / public mount. Use in CI when you want production-style gates without treating every advisory as blocking.
 - Use **`--json`** in CI or deployment scripts for a stable machine-readable shape:
 
 ```bash

@@ -55,6 +55,8 @@ environment.
 - **TTL:** {class}`~fluxlit.url_session.InMemorySessionStore` supports TTL; cap size with `max_entries`.
 - **Logging:** do not log raw tokens at INFO. The gateway structured log field `query` redacts `fluxlit_sid` and your configured `url_session_query_param`.
 
+**Multi-replica:** `InMemorySessionStore` is **per process**. Behind multiple pods or VMs, use a **shared** `SessionStore` implementation or load-balancer **affinity**; see {doc}`deployment` (**Multi-replica operations checklist**) and the runbook **Multi-replica: new Streamlit session after refresh** in {doc}`runbooks`.
+
 ## External store recipes
 
 For multiple replicas, implement {class}`~fluxlit.url_session.SessionStore` with a

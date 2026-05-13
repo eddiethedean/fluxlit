@@ -37,7 +37,7 @@ click==8.3.3
     #   uvicorn
 fastapi==0.136.1
     # via fluxlit
-fluxlit==0.11.0
+fluxlit==0.12.0
     # via -r examples/docker_compose/requirements.in
 gitdb==4.0.12
     # via gitpython

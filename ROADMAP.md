@@ -88,23 +88,18 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 
 ---
 
-## Current status (0.11.x)
+## Current status (0.12.x)
 
-**Shipped (0.11.0)**
+**Shipped (0.12.0) — Phase 2 baseline**
 
-- **Unified multi-worker guard:** ASGI lifespan fails fast when Uvicorn ``workers`` > 1 (unless ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1``, explicitly unsupported); see {doc}`deployment` and {doc}`configuration`.
-- **Gateway metrics:** Prometheus histogram ``observe`` failures log at **DEBUG** on ``fluxlit.gateway`` without failing the request.
-- **Traefik proxy smoke:** ``docker-compose.traefik.yml`` (strip-prefix, port **8085**) in ``docker/proxy-deployment/``; integrated into ``run-all-proxy-smokes.sh`` and the reverse-proxy matrix in {doc}`deployment`.
-- **Cookbook:** gateway Prometheus scrape hints, Kubernetes-style ``healthz`` / ``readyz`` probe snippets, ``fluxlit config --strict`` in CI, and ``FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES`` / **413** note in {doc}`cookbook`.
-- **Diagnostics:** ``fluxlit doctor`` / ``fluxlit config`` warn when gateway header allowlists request **rejected** credential-style names (never forwarded); warn when ``trust_proxy`` is on with **unlimited** proxied upload size; ``fluxlit doctor --verbose`` ``gateway_proxy`` JSON includes max body bytes and concurrent upstream cap; :class:`~fluxlit.config.FluxlitSettings` records rejected forward-header names for those warnings.
-- **Roadmap tracking:** Phase 2 “suggested PR slices” subsection (implementation tracking) under **[Phase 2 — delivery checklist](#phase-2--delivery-checklist-track-as-issuesmilestones)**.
+- **Stability charter:** Prometheus metric / label / bucket policy, manifest ``manifest_version`` 1 fields, structured log contracts, experimental settings, and draft **1.0 compatibility** text in {doc}`support-matrix` / {doc}`observability`.
+- **Multi-replica:** deployment checklist, runbook for **new session after refresh**, URL-session cross-links, optional **Kubernetes** PDB + Service session-affinity examples.
+- **Evidence:** ``scripts/soak_readyz.sh``, chaos/soak script expectations in headers, runbooks **scripted load** table, manual workflow [`.github/workflows/soak-fluxlit-dispatch.yml`](.github/workflows/soak-fluxlit-dispatch.yml), {doc}`testing` recipe.
+- **DX:** ``fluxlit doctor --strict`` fails on broad ``forwarded_allow_ips`` with ``trust_proxy`` and on ``public_base_url`` path vs mount mismatch (``fluxlit config --strict`` still fails on any warning).
 
-**Release & CI (0.11.0 verification, May 2026)**
+**Previously (0.11.0)**
 
-- **`main` / `v0.11.0`:** `main` includes the consolidated **CHANGELOG** / **ROADMAP** edits plus doc alignment for the multi-worker lifespan guard and Prometheus **DEBUG** observe logging; the annotated git tag **`v0.11.0`** points at that tip so the tag matches the repository’s canonical 0.11.0 narrative.
-- **Default CI ([`ci.yml`](.github/workflows/ci.yml)):** **green** on `main` for those commits (OS × Python matrix, Ruff, **`pytest -n auto -m "not slow"`**, Mypy on `src/fluxlit`).
-- **Release workflow ([`release.yml`](.github/workflows/release.yml)):** reruns complete **Ruff**, **pytest** with **`--cov-fail-under=100`**, **Mypy**, regenerated **`docs/_generated`** snapshot check, **Sphinx** **`-W`**, **`pip-audit`** on **`.[auth]`**, **build**, **twine check**, and a **wheel smoke install**. One run hit a **spurious cancel** during the test step after tests had already passed; **rerun** finished **checks** successfully — treat as a flake to watch; consider documenting “rerun Release if checks cancel mid-step.”
-- **PyPI immutability:** **`fluxlit==0.11.0`** files on PyPI came from the **first** successful **`v0.11.0`** publish; **uploads cannot be replaced**. After moving the git tag forward, **PyPI wheels/sdists** are still byte-identical to that first publish. Need artifacts that include **commits after that upload** → ship **0.11.1** (or later) with a new tag.
+- **Unified multi-worker guard**, **Traefik** proxy smoke, **cookbook** / **doctor** diagnostics (rejected forward-header names, ``trust_proxy`` + unlimited body warn), **Packaging** sdist venv excludes, **env_parse** consolidation, **Release & CI** notes and PyPI immutability lesson — see **0.11.0** on PyPI and {doc}`changelog`.
 
 **Done (0.10.0)**
 
@@ -122,48 +117,46 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 - **0.8.x foundation** (gateway, URL session, testing client, observability, docs) remains as documented in prior roadmap sections.
 - **Pins:** Optional env-driven features and supported Python / Streamlit ranges are summarized in [docs/support-matrix.md](docs/support-matrix.md).
 
-**Next: 0.12.x (Phase 2)** — see **[Path to 1.0](#path-to-1-0)** Phase 2: evidence-backed load/chaos baselines, stability charter for metrics/manifest, multi-replica narrative upgrades, and stricter misconfiguration handling where appropriate.
+**Next: 0.13.x / Phase 2 follow-through** — evidence **baselines** (published numbers, optional CI expansion), OpenTelemetry depth, stability-charter **enforcement** in code where drift-prone, and remaining DX hard-errors. Phase 3 (**1.0.0rc***) gates remain in **[Path to 1.0](#path-to-1-0)**.
 
 ### Phase 2 — delivery checklist (track as issues/milestones)
 
 Use your issue tracker or release milestones to burn these down; this list mirrors Phase 2 in **[Path to 1.0](#path-to-1-0)** above.
 
-- [ ] **Evidence:** scripted load/soak/chaos runs with expected signals (metrics, logs, `readyz`) aligned with [docs/runbooks.md](docs/runbooks.md).
-- [ ] **Multi-replica:** first-class docs for horizontal scale (sticky sessions, external `SessionStore`, rollout/drain) building on URL-session and examples.
-- [ ] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs (and code comments where it prevents drift).
-- [ ] **DX / misconfiguration:** clearer startup or CLI errors for invalid combinations (`forwarded_allow_ips`, `public_base_url` / `root_path` mismatch). **0.11.0** ships lifespan fail-fast when the unified ASGI app runs under Uvicorn with ``workers`` > 1 (unless ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1``, unsupported); see [docs/deployment.md](docs/deployment.md).
+- [x] **Evidence:** scripted load/soak/chaos runs with expected signals (metrics, logs, `readyz`) aligned with [docs/runbooks.md](docs/runbooks.md) — **0.12.0** ships ``soak_readyz``, script/runbook alignment, and optional **workflow_dispatch** soak; broader baselines / scheduled FluxLit soak remain follow-on.
+- [x] **Multi-replica:** first-class docs for horizontal scale (sticky sessions, external `SessionStore`, rollout/drain) building on URL-session and examples — **0.12.0** checklist + K8s examples + runbook.
+- [x] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs (and code comments where it prevents drift) — **0.12.0** tables in {doc}`support-matrix` / {doc}`observability`.
+- [x] **DX / misconfiguration:** clearer diagnostics for ``forwarded_allow_ips`` / ``public_base_url`` vs mount — **0.12.0** adds ``fluxlit doctor --strict`` (plus **0.11.0** lifespan fail-fast for Uvicorn ``workers`` > 1); further hard-errors and richer hints remain for **0.13.x**.
 
 ### Suggested PR slices (implementation tracking)
 
 Split Phase 2 work so each change stays reviewable and bisectable:
 
-- **Evidence / load:** extend [`scripts/soak_http.sh`](scripts/soak_http.sh), [`scripts/chaos_graceful_shutdown.sh`](scripts/chaos_graceful_shutdown.sh) / [`scripts/chaos_streamlit_kill.sh`](scripts/chaos_streamlit_kill.sh), and align expected signals with [docs/runbooks.md](docs/runbooks.md); optional CI or scheduled job that runs soak without the full unit-test matrix.
-- **Multi-replica:** deepen [docs/deployment.md](docs/deployment.md) and [examples/kubernetes/](examples/kubernetes/) with sticky-session and external `SessionStore` playbooks cross-linked from [docs/url-session.md](docs/url-session.md).
-- **Stability charter:** add explicit “stable vs experimental” tables (Prometheus names/labels, `manifest_version` 1 fields, log field keys) in [docs/support-matrix.md](docs/support-matrix.md) and/or [docs/observability.md](docs/observability.md); mirror summaries on `FluxlitSettings` experimental fields.
-- **DX / misconfiguration:** **Shipped in 0.11.0:** unified ASGI lifespan fails when Uvicorn `workers` > 1 unless `FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1` (see [docs/configuration.md](docs/configuration.md), [docs/deployment.md](docs/deployment.md)). **Follow-ups:** stricter checks for `forwarded_allow_ips` / `trust_proxy`, `public_base_url` vs `root_path`, and richer `fluxlit doctor` hints.
-- **Dependency hygiene:** when bumping **httpx**, re-audit private imports in [`src/fluxlit/client.py`](src/fluxlit/client.py) (`httpx._types`, `httpx._client`) against the release’s public typing surface.
+- **Evidence / load:** **0.12.0:** ``soak_readyz``, runbook/testing alignment, ``soak-fluxlit-dispatch`` workflow — extend with published SLO numbers / optional scheduled FluxLit soak.
+- **Multi-replica:** **0.12.0** checklist + examples — deepen external ``SessionStore`` recipes and engine-specific ingress notes as needed.
+- **Stability charter:** **0.12.0** docs tables — mirror into code comments / settings docstrings where operators grep.
+- **DX / misconfiguration:** **0.12.0** ``doctor --strict`` for proxy allowlist + public URL path; **0.11.0** lifespan guard for multi-worker — follow-ups: hard errors for additional combos, richer ``fluxlit config`` overlap.
+- **Dependency hygiene:** when bumping **httpx**, re-audit private imports in [`src/fluxlit/client.py`](src/fluxlit/client.py) (`httpx._types`, `httpx._client`) against the release’s public typing surface (noting intentional use in [docs/support-matrix.md](docs/support-matrix.md)).
 
 **Gaps vs “production”**
 
-- CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time. **Release** workflow parity with the **`docs`** job on tag pushes is exercised for **0.11.0** (see **Release & CI** above); align future tags with PyPI before upload or bump **patch** when artifacts must change.
+- CI includes **`slow-tests`**, **`docs`** (coverage XML artifact, generated-doc snapshot check, Sphinx **`-W`**), Docker **proxy-smoke**, Playwright **e2e** (including subpath), audit/SBOM, upgrade smoke, and a scheduled soak-script check; continue with broader load/chaos scenarios over time. **Release** workflow parity with the **`docs`** job on tag pushes is exercised on each release tag; align tags with PyPI before upload or bump **patch** when artifacts must change.
 - **Prometheus metrics**, hardened Docker/K8s references, runbooks, and `fluxlit[auth]` are available; deeper OpenTelemetry integration, broader proxy matrices, and production-scale validation remain ongoing.
 - **Browser refresh continuity** ships for cookie-free URL + server-store patterns, including test-mode defaults for AppTest; production multi-replica continuity still requires an app-provided external store such as Redis.
 - Deeper **operational maturity** remains ongoing: load baselines, chaos scenarios, ecosystem deployment recipes — **1.0 readiness** is now spelled out in **[Path to 1.0](#path-to-1-0)** above.
 
-**Triage: 0.11.0 vs deferred (0.12.x / Phase 2)**
+**Triage: 0.12.0 vs deferred (0.13.x / Phase 2 follow-on)**
 
-| Topic | 0.11.0 | Deferred |
+| Topic | 0.12.0 | Deferred |
 |-------|--------|----------|
-| Proxy matrix parity (Traefik + docs) | **Done** | Further engines / shapes as needed |
-| Cookbook / doctor misconfig signals | **Done** (above) | Deeper startup validation (e.g. hard errors for some combos) |
-| Unified stack vs Uvicorn ``workers`` > 1 | **Done** (lifespan fail-fast, tests, docs; opt-out env documented as unsupported) | Stricter related checks (e.g. proxy/base URL mismatches) in **0.12.x** |
-| Prometheus histogram ``observe`` failures | **Done** (DEBUG log on ``fluxlit.gateway``; request continues) | — |
-| Broader load/chaos **evidence** | Partially (existing scripts/CI) | **0.12.x** — published baselines + runbook alignment |
-| OpenTelemetry depth | Hooks + docs recipes | **0.12.x** — fuller propagation story |
-| Multi-replica + external ``SessionStore`` as first-class ops narrative | Examples + URL-session docs | **0.12.x** — expanded playbooks |
-| Stability charter (metric/manifest field classes) | — | **0.12.x** |
+| Stability charter (docs) | **Done** (support-matrix + observability + draft 1.0 text) | Code-comment mirroring, enforcement tests |
+| Multi-replica ops narrative | **Done** (checklist, runbook, K8s examples, url-session links) | Deeper engine-specific ingress / external store cookbooks |
+| Evidence scripts + runbook alignment | **Done** (``soak_readyz``, headers, runbooks table, manual workflow) | Published numeric baselines, optional scheduled FluxLit soak in CI |
+| ``fluxlit doctor --strict`` (proxy / public URL path) | **Done** | Additional FAIL rows, startup-time hard errors |
+| Broader load/chaos **evidence** | Partially | **0.13.x** — SLO numbers, longer soak jobs |
+| OpenTelemetry depth | Hooks + docs recipes | **0.13.x** — fuller propagation story |
 | Per-push min/max dependency matrix | — | Optional / **post-1.0** cost tradeoff (see support matrix) |
-| Git **`v0.11.0`** vs first PyPI **0.11.0** upload | Tag updated post-publish for docs/changelog/guard alignment | **0.11.1+** on PyPI if wheel/sdist must match newer commits |
+| Git tag vs PyPI byte identity | Documented practice | Bump **patch** when artifacts must change |
 
 ---
 

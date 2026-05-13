@@ -1,0 +1,43 @@
+# Short FluxLit soak for manual verification (does not run on push/PR).
+# Starts examples.smoke_app, runs scripts/soak_readyz.sh with a bounded COUNT, tears down.
+name: soak-fluxlit-dispatch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  soak-readyz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run smoke app and soak readyz
+        run: |
+          set -euo pipefail
+          export FLUXLIT_NO_PIDFILE=1
+          fluxlit run examples.smoke_app.app:app --host 127.0.0.1 --port 8765 --no-pidfile &
+          gw_pid=$!
+          cleanup() {
+            if kill -0 "$gw_pid" 2>/dev/null; then
+              kill "$gw_pid" 2>/dev/null || true
+              wait "$gw_pid" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:8765/api/healthz" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS "http://127.0.0.1:8765/api/healthz" >/dev/null
+          chmod +x scripts/soak_readyz.sh
+          COUNT=40 BASE_URL=http://127.0.0.1:8765 ./scripts/soak_readyz.sh

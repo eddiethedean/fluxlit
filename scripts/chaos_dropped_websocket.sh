@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Local chaos check: open and drop a Streamlit WebSocket connection.
+#
+# Expected: gateway tolerates abrupt client close; no wedged upstream (watch logs).
+# See docs/runbooks.md (WebSocket failures) for production proxy timeouts.
 set -euo pipefail
 
 PORT="${PORT:-8000}"
