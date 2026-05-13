@@ -4,19 +4,18 @@
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 
-- **Runtime:** unified ``FluxLit`` ASGI lifespan fails fast when Uvicorn runs with ``workers`` > 1 (detected via ``uvicorn.lifespan.on.LifespanOn``); set ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`` to override (unsupported). See {doc}`deployment` and {doc}`configuration`.
-- **Gateway:** log at **DEBUG** when Prometheus histogram observation raises instead of swallowing silently.
-- **Roadmap:** Phase 2 “suggested PR slices” subsection links scripts, docs, and follow-up DX work.
-
 ## 0.11.0 - 2026-05-12
 
+- **Runtime:** unified ``FluxLit`` ASGI lifespan fails fast when Uvicorn runs with ``workers`` > 1 (detected via ``uvicorn.lifespan.on.LifespanOn``); set ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1`` to override (unsupported). See {doc}`deployment` and {doc}`configuration`.
+- **Gateway:** log at **DEBUG** on ``fluxlit.gateway`` when Prometheus histogram observation raises instead of swallowing silently (the request still completes; that hop’s metric may be missing).
+- **Roadmap:** Phase 2 “suggested PR slices” subsection links scripts, docs, and follow-up DX work.
 - **Proxy matrix:** Traefik **v3.2** strip-prefix smoke stack on port **8085** (`docker-compose.traefik.yml`, `traefik-dynamic.yml`); wired into `docker/proxy-deployment/run-all-proxy-smokes.sh` and the reverse-proxy matrix in {doc}`deployment`.
 - **Cookbook:** gateway Prometheus metrics, Kubernetes-style `healthz` / `readyz` probes, `fluxlit config --strict` in CI, and `FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES` / **413** guidance in {doc}`cookbook`.
 - **Diagnostics:** :func:`fluxlit.gateway.forward_headers.rejected_gateway_forward_header_allowlist` and settings capture of rejected allowlist names; `fluxlit config` / :func:`~fluxlit.config.config_print.collect_configuration_warnings` warn on credential-style names users listed but the gateway never forwards, and when `trust_proxy` is on with unlimited proxied upload body size; `fluxlit doctor` adds `gateway_forward_rejected_names`; verbose `gateway_proxy` includes `max_proxy_request_body_bytes` and `max_concurrent_upstream_http`.
 - **Packaging:** Hatch sdist excludes stray virtualenv directories under ``examples/`` so ``uv build`` / PyPI sdists do not fail on disallowed symlinks.
 - **Internal:** Consolidate affirmative ``FLUXLIT_*`` environment parsing via ``fluxlit.runtime.env_parse.truthy_env`` (used for ``FLUXLIT_DEBUG``, URL-session test guards, and related call sites).
 
-**Upgrading from 0.10.x:** Bump pins to ``fluxlit>=0.11,<1.0``. Re-check ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` if you list credential header names (they are ignored); new warnings may appear in ``fluxlit doctor`` / ``fluxlit config --strict`` when ``trust_proxy`` is enabled without a body limit.
+**Upgrading from 0.10.x:** Bump pins to ``fluxlit>=0.11,<1.0``. Re-check ``FLUXLIT_GATEWAY_FORWARD_CLIENT_HEADERS_TO_STREAMLIT`` if you list credential header names (they are ignored); new warnings may appear in ``fluxlit doctor`` / ``fluxlit config --strict`` when ``trust_proxy`` is enabled without a body limit. If you run the unified ``FluxLit`` ASGI app under Uvicorn with ``--workers`` > 1, use **one worker per replica** and scale out (lifespan startup **fails** unless you set the unsupported ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER`` override).
 
 ## 0.10.0 - 2026-05-12
 

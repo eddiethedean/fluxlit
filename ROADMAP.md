@@ -92,9 +92,12 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 
 **Shipped (0.11.0)**
 
+- **Unified multi-worker guard:** ASGI lifespan fails fast when Uvicorn ``workers`` > 1 (unless ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1``, explicitly unsupported); see {doc}`deployment` and {doc}`configuration`.
+- **Gateway metrics:** Prometheus histogram ``observe`` failures log at **DEBUG** on ``fluxlit.gateway`` without failing the request.
 - **Traefik proxy smoke:** ``docker-compose.traefik.yml`` (strip-prefix, port **8085**) in ``docker/proxy-deployment/``; integrated into ``run-all-proxy-smokes.sh`` and the reverse-proxy matrix in {doc}`deployment`.
 - **Cookbook:** gateway Prometheus scrape hints, Kubernetes-style ``healthz`` / ``readyz`` probe snippets, ``fluxlit config --strict`` in CI, and ``FLUXLIT_GATEWAY_MAX_PROXY_REQUEST_BODY_BYTES`` / **413** note in {doc}`cookbook`.
 - **Diagnostics:** ``fluxlit doctor`` / ``fluxlit config`` warn when gateway header allowlists request **rejected** credential-style names (never forwarded); warn when ``trust_proxy`` is on with **unlimited** proxied upload size; ``fluxlit doctor --verbose`` ``gateway_proxy`` JSON includes max body bytes and concurrent upstream cap; :class:`~fluxlit.config.FluxlitSettings` records rejected forward-header names for those warnings.
+- **Roadmap tracking:** Phase 2 “suggested PR slices” subsection (implementation tracking) under **[Phase 2 — delivery checklist](#phase-2--delivery-checklist-track-as-issuesmilestones)**.
 
 **Done (0.10.0)**
 
@@ -121,7 +124,7 @@ Use your issue tracker or release milestones to burn these down; this list mirro
 - [ ] **Evidence:** scripted load/soak/chaos runs with expected signals (metrics, logs, `readyz`) aligned with [docs/runbooks.md](docs/runbooks.md).
 - [ ] **Multi-replica:** first-class docs for horizontal scale (sticky sessions, external `SessionStore`, rollout/drain) building on URL-session and examples.
 - [ ] **Stability charter:** classify Prometheus metric names/labels, page manifest fields (`manifest_version` 1), log field names, and experimental settings as stable vs experimental in docs (and code comments where it prevents drift).
-- [ ] **DX / misconfiguration:** clearer startup or CLI errors for invalid combinations (`forwarded_allow_ips`, `public_base_url` / `root_path` mismatch, multi-worker unified mode).
+- [ ] **DX / misconfiguration:** clearer startup or CLI errors for invalid combinations (`forwarded_allow_ips`, `public_base_url` / `root_path` mismatch). **0.11.0** ships lifespan fail-fast when the unified ASGI app runs under Uvicorn with ``workers`` > 1 (unless ``FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1``, unsupported); see [docs/deployment.md](docs/deployment.md).
 
 ### Suggested PR slices (implementation tracking)
 
@@ -130,7 +133,7 @@ Split Phase 2 work so each change stays reviewable and bisectable:
 - **Evidence / load:** extend [`scripts/soak_http.sh`](scripts/soak_http.sh), [`scripts/chaos_graceful_shutdown.sh`](scripts/chaos_graceful_shutdown.sh) / [`scripts/chaos_streamlit_kill.sh`](scripts/chaos_streamlit_kill.sh), and align expected signals with [docs/runbooks.md](docs/runbooks.md); optional CI or scheduled job that runs soak without the full unit-test matrix.
 - **Multi-replica:** deepen [docs/deployment.md](docs/deployment.md) and [examples/kubernetes/](examples/kubernetes/) with sticky-session and external `SessionStore` playbooks cross-linked from [docs/url-session.md](docs/url-session.md).
 - **Stability charter:** add explicit “stable vs experimental” tables (Prometheus names/labels, `manifest_version` 1 fields, log field keys) in [docs/support-matrix.md](docs/support-matrix.md) and/or [docs/observability.md](docs/observability.md); mirror summaries on `FluxlitSettings` experimental fields.
-- **DX / misconfiguration:** unified ASGI lifespan rejects Uvicorn `workers` > 1 unless `FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1` (see [docs/configuration.md](docs/configuration.md)); follow-ups: stricter checks for `forwarded_allow_ips` / `trust_proxy`, `public_base_url` vs `root_path`, and richer `fluxlit doctor` hints.
+- **DX / misconfiguration:** **Shipped in 0.11.0:** unified ASGI lifespan fails when Uvicorn `workers` > 1 unless `FLUXLIT_ALLOW_UNIFIED_UVICORN_MULTIWORKER=1` (see [docs/configuration.md](docs/configuration.md), [docs/deployment.md](docs/deployment.md)). **Follow-ups:** stricter checks for `forwarded_allow_ips` / `trust_proxy`, `public_base_url` vs `root_path`, and richer `fluxlit doctor` hints.
 - **Dependency hygiene:** when bumping **httpx**, re-audit private imports in [`src/fluxlit/client.py`](src/fluxlit/client.py) (`httpx._types`, `httpx._client`) against the release’s public typing surface.
 
 **Gaps vs “production”**
@@ -146,6 +149,8 @@ Split Phase 2 work so each change stays reviewable and bisectable:
 |-------|--------|----------|
 | Proxy matrix parity (Traefik + docs) | **Done** | Further engines / shapes as needed |
 | Cookbook / doctor misconfig signals | **Done** (above) | Deeper startup validation (e.g. hard errors for some combos) |
+| Unified stack vs Uvicorn ``workers`` > 1 | **Done** (lifespan fail-fast, tests, docs; opt-out env documented as unsupported) | Stricter related checks (e.g. proxy/base URL mismatches) in **0.12.x** |
+| Prometheus histogram ``observe`` failures | **Done** (DEBUG log on ``fluxlit.gateway``; request continues) | — |
 | Broader load/chaos **evidence** | Partially (existing scripts/CI) | **0.12.x** — published baselines + runbook alignment |
 | OpenTelemetry depth | Hooks + docs recipes | **0.12.x** — fuller propagation story |
 | Multi-replica + external ``SessionStore`` as first-class ops narrative | Examples + URL-session docs | **0.12.x** — expanded playbooks |
