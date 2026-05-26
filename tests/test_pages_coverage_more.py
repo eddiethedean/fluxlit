@@ -521,6 +521,13 @@ def test_signature_rejects_generic_alias_type_param() -> None:
         validate_strict_page_signature(bad)
 
 
+def test_is_injectable_type_rejects_non_type() -> None:
+    from fluxlit.pages.signature import _is_injectable_type
+
+    assert _is_injectable_type(list[int]) is False
+    assert _is_injectable_type(42) is False
+
+
 def test_resolve_page_kwargs_cookie_param() -> None:
     app = FluxLit()
     c = app.get_client()
