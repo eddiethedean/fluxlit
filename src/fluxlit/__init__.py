@@ -126,4 +126,4 @@ __all__ = [
     "trace_span",
     "__version__",
 ]
-__version__ = "0.13.2"
+__version__ = "0.13.3"

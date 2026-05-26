@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 import httpx
 from starlette.types import Receive, Scope, Send
@@ -41,7 +42,10 @@ from fluxlit.gateway._log import gateway_log
 from fluxlit.gateway.forward_headers import merge_allowlisted_browser_headers
 from fluxlit.gateway.header_filter import filter_request_headers
 from fluxlit.gateway.options import GatewayProxyOptions
-from fluxlit.gateway.responses import respond_413_payload_too_large
+from fluxlit.gateway.responses import (
+    respond_413_payload_too_large,
+    respond_client_disconnected,
+)
 from fluxlit.gateway.upstream_http import (
     build_target_url,
     forwarded_upstream_header_pairs,
@@ -53,6 +57,10 @@ from fluxlit.tracing import trace_span
 
 class _GatewayPayloadTooLarge(Exception):
     """Internal: proxied request body exceeded configured max bytes."""
+
+
+class _GatewayClientDisconnected(Exception):
+    """Internal: client disconnected before the request body was fully received."""
 
 
 async def proxy_http(
@@ -126,19 +134,27 @@ async def proxy_http_inner(
 
     max_body = proxy_options.max_proxy_body_bytes
 
-    async def request_body() -> AsyncIterator[bytes]:
+    async def request_body(
+        first_message: dict[str, Any] | None = None,
+    ) -> AsyncIterator[bytes]:
         total = 0
+        message: dict[str, Any] | None = first_message
         while True:
-            message = await receive()
-            if message["type"] == "http.request":
-                chunk = message.get("body", b"")
+            if message is None:
+                message = dict(await receive())
+            current = message
+            message = None
+            if current["type"] == "http.request":
+                chunk = current.get("body", b"")
                 if chunk:
                     total += len(chunk)
                     if max_body and total > max_body:
                         raise _GatewayPayloadTooLarge
                     yield chunk
-                if not message.get("more_body", False):
+                if not current.get("more_body", False):
                     break
+            elif current["type"] == "http.disconnect":
+                raise _GatewayClientDisconnected
             else:
                 break
 
@@ -154,6 +170,8 @@ async def proxy_http_inner(
         while True:
             message = await receive()
             if message["type"] != "http.request":
+                if message["type"] == "http.disconnect":
+                    raise _GatewayClientDisconnected
                 break
             chunk = message.get("body", b"")
             total += len(chunk)
@@ -174,6 +192,8 @@ async def proxy_http_inner(
         while True:
             message = await receive()
             if message["type"] != "http.request":
+                if message["type"] == "http.disconnect":
+                    raise _GatewayClientDisconnected
                 break
             chunk = message.get("body", b"")
             if chunk:
@@ -193,7 +213,11 @@ async def proxy_http_inner(
         elif max_body:
             content = await collect_limited_request_body()
         else:
-            content = request_body()
+            first_raw = await receive()
+            first_body_message = dict(first_raw)
+            if first_body_message.get("type") == "http.disconnect":
+                raise _GatewayClientDisconnected
+            content = request_body(first_body_message)
 
         client = await httpx_client_getter()
         if method in {"GET", "HEAD"}:
@@ -209,6 +233,9 @@ async def proxy_http_inner(
             response = await client.send(req, stream=False)
     except _GatewayPayloadTooLarge:
         await respond_413_payload_too_large(send)
+        return
+    except _GatewayClientDisconnected:
+        await respond_client_disconnected(send)
         return
     except httpx.RequestError as exc:
         gateway_log.warning(

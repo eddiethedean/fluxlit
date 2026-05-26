@@ -64,6 +64,24 @@ async def bad_streamlit_upstream_ws(receive: Receive, send: Send) -> None:
             return
 
 
+async def respond_client_disconnected(send: Send) -> None:
+    """Client closed the request before the body finished (do not contact upstream)."""
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 499,
+            "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b"Client Closed Request",
+            "more_body": False,
+        }
+    )
+
+
 async def respond_413_payload_too_large(send: Send) -> None:
     await send(
         {

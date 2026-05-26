@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from starlette.types import ASGIApp
@@ -159,7 +159,7 @@ def build_gateway(
                 mount,
             )
 
-    return make_gateway_app(
+    gateway_app = make_gateway_app(
         api_app=api_app,
         resolve_upstream=resolve_upstream,
         prefix=prefix,
@@ -176,3 +176,6 @@ def build_gateway(
         debug_path=debug_path,
         on_lifespan_shutdown=_close_shared_httpx_client,
     )
+    # Unified stack lifespan is handled outside the gateway; shutdown hook for httpx pool.
+    cast(Any, gateway_app).fluxlit_shutdown = _close_shared_httpx_client
+    return gateway_app

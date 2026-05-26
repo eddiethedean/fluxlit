@@ -133,6 +133,21 @@ def test_page_registration_requires_session_store_when_injected() -> None:
             del st, client, store
 
 
+def test_page_registration_requires_session_store_even_with_default() -> None:
+    app = FluxLit()
+    placeholder = InMemorySessionStore()
+
+    with pytest.raises(ValueError, match="session_store"):
+
+        @app.page("/needs-store-default")
+        def needs_store_default(
+            st: Any,
+            client: ApiClient,
+            store: SessionStore = placeholder,
+        ) -> None:
+            del st, client, store
+
+
 def test_page_registry_strip_annotated() -> None:
     from typing import Annotated
 
@@ -171,13 +186,48 @@ def test_resolve_page_kwargs_feature_flags_from_settings() -> None:
     assert kw["flags"].experimental_yield_pages is True
 
 
-def test_depends_use_cache_false_warns() -> None:
-    import warnings
+def test_depends_use_cache_true_reuses_callable_within_run() -> None:
+    calls = {"n": 0}
 
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        Depends(lambda: 1, use_cache=False)
-    assert any("use_cache=False" in str(w.message) for w in caught)
+    def counter() -> int:
+        calls["n"] += 1
+        return calls["n"]
+
+    app = FluxLit()
+
+    def fn(
+        st: Any,
+        client: ApiClient,
+        a: int = Depends(counter),
+        b: int = Depends(counter),
+    ) -> None:
+        del st, client, a, b
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["a"] == 1 and kw["b"] == 1
+    assert calls["n"] == 1
+
+
+def test_depends_use_cache_false_invokes_twice() -> None:
+    calls = {"n": 0}
+
+    def counter() -> int:
+        calls["n"] += 1
+        return calls["n"]
+
+    app = FluxLit()
+
+    def fn(
+        st: Any,
+        client: ApiClient,
+        a: int = Depends(counter),
+        b: int = Depends(counter, use_cache=False),
+    ) -> None:
+        del st, client, a, b
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["a"] == 1 and kw["b"] == 2
+    assert calls["n"] == 2
 
 
 def test_resolve_and_call_page_generator_experimental(monkeypatch: pytest.MonkeyPatch) -> None:

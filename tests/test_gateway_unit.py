@@ -1293,6 +1293,81 @@ async def test_proxy_http_get_body_over_max_returns_413() -> None:
 
 
 @pytest.mark.asyncio
+async def test_proxy_http_get_drain_ignores_unknown_asgi_message_then_proxies() -> None:
+    queue: list[dict[str, Any]] = [
+        {"type": "http.speculative.extension"},
+        {"type": "http.request", "body": b"", "more_body": False},
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return queue.pop(0)
+
+    class _Client:
+        def build_request(self, method: str, url: str, **kwargs: object) -> httpx.Request:
+            return httpx.Request(method, url)
+
+        async def send(self, request: httpx.Request, *, stream: bool) -> httpx.Response:
+            return httpx.Response(200, content=b"ok")
+
+    sent: list[dict[str, Any]] = []
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    await _proxy_http(
+        {"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": b""},
+        receive,
+        send_asgi,
+        "http://127.0.0.1:9",
+        "/",
+        request_id="rid-drain-unknown",
+        proxy_options=GatewayProxyOptions(max_proxy_body_bytes=100),
+        httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
+        upstream_sem=None,
+    )
+    assert sent[0]["status"] == 200
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_collect_ignores_unknown_asgi_message_before_body() -> None:
+    queue: list[dict[str, Any]] = [
+        {"type": "http.speculative.extension"},
+        {"type": "http.request", "body": b"ok", "more_body": False},
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return queue.pop(0)
+
+    class _Client:
+        def build_request(self, method: str, url: str, **kwargs: object) -> httpx.Request:
+            captured["content"] = kwargs["content"]
+            return httpx.Request(method, url)
+
+        async def send(self, request: httpx.Request, *, stream: bool) -> httpx.Response:
+            return httpx.Response(204, content=b"")
+
+    captured: dict[str, object] = {}
+    sent: list[dict[str, Any]] = []
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    await _proxy_http(
+        {"type": "http", "method": "POST", "path": "/submit", "headers": [], "query_string": b""},
+        receive,
+        send_asgi,
+        "http://127.0.0.1:9",
+        "/submit",
+        request_id="rid-collect-unknown",
+        proxy_options=GatewayProxyOptions(max_proxy_body_bytes=10),
+        httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
+        upstream_sem=None,
+    )
+    assert captured["content"] == b""
+    assert sent[0]["status"] == 204
+
+
+@pytest.mark.asyncio
 async def test_proxy_http_get_drain_stops_on_disconnect_message() -> None:
     class _Client:
         def build_request(self, method: str, url: str, **kwargs: object) -> httpx.Request:
@@ -1320,7 +1395,7 @@ async def test_proxy_http_get_drain_stops_on_disconnect_message() -> None:
         httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
         upstream_sem=None,
     )
-    assert sent[0]["status"] == 200
+    assert sent[0]["status"] == 499
 
 
 @pytest.mark.asyncio
@@ -1538,24 +1613,20 @@ async def test_proxy_http_post_streaming_body_over_limit_raises_413_when_consume
 
 @pytest.mark.asyncio
 async def test_proxy_http_post_streaming_body_stops_on_disconnect_message() -> None:
-    captured: dict[str, object] = {}
-
     class _Client:
         def build_request(self, method: str, url: str, **kwargs: object) -> object:
-            return types.SimpleNamespace(content=kwargs["content"])
+            raise AssertionError("upstream must not be contacted after disconnect")
 
         async def send(self, request: object, *, stream: bool) -> httpx.Response:
-            chunks: list[bytes] = []
-            async for chunk in request.content:
-                chunks.append(chunk)
-            captured["chunks"] = chunks
-            return httpx.Response(200, content=b"ok")
+            raise AssertionError("upstream must not be contacted after disconnect")
 
     async def receive() -> dict[str, Any]:
         return {"type": "http.disconnect"}
 
+    sent: list[dict[str, Any]] = []
+
     async def send(msg: MutableMapping[str, Any]) -> None:
-        return None
+        sent.append(dict(msg))
 
     await _proxy_http(
         {"type": "http", "method": "POST", "path": "/submit", "headers": [], "query_string": b""},
@@ -1568,7 +1639,7 @@ async def test_proxy_http_post_streaming_body_stops_on_disconnect_message() -> N
         httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
         upstream_sem=None,
     )
-    assert captured["chunks"] == []
+    assert sent[0]["status"] == 499
 
 
 @pytest.mark.asyncio
@@ -1636,6 +1707,122 @@ async def test_proxy_http_post_collects_limited_body_success() -> None:
         upstream_sem=None,
     )
     assert captured["content"] == b"ab"
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_streaming_stops_on_unknown_asgi_message() -> None:
+    queue: list[dict[str, Any]] = [
+        {"type": "http.request", "body": b"x", "more_body": True},
+        {"type": "http.speculative.extension"},
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return queue.pop(0)
+
+    class _Client:
+        def build_request(self, method: str, url: str, **kwargs: object) -> object:
+            return types.SimpleNamespace(content=kwargs["content"])
+
+        async def send(self, request: object, *, stream: bool) -> httpx.Response:
+            chunks: list[bytes] = []
+            async for chunk in request.content:
+                chunks.append(chunk)
+            captured["chunks"] = chunks
+            return httpx.Response(200, content=b"ok")
+
+    captured: dict[str, object] = {}
+    sent: list[dict[str, Any]] = []
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    await _proxy_http(
+        {"type": "http", "method": "POST", "path": "/submit", "headers": [], "query_string": b""},
+        receive,
+        send_asgi,
+        "http://127.0.0.1:9",
+        "/submit",
+        request_id="rid-stream-unknown",
+        proxy_options=GatewayProxyOptions(max_proxy_body_bytes=0),
+        httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
+        upstream_sem=None,
+    )
+    assert captured["chunks"] == [b"x"]
+    assert sent[0]["status"] == 200
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_streaming_disconnect_mid_body_returns_499() -> None:
+    messages = [
+        {"type": "http.request", "body": b"partial", "more_body": True},
+        {"type": "http.disconnect"},
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return messages.pop(0)
+
+    class _Client:
+        def build_request(self, method: str, url: str, **kwargs: object) -> object:
+            return types.SimpleNamespace(content=kwargs["content"])
+
+        async def send(self, request: object, *, stream: bool) -> httpx.Response:
+            async for _chunk in request.content:
+                pass
+            return httpx.Response(200, content=b"ok")
+
+    sent: list[dict[str, Any]] = []
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    await _proxy_http(
+        {"type": "http", "method": "POST", "path": "/submit", "headers": [], "query_string": b""},
+        receive,
+        send_asgi,
+        "http://127.0.0.1:9",
+        "/submit",
+        request_id="rid-stream-mid-disc",
+        proxy_options=GatewayProxyOptions(max_proxy_body_bytes=0),
+        httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
+        upstream_sem=None,
+    )
+    assert sent[0]["status"] == 499
+
+
+@pytest.mark.asyncio
+async def test_proxy_http_buffered_post_disconnect_mid_body_skips_upstream() -> None:
+    messages = [
+        {"type": "http.request", "body": b"partial", "more_body": True},
+        {"type": "http.disconnect"},
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return messages.pop(0)
+
+    class _Client:
+        def build_request(self, method: str, url: str, **kwargs: object) -> httpx.Request:
+            raise AssertionError("upstream must not be contacted after mid-body disconnect")
+
+        async def send(self, request: httpx.Request, *, stream: bool) -> httpx.Response:
+            raise AssertionError("upstream must not be contacted after mid-body disconnect")
+
+    sent: list[dict[str, Any]] = []
+
+    async def send_asgi(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    await _proxy_http(
+        {"type": "http", "method": "POST", "path": "/submit", "headers": [], "query_string": b""},
+        receive,
+        send_asgi,
+        "http://127.0.0.1:9",
+        "/submit",
+        request_id="rid-mid-disconnect",
+        proxy_options=GatewayProxyOptions(max_proxy_body_bytes=100),
+        httpx_client_getter=_httpx_getter(cast(httpx.AsyncClient, _Client())),
+        upstream_sem=None,
+    )
+    assert sent[0]["status"] == 499
 
 
 @pytest.mark.asyncio
@@ -1820,6 +2007,13 @@ def test_build_gateway_creates_upstream_semaphore() -> None:
     gw = build_gateway(FastAPI(), "http://127.0.0.1:9", proxy_settings=settings)
     client = TestClient(gw)
     assert client.get("/anything").status_code == 502
+
+
+def test_build_gateway_exposes_fluxlit_shutdown_hook() -> None:
+    gw = build_gateway(FastAPI(), "http://127.0.0.1:9", api_prefix="/api")
+    hook = getattr(gw, "fluxlit_shutdown", None)
+    assert hook is not None
+    assert asyncio.iscoroutinefunction(hook)
 
 
 def test_build_gateway_prometheus_metrics_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:

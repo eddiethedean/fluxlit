@@ -651,7 +651,7 @@ wheels = [
 
 [[package]]
 name = "fluxlit"
-version = "0.13.2"
+version = "0.13.3"
 source = { editable = "." }
 dependencies = [
     { name = "anyio" },
@@ -709,7 +709,7 @@ requires-dist = [
     { name = "anyio", specifier = ">=4.0" },
     { name = "cryptography", marker = "extra == 'auth'", specifier = ">=42.0.0" },
     { name = "cryptography", marker = "extra == 'dev'", specifier = ">=42.0.0" },
-    { name = "fastapi", specifier = ">=0.111" },
+    { name = "fastapi", specifier = ">=0.111,<0.136.3" },
     { name = "furo", marker = "extra == 'docs'", specifier = ">=2024.1" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "itsdangerous", marker = "extra == 'docs'", specifier = ">=2.0" },

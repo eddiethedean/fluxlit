@@ -259,6 +259,46 @@ async def test_shutdown_without_startup_sends_shutdown_complete(
 
 
 @pytest.mark.asyncio
+async def test_inner_lifespan_exits_startup_without_complete_emits_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Inner FastAPI lifespan that returns early must not leave Uvicorn hanging."""
+    bail = tmp_path / "bail_lifespan_app.py"
+    bail.write_text(
+        "from fluxlit import FluxLit\n"
+        "app = FluxLit(title='bail')\n"
+        "_inner = app.api\n"
+        "async def _api(scope, receive, send):\n"
+        "    if scope.get('type') == 'lifespan':\n"
+        "        msg = await receive()\n"
+        "        if msg.get('type') == 'lifespan.startup':\n"
+        "            return\n"
+        "    await _inner(scope, receive, send)\n"
+        "app.api = _api\n",
+        encoding="utf-8",
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _minimal_asgi_env(monkeypatch)
+    monkeypatch.setenv("FLUXLIT_APP", "bail_lifespan_app:app")
+
+    asgi = create_unified_app()
+    q: list[ASGIMessage] = [{"type": "lifespan.startup"}]
+    sent: list[ASGIMessage] = []
+
+    async def receive() -> ASGIMessage:
+        return q.pop(0)
+
+    async def send(message: ASGIMessage) -> None:
+        sent.append(message)
+
+    await asgi({"type": "lifespan"}, receive, send)
+    failed = [m for m in sent if m.get("type") == "lifespan.startup.failed"]
+    assert failed
+    assert "exited during startup" in (failed[0].get("message") or "")
+
+
+@pytest.mark.asyncio
 async def test_inner_lifespan_startup_failure_emits_startup_failed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

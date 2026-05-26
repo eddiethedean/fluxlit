@@ -92,6 +92,8 @@ The sections below (**Current status**, **Version 0.x**, **Phase 0–6**) keep *
 
 ## Current status (0.13.x)
 
+**Latest patch: 0.13.3** (see [CHANGELOG.md](CHANGELOG.md)) — unified-stack ``httpx`` pool shutdown, typed URL-session hydrate fix, gateway **499** on client disconnect mid-body, ``Depends`` ``use_cache``, stricter ``SessionStore`` registration, lifespan startup failure when inner app exits early.
+
 **Shipped (0.13.0) — Phase 2 complete** (PyPI / git tag **0.13.0**)
 
 - **Evidence baselines:** ``scripts/soak_metrics.sh``; soak methodology (what to record, emissions vs non-emissions, gateway vs Streamlit correlation) in [docs/runbooks.md](docs/runbooks.md) and [docs/testing.md](docs/testing.md); weekly **informational** FluxLit soak job in [`.github/workflows/soak-scheduled.yml`](.github/workflows/soak-scheduled.yml) (**`continue-on-error: true`**); [`.github/workflows/soak-fluxlit-dispatch.yml`](.github/workflows/soak-fluxlit-dispatch.yml) runs ``soak_readyz`` + ``soak_metrics`` with metrics enabled.

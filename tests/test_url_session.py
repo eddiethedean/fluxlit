@@ -362,6 +362,42 @@ def test_hydrate_url_session_typed_no_query_param() -> None:
     assert sid is None and model is None
 
 
+def test_hydrate_url_session_typed_coerces_into_session_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Blob(BaseModel):
+        count: int
+
+    monkeypatch.delenv("FLUXLIT_TESTS", raising=False)
+    monkeypatch.delenv("FLUXLIT_DISABLE_URL_SESSION", raising=False)
+    st = _FakeSt()
+    st.query_params["fluxlit_sid"] = "s"
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("s", {"count": "2"})
+    sid, model = hydrate_url_session_typed(st, store, Blob)
+    assert sid == "s"
+    assert model is not None and model.count == 2
+    assert st.session_state["count"] == 2
+    assert isinstance(st.session_state["count"], int)
+
+
+def test_hydrate_url_session_typed_omits_extra_store_keys_from_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Blob(BaseModel):
+        count: int
+
+    monkeypatch.delenv("FLUXLIT_TESTS", raising=False)
+    monkeypatch.delenv("FLUXLIT_DISABLE_URL_SESSION", raising=False)
+    st = _FakeSt()
+    st.query_params["fluxlit_sid"] = "s"
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("s", {"count": 1, "extra_field": "drop-me"})
+    hydrate_url_session_typed(st, store, Blob)
+    assert st.session_state["count"] == 1
+    assert "extra_field" not in st.session_state
+
+
 def test_hydrate_url_session_typed_invalid_blob_does_not_merge_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

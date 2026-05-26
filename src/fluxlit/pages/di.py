@@ -56,15 +56,6 @@ class Depends:
         *,
         use_cache: bool = True,
     ) -> None:
-        if not use_cache:
-            import warnings
-
-            warnings.warn(
-                "Depends(use_cache=False) is not implemented; dependencies are resolved "
-                "on every page run.",
-                UserWarning,
-                stacklevel=2,
-            )
         self.dependency = dependency
         self.use_cache = use_cache
 
@@ -279,10 +270,19 @@ def resolve_page_kwargs(
     globalns = getattr(fn, "__globals__", None) or {}
     hints = get_type_hints(fn, globalns=globalns, include_extras=True)
     kwargs: dict[str, Any] = {}
+    dep_cache: dict[int, Any] = {}
     for name, param in sig.parameters.items():
         dep = _unwrap_depends(param, hints, name)
         if dep is not None and dep.dependency is not None:
-            kwargs[name] = _resolve_depends_callable(dep.dependency, app=app)
+            dep_fn = dep.dependency
+            cache_key = id(dep_fn)
+            if dep.use_cache and cache_key in dep_cache:
+                kwargs[name] = dep_cache[cache_key]
+            else:
+                resolved = _resolve_depends_callable(dep_fn, app=app)
+                if dep.use_cache:
+                    dep_cache[cache_key] = resolved
+                kwargs[name] = resolved
             continue
         hdr = _unwrap_header(param, hints, name)
         if hdr is not None:

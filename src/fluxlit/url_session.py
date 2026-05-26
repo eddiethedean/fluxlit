@@ -186,6 +186,7 @@ def hydrate_url_session(
     *,
     param: str | None = None,
     merge: bool = True,
+    blob: Mapping[str, JsonValue] | None = None,
 ) -> str | None:
     """If ``st.query_params[param]`` is set, load the store payload into ``st.session_state``.
 
@@ -203,15 +204,19 @@ def hydrate_url_session(
     sid = _query_param_get(st, resolved)
     if not sid:
         return None
-    blob = store.get(sid)
-    if blob is None:
-        return sid
+    if blob is not None:
+        payload = dict(blob)
+    else:
+        from_store = store.get(sid)
+        if from_store is None:
+            return sid
+        payload = dict(from_store)
     ss = st.session_state
     if merge:
-        for k, v in blob.items():
+        for k, v in payload.items():
             ss.setdefault(k, v)
     else:
-        for k, v in blob.items():
+        for k, v in payload.items():
             ss[k] = v
     return sid
 
@@ -337,5 +342,11 @@ def hydrate_url_session_typed(
         if strict:
             raise
         return sid, None
-    hydrate_url_session(st, store, param=resolved, merge=merge)
+    hydrate_url_session(
+        st,
+        store,
+        param=resolved,
+        merge=merge,
+        blob=validated.model_dump(),
+    )
     return sid, validated

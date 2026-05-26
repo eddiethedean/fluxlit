@@ -75,8 +75,6 @@ def _validate_session_store_on_page(app: FluxLitApp, fn: Callable[..., Any]) -> 
     for name, param in sig.parameters.items():
         if name in ("st", "client"):
             continue
-        if param.default is not inspect.Parameter.empty:
-            continue
         base = _strip_annotated(hints.get(name, param.annotation))
         if base is SessionStore:
             msg = (

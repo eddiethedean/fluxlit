@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import types
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import pytest
@@ -274,6 +275,85 @@ async def test_lifespan_bridge_inner_startup_failure_terminates_sidecar(
     await app({"type": "lifespan"}, receive, send)
     assert sent == [{"type": "lifespan.startup.failed", "message": "inner boom"}]
     assert terminated == [2.0]
+
+
+@pytest.mark.asyncio
+async def test_lifespan_bridge_shutdown_awaits_gateway_fluxlit_shutdown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unified lifespan must call ``gateway_app.fluxlit_shutdown`` (not only split gateway)."""
+    from fluxlit import FluxLit
+    from fluxlit.runtime.lifespan_bridge import build_unified_fluxlit_asgi_app
+
+    shutdown_called: list[bool] = []
+
+    async def shutdown_hook() -> None:
+        shutdown_called.append(True)
+
+    async def gateway(scope: object, receive: object, send: object) -> None:
+        return None
+
+    gateway.fluxlit_shutdown = shutdown_hook  # type: ignore[attr-defined]
+
+    class _Proc:
+        def poll(self) -> None:
+            return None
+
+        def terminate(self) -> None:
+            return
+
+        def kill(self) -> None:
+            return
+
+    monkeypatch.setattr("fluxlit.runtime.lifespan_bridge.subprocess.Popen", lambda *a, **k: _Proc())
+    monkeypatch.setattr(
+        "fluxlit.runtime.lifespan_bridge._invoke_wait_for_tcp", lambda *a, **k: None
+    )
+    monkeypatch.setattr("fluxlit.runtime.lifespan_bridge._terminate_process", lambda *a, **k: None)
+
+    fl = FluxLit()
+    _inner_api = fl.api
+
+    async def inner_ok(
+        scope: dict[str, object],
+        receive: Callable[[], Awaitable[dict[str, object]]],
+        send: Callable[[dict[str, object]], Awaitable[None]],
+    ) -> None:
+        if scope.get("type") == "lifespan":
+            while True:
+                msg = await receive()
+                if msg.get("type") == "lifespan.startup":
+                    await send({"type": "lifespan.startup.complete"})
+                elif msg.get("type") == "lifespan.shutdown":
+                    await send({"type": "lifespan.shutdown.complete"})
+                    return
+        await _inner_api(scope, receive, send)  # type: ignore[arg-type]
+
+    object.__setattr__(fl, "api", inner_ok)
+
+    app = build_unified_fluxlit_asgi_app(
+        fl,
+        gateway_app=gateway,  # type: ignore[arg-type]
+        cmd=["streamlit"],
+        env={},
+        streamlit_port=8501,
+        upstream_url_box=["http://127.0.0.1:8501"],
+    )
+    q: list[dict[str, object]] = [
+        {"type": "lifespan.startup"},
+        {"type": "lifespan.shutdown"},
+    ]
+    sent: list[dict[str, object]] = []
+
+    async def receive() -> dict[str, object]:
+        return q.pop(0)
+
+    async def send(message: dict[str, object]) -> None:
+        sent.append(message)
+
+    await app({"type": "lifespan"}, receive, send)
+    assert shutdown_called == [True]
+    assert {"type": "lifespan.shutdown.complete"} in sent
 
 
 @pytest.mark.asyncio

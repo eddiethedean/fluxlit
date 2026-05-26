@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import subprocess
 import sys
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from typing import TYPE_CHECKING, Any, TypeAlias, cast
 
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -110,6 +110,13 @@ def build_unified_fluxlit_asgi_app(
                         exc = inner_task.exception()
                         if exc is not None:
                             await send({"type": "lifespan.startup.failed", "message": str(exc)})
+                        else:
+                            await send(
+                                {
+                                    "type": "lifespan.startup.failed",
+                                    "message": ("inner application lifespan exited during startup"),
+                                }
+                            )
                         return
                     continue
 
@@ -125,6 +132,12 @@ def build_unified_fluxlit_asgi_app(
                         if streamlit_proc is not None:
                             _terminate_process(streamlit_proc, timeout_s=5.0)
                             streamlit_proc = None
+                        shutdown_hook = cast(
+                            Callable[[], Awaitable[None]] | None,
+                            getattr(gateway_app, "fluxlit_shutdown", None),
+                        )
+                        if shutdown_hook is not None:
+                            await shutdown_hook()
                     return
 
                 # Lifespan spec: only startup and shutdown are defined for receive.

@@ -4,6 +4,16 @@
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 
+## 0.13.3 - 2026-05-26
+
+- **Runtime:** Close shared gateway :class:`httpx.AsyncClient` on unified-stack lifespan shutdown (fixes leak on default ``fluxlit dev`` / ``run``).
+- **URL session:** :func:`~fluxlit.url_session.hydrate_url_session_typed` merges validated ``model_dump()`` into ``session_state``, not raw store blobs.
+- **Gateway:** Do not forward POST bodies to Streamlit after mid-request client disconnect (HTTP **499**).
+- **Pages:** Register-time error for :class:`~fluxlit.url_session.SessionStore`-annotated parameters even when a default is present; :class:`~fluxlit.pages.di.Depends` honors ``use_cache`` within a single page run.
+- **Runtime:** Emit ``lifespan.startup.failed`` when inner FastAPI lifespan exits during unified startup without completing.
+
+**Upgrading from 0.13.2:** No intentional breaking changes. GET requests aborted by an early client disconnect now receive **499** instead of being proxied to Streamlit.
+
 ## 0.13.2 - 2026-05-26
 
 - **Dependencies:** cap ``fastapi`` below ``0.136.3`` (PyPI advisory ``MAL-2026-4750`` on the ``0.136.3`` release) until upstream resolves the ``fastar`` optional-dependency concern.
