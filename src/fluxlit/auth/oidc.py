@@ -9,6 +9,7 @@ import base64
 import hashlib
 import json
 import secrets
+import threading
 import time
 import warnings
 from dataclasses import dataclass, field
@@ -221,26 +222,31 @@ class InMemoryOIDCBFFTokenStore:
 
     _pkce: dict[str, tuple[str, float]] = field(default_factory=dict)
     _exchange: dict[str, tuple[str, float]] = field(default_factory=dict)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     state_ttl_seconds: float = 600.0
     otc_ttl_seconds: float = 120.0
 
     def save_pkce_verifier(self, state: str, code_verifier: str, *, now: float) -> None:
-        _purge_expired(self._pkce, self.state_ttl_seconds, now)
-        self._pkce[state] = (code_verifier, now)
+        with self._lock:
+            _purge_expired(self._pkce, self.state_ttl_seconds, now)
+            self._pkce[state] = (code_verifier, now)
 
     def pop_pkce_verifier(self, state: str, *, now: float) -> str | None:
-        _purge_expired(self._pkce, self.state_ttl_seconds, now)
-        entry = self._pkce.pop(state, None)
-        return None if entry is None else entry[0]
+        with self._lock:
+            _purge_expired(self._pkce, self.state_ttl_seconds, now)
+            entry = self._pkce.pop(state, None)
+            return None if entry is None else entry[0]
 
     def save_exchange_token(self, auth_code: str, access_token: str, *, now: float) -> None:
-        _purge_expired(self._exchange, self.otc_ttl_seconds, now)
-        self._exchange[auth_code] = (access_token, now)
+        with self._lock:
+            _purge_expired(self._exchange, self.otc_ttl_seconds, now)
+            self._exchange[auth_code] = (access_token, now)
 
     def pop_exchange_token(self, auth_code: str, *, now: float) -> str | None:
-        _purge_expired(self._exchange, self.otc_ttl_seconds, now)
-        entry = self._exchange.pop(auth_code, None)
-        return None if entry is None else entry[0]
+        with self._lock:
+            _purge_expired(self._exchange, self.otc_ttl_seconds, now)
+            entry = self._exchange.pop(auth_code, None)
+            return None if entry is None else entry[0]
 
 
 class ExchangeBody(BaseModel):

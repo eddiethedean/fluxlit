@@ -56,6 +56,15 @@ class Depends:
         *,
         use_cache: bool = True,
     ) -> None:
+        if not use_cache:
+            import warnings
+
+            warnings.warn(
+                "Depends(use_cache=False) is not implemented; dependencies are resolved "
+                "on every page run.",
+                UserWarning,
+                stacklevel=2,
+            )
         self.dependency = dependency
         self.use_cache = use_cache
 
@@ -341,7 +350,16 @@ def resolve_page_kwargs(
         from fluxlit.pages.flags import FluxlitFeatureFlags
 
         if base is FluxlitFeatureFlags:
-            kwargs[name] = FluxlitFeatureFlags.from_environ()
+            env_flags = FluxlitFeatureFlags.from_environ()
+            if getattr(app.settings, "experimental_yield_pages", False):
+                kwargs[name] = FluxlitFeatureFlags(
+                    experimental_yield_pages=(
+                        env_flags.experimental_yield_pages
+                        or bool(app.settings.experimental_yield_pages)
+                    )
+                )
+            else:
+                kwargs[name] = env_flags
             continue
     return kwargs
 

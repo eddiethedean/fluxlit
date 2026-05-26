@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import pkgutil
 from collections.abc import Callable, Sequence
 from types import FunctionType
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Annotated, Any, TypeAlias, get_args, get_origin, get_type_hints
 
 from fluxlit.pages.meta import PageMeta
 from fluxlit.pages.records import PageRecord
 from fluxlit.pages.signature import validate_strict_page_signature
 from fluxlit.pages.slug import page_slug
+from fluxlit.url_session import SessionStore
 
 if TYPE_CHECKING:
     from fluxlit.app import FluxLit
@@ -56,6 +58,35 @@ def discover_streamlit_pages(app: FluxLitApp, directory: str, *, package: str) -
     app._pages.sort(key=lambda r: (r.path, r.title))
 
 
+def _strip_annotated(ann: Any) -> Any:
+    if get_origin(ann) is Annotated:
+        return get_args(ann)[0]
+    return ann
+
+
+def _validate_session_store_on_page(app: FluxLitApp, fn: Callable[..., Any]) -> None:
+    if app.session_store is not None:
+        return
+    sig = inspect.signature(fn)
+    try:
+        hints = get_type_hints(fn, globalns=getattr(fn, "__globals__", None) or {})
+    except (NameError, TypeError):
+        return
+    for name, param in sig.parameters.items():
+        if name in ("st", "client"):
+            continue
+        if param.default is not inspect.Parameter.empty:
+            continue
+        base = _strip_annotated(hints.get(name, param.annotation))
+        if base is SessionStore:
+            msg = (
+                f"Page handler {getattr(fn, '__qualname__', repr(fn))!r} requires "
+                "SessionStore injection but FluxLit(session_store=None). Pass "
+                "session_store= to FluxLit(...) or remove the SessionStore parameter."
+            )
+            raise ValueError(msg)
+
+
 def register_streamlit_page(
     app: FluxLitApp,
     path: str,
@@ -70,6 +101,7 @@ def register_streamlit_page(
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         if app.settings.strict_page_signatures:
             validate_strict_page_signature(fn)
+        _validate_session_store_on_page(app, fn)
         default_title = "Page"
         if isinstance(fn, FunctionType):
             default_title = fn.__name__.replace("_", " ").title()

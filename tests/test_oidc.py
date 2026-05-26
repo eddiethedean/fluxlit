@@ -172,3 +172,29 @@ def test_oidc_bff_explicit_in_memory_token_store() -> None:
     r3 = client.post("/auth/exchange", json={"code": auth_code})
     assert r3.status_code == 200
     assert r3.json().get("token_type") == "bearer"
+
+
+def test_in_memory_oidc_bff_token_store_thread_safe() -> None:
+    import threading
+
+    store = InMemoryOIDCBFFTokenStore()
+    now = 1.0
+    errors: list[BaseException] = []
+
+    def worker(i: int) -> None:
+        try:
+            state = f"state-{i}"
+            store.save_pkce_verifier(state, f"verifier-{i}", now=now)
+            assert store.pop_pkce_verifier(state, now=now) == f"verifier-{i}"
+            code = f"code-{i}"
+            store.save_exchange_token(code, f"token-{i}", now=now)
+            assert store.pop_exchange_token(code, now=now) == f"token-{i}"
+        except BaseException as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(32)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []

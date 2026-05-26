@@ -76,6 +76,22 @@ def test_redact_query_string_preserves_blank_sensitive_values() -> None:
     assert redact_query_string("fluxlit_sid=&x=1") == "fluxlit_sid=&x=1"
 
 
+def test_redact_query_string_auth_code() -> None:
+    out = redact_query_string("auth_code=onetimelongcode&page=home")
+    assert "onetimelongcode" not in out
+    assert "redacted" in out.lower()
+    assert "page" in out
+
+
+def test_redact_query_string_case_insensitive_key() -> None:
+    out = redact_query_string(
+        "FLUXLIT_SID=secret&foo=bar",
+        sensitive_keys=frozenset({"fluxlit_sid"}),
+    )
+    assert "secret" not in out
+    assert "redacted" in out.lower()
+
+
 def test_sanitize_headers_preserves_unlisted_headers() -> None:
     out = sanitize_headers({"X-Api-Key": "public-id", "Authorization": "Bearer z"})
     assert out["X-Api-Key"] == "public-id"

@@ -159,7 +159,7 @@ class JWTBearer:
                 detail="Missing bearer token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        token = auth[7:].strip()
+        token = auth.split(" ", 1)[1].strip() if " " in auth else ""
         if not token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

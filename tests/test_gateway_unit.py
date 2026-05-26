@@ -2153,3 +2153,65 @@ def test_prometheus_request_counter_increments_for_streamlit_and_api_dispatch() 
     m2 = client.get("/__fluxlit/metrics").text
     n_api_1 = _fluxlit_gateway_requests_total(m2, dispatch="api", method_kind="GET")
     assert n_api_1 >= n_api_0 + 1.0
+
+
+@pytest.mark.asyncio
+async def test_gateway_lifespan_shutdown_closes_shared_httpx_client() -> None:
+    from fluxlit.gateway.dispatch import make_gateway_app
+    from fluxlit.gateway.options import GatewayProxyOptions
+
+    closed: list[bool] = []
+
+    class _TrackClose(httpx.AsyncClient):
+        async def aclose(self) -> None:
+            closed.append(True)
+            await super().aclose()
+
+    shared_client = _TrackClose()
+
+    async def shared_httpx_client() -> httpx.AsyncClient:
+        return shared_client
+
+    async def close_shared_httpx_client() -> None:
+        await shared_client.aclose()
+
+    async def api(scope: Scope, receive: Receive, send: Send) -> None:
+        while True:
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                await send({"type": "lifespan.startup.complete"})
+            elif message["type"] == "lifespan.shutdown":
+                await send({"type": "lifespan.shutdown.complete"})
+                return
+
+    gw = make_gateway_app(
+        api_app=api,
+        resolve_upstream=lambda: "http://127.0.0.1:9",
+        prefix="/api",
+        mount="",
+        opts=GatewayProxyOptions(),
+        upstream_sem=None,
+        shared_httpx_client=shared_httpx_client,
+        prom_metrics=None,
+        prom_path="/metrics",
+        access_log=False,
+        log_sensitive_query_keys=frozenset(),
+        on_lifespan_shutdown=close_shared_httpx_client,
+    )
+
+    messages = [
+        {"type": "lifespan.startup"},
+        {"type": "lifespan.shutdown"},
+    ]
+
+    async def receive() -> dict[str, Any]:
+        return messages.pop(0)
+
+    sent: list[dict[str, Any]] = []
+
+    async def send(msg: MutableMapping[str, Any]) -> None:
+        sent.append(dict(msg))
+
+    await gw({"type": "lifespan"}, receive, send)
+    assert {"type": "lifespan.shutdown.complete"} in sent
+    assert closed == [True]

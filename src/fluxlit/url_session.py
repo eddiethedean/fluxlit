@@ -22,13 +22,27 @@ from typing import Protocol, TypeVar, cast, runtime_checkable
 
 from pydantic import BaseModel, ValidationError
 
-from fluxlit.config import JsonValue
+from fluxlit.config import FluxlitSettings, JsonValue
 from fluxlit.runtime.env_parse import truthy_env
 from fluxlit.streamlit.facade import StreamlitSessionFacade
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
 _log = logging.getLogger("fluxlit.url_session")
+
+_FALLBACK_URL_SESSION_PARAM = "fluxlit_sid"
+
+
+def _default_url_session_param() -> str:
+    """Resolve the URL-session query key from :class:`~fluxlit.config.FluxlitSettings`."""
+    p = (FluxlitSettings().url_session_query_param or "").strip()
+    return p or _FALLBACK_URL_SESSION_PARAM
+
+
+def _resolve_url_session_param(param: str | None) -> str:
+    if param is not None:
+        return param
+    return _default_url_session_param()
 
 
 @runtime_checkable
@@ -170,7 +184,7 @@ def hydrate_url_session(
     st: StreamlitSessionFacade,
     store: SessionStore,
     *,
-    param: str = "fluxlit_sid",
+    param: str | None = None,
     merge: bool = True,
 ) -> str | None:
     """If ``st.query_params[param]`` is set, load the store payload into ``st.session_state``.
@@ -185,7 +199,8 @@ def hydrate_url_session(
     """
     if _url_session_disabled():
         return None
-    sid = _query_param_get(st, param)
+    resolved = _resolve_url_session_param(param)
+    sid = _query_param_get(st, resolved)
     if not sid:
         return None
     blob = store.get(sid)
@@ -205,7 +220,7 @@ def ensure_url_session(
     st: StreamlitSessionFacade,
     store: SessionStore,
     *,
-    param: str = "fluxlit_sid",
+    param: str | None = None,
     initial: Mapping[str, JsonValue] | None = None,
     ttl_seconds: float | None = None,
 ) -> str:
@@ -215,9 +230,10 @@ def ensure_url_session(
     (read-only ``query_params``), still returns a new id and persists *initial* so
     callers can surface a warning or use client-side navigation.
     """
+    resolved = _resolve_url_session_param(param)
     if _url_session_disabled():
-        return _query_param_get(st, param) or ""
-    existing = _query_param_get(st, param)
+        return _query_param_get(st, resolved) or ""
+    existing = _query_param_get(st, resolved)
     if existing:
         if initial:
             cur = store.get(existing)
@@ -227,7 +243,7 @@ def ensure_url_session(
         return existing
     sid = new_session_id()
     store.set(sid, dict(initial or {}), ttl_seconds=ttl_seconds)
-    _query_param_set(st, param, sid)
+    _query_param_set(st, resolved, sid)
     return sid
 
 
@@ -235,7 +251,7 @@ def persist_url_session(
     st: StreamlitSessionFacade,
     store: SessionStore,
     *,
-    param: str = "fluxlit_sid",
+    param: str | None = None,
     ttl_seconds: float | None = None,
 ) -> str | None:
     """Write current ``st.session_state`` (shallow dict copy) to the store for ``param`` id.
@@ -249,9 +265,10 @@ def persist_url_session(
     session id is still returned; a **warning** is logged (with traceback when
     ``FLUXLIT_DEBUG=1``).
     """
+    resolved = _resolve_url_session_param(param)
     if _url_session_disabled():
         return None
-    sid = _query_param_get(st, param)
+    sid = _query_param_get(st, resolved)
     if not sid:
         return None
     ss = st.session_state
@@ -271,14 +288,14 @@ def persist_url_session(
             _log.exception(
                 "persist_url_session: failed to snapshot session_state for param=%r sid=%s; "
                 "store not updated",
-                param,
+                resolved,
                 sid,
             )
         else:
             _log.warning(
                 "persist_url_session: failed to snapshot session_state for param=%r sid=%s; "
                 "store not updated: %s (set FLUXLIT_DEBUG=1 for traceback)",
-                param,
+                resolved,
                 sid,
                 exc,
             )
@@ -292,25 +309,33 @@ def hydrate_url_session_typed(
     store: SessionStore,
     model: type[ModelT],
     *,
-    param: str = "fluxlit_sid",
+    param: str | None = None,
     merge: bool = True,
     strict: bool = False,
 ) -> tuple[str | None, ModelT | None]:
     """Like :func:`hydrate_url_session`, then validate the store payload as *model*.
 
+    Validates the store blob **before** merging into ``st.session_state`` so invalid
+    payloads do not partially hydrate the UI session.
+
     Returns ``(session_id_or_none, validated_model_or_none)``. On validation failure,
     when *strict* is false, returns ``(sid, None)``; when *strict* is true, raises
     :class:`pydantic.ValidationError`.
     """
-    sid = hydrate_url_session(st, store, param=param, merge=merge)
-    if sid is None:
+    if _url_session_disabled():
+        return None, None
+    resolved = _resolve_url_session_param(param)
+    sid = _query_param_get(st, resolved)
+    if not sid:
         return None, None
     blob = store.get(sid)
     if blob is None:
         return sid, None
     try:
-        return sid, model.model_validate(dict(blob))
+        validated = model.model_validate(dict(blob))
     except ValidationError:
         if strict:
             raise
         return sid, None
+    hydrate_url_session(st, store, param=resolved, merge=merge)
+    return sid, validated

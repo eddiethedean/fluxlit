@@ -6,6 +6,7 @@ import logging
 import time
 
 import pytest
+from pydantic import BaseModel
 
 from fluxlit.config import JsonValue
 from fluxlit.url_session import (
@@ -13,6 +14,7 @@ from fluxlit.url_session import (
     _query_param_set,
     ensure_url_session,
     hydrate_url_session,
+    hydrate_url_session_typed,
     new_session_id,
     persist_url_session,
 )
@@ -320,6 +322,63 @@ def test_query_param_set_logs_on_assign_failure_with_debug(
     caplog.set_level(logging.DEBUG, logger="fluxlit.url_session")
     assert _query_param_set(st, "fluxlit_sid", "z") is False
     assert any("_query_param_set" in rec.message for rec in caplog.records)
+
+
+def test_ensure_url_session_uses_settings_query_param(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FLUXLIT_URL_SESSION_QUERY_PARAM", "my_sid")
+    st = _FakeSt()
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    sid = ensure_url_session(st, store, initial={"x": 1})
+    assert st.query_params.get("my_sid") == sid
+    assert store.get(sid) == {"x": 1}
+
+
+def test_hydrate_url_session_typed_success_merges_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Blob(BaseModel):
+        count: int
+
+    monkeypatch.delenv("FLUXLIT_TESTS", raising=False)
+    monkeypatch.delenv("FLUXLIT_DISABLE_URL_SESSION", raising=False)
+    st = _FakeSt()
+    st.query_params["fluxlit_sid"] = "s"
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("s", {"count": 2})
+    sid, model = hydrate_url_session_typed(st, store, Blob)
+    assert sid == "s"
+    assert model is not None and model.count == 2
+    assert st.session_state["count"] == 2
+
+
+def test_hydrate_url_session_typed_no_query_param() -> None:
+    class Blob(BaseModel):
+        count: int
+
+    st = _FakeSt()
+    sid, model = hydrate_url_session_typed(st, InMemorySessionStore(), Blob)
+    assert sid is None and model is None
+
+
+def test_hydrate_url_session_typed_invalid_blob_does_not_merge_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Blob(BaseModel):
+        count: int
+
+    monkeypatch.delenv("FLUXLIT_TESTS", raising=False)
+    monkeypatch.delenv("FLUXLIT_DISABLE_URL_SESSION", raising=False)
+    st = _FakeSt()
+    st.query_params["fluxlit_sid"] = "s"
+    st.session_state["keep"] = "local"
+    store = InMemorySessionStore(default_ttl_seconds=None)
+    store.set("s", {"count": "not-int"})
+    sid, model = hydrate_url_session_typed(st, store, Blob, strict=False)
+    assert sid == "s"
+    assert model is None
+    assert st.session_state == {"keep": "local"}
 
 
 def test_persist_skips_dunder_keys() -> None:

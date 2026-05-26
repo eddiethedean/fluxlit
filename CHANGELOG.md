@@ -4,6 +4,20 @@
 
 <!-- Add user-facing bullets above before tagging; keep this section between releases. -->
 
+## 0.13.2 - 2026-05-26
+
+- **Auth:** Case-insensitive ``Bearer`` token extraction in :class:`~fluxlit.auth.jwt.JWTBearer`.
+- **Auth:** :func:`~fluxlit.auth.streamlit.prepare_streamlit_api_client` closes the bootstrap :class:`~fluxlit.client.ApiClient` when the BFF exchange raises.
+- **Auth:** :class:`~fluxlit.auth.oidc.InMemoryOIDCBFFTokenStore` uses a lock for concurrent PKCE / exchange access.
+- **Gateway:** Redact ``auth_code`` and match sensitive query keys case-insensitively in access logs; close the shared upstream :class:`httpx.AsyncClient` on ASGI lifespan shutdown.
+- **Streamlit:** Reuse a cached :class:`~fluxlit.client.ApiClient` in ``st.session_state`` across reruns in the managed entrypoint.
+- **URL session:** Default query param from :attr:`~fluxlit.config.FluxlitSettings.url_session_query_param`; :func:`~fluxlit.url_session.hydrate_url_session_typed` validates store payloads before merging into ``session_state``.
+- **Pages:** Register-time error when a page requires :class:`~fluxlit.url_session.SessionStore` but ``FluxLit(session_store=None)``; injected :class:`~fluxlit.pages.flags.FluxlitFeatureFlags` respects settings and env; :func:`~fluxlit.pages.di.Depends` warns when ``use_cache=False`` (not yet implemented).
+- **Testing:** :meth:`~fluxlit.testing.FluxLitTestClient.select_page` and :func:`~fluxlit.testing.apptest_select_page` accept ``page_overrides``.
+- **Docs:** Correct :func:`~fluxlit.pages.query.parse_query_params` multi-value query documentation.
+
+**Upgrading from 0.13.1:** No intentional breaking changes. ``Authorization: BEARER …`` headers now work; invalid URL-session blobs no longer partially hydrate ``session_state`` before typed validation fails.
+
 ## 0.13.1 - 2026-05-14
 
 - **Gateway (WebSocket):** After ``websocket.accept``, relay failures log, issue a single best-effort ``websocket.close`` (code **1011**) on generic errors, and ignore duplicate close attempts; cover ``ConnectionClosed`` from upstream ``send`` without treating it as a relay ``Exception``.

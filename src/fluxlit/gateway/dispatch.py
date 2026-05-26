@@ -49,12 +49,15 @@ def make_gateway_app(
     debug_mode: bool = False,
     debug_snapshot: dict[str, Any] | None = None,
     debug_path: str = "/__fluxlit/debug",
+    on_lifespan_shutdown: Callable[[], Awaitable[None]] | None = None,
 ) -> ASGIApp:
     """Return the ASGI handler for HTTP/WebSocket (not lifespan)."""
 
     async def app(scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "lifespan":
             await api_app(scope, receive, send)
+            if on_lifespan_shutdown is not None:
+                await on_lifespan_shutdown()
             return
         rid = request_id_from_scope(scope)
         token = set_request_id(rid)

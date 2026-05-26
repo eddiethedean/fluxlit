@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from fluxlit import FluxLit, NavigationModel
 from fluxlit.application.page_registry import register_streamlit_page
+from fluxlit.client import ApiClient
 from fluxlit.config import FluxlitSettings
 from fluxlit.pages.apply_meta import (
     coerce_page_return,
@@ -116,6 +117,67 @@ def test_resolve_page_kwargs_session_store() -> None:
 
     kw = resolve_page_kwargs(fn2, st=0, client=app.get_client(), app=app, overrides=None)
     assert kw["store_"] is store
+
+
+def test_page_registration_requires_session_store_when_injected() -> None:
+    app = FluxLit()
+
+    with pytest.raises(ValueError, match="session_store"):
+
+        @app.page("/needs-store")
+        def needs_store(
+            st: Any,
+            client: ApiClient,
+            store: Annotated[SessionStore, "url-bound"],
+        ) -> None:
+            del st, client, store
+
+
+def test_page_registry_strip_annotated() -> None:
+    from typing import Annotated
+
+    from fluxlit.application.page_registry import _strip_annotated
+
+    assert _strip_annotated(Annotated[SessionStore, "meta"]) is SessionStore
+    assert _strip_annotated(int) is int
+
+
+def test_page_registration_skips_session_store_check_when_store_configured() -> None:
+    app = FluxLit(session_store=InMemorySessionStore())
+
+    @app.page("/ok")
+    def ok(st: Any, client: ApiClient, store: SessionStore) -> None:
+        del st, client, store
+
+    assert len(app.pages) == 1
+
+
+def test_page_registration_session_store_hint_skipped_on_unresolved_hints() -> None:
+    from fluxlit.application.page_registry import _validate_session_store_on_page
+
+    def broken(st, client, store: MissingSessionStore):  # noqa: ANN001, F821
+        del st, client, store
+
+    _validate_session_store_on_page(FluxLit(), broken)
+
+
+def test_resolve_page_kwargs_feature_flags_from_settings() -> None:
+    app = FluxLit(settings=FluxlitSettings(experimental_yield_pages=True))
+
+    def fn(st: Any, client: ApiClient, flags: FluxlitFeatureFlags) -> None:
+        del st, client, flags
+
+    kw = resolve_page_kwargs(fn, st=0, client=app.get_client(), app=app, overrides=None)
+    assert kw["flags"].experimental_yield_pages is True
+
+
+def test_depends_use_cache_false_warns() -> None:
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        Depends(lambda: 1, use_cache=False)
+    assert any("use_cache=False" in str(w.message) for w in caught)
 
 
 def test_resolve_and_call_page_generator_experimental(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import contextlib
 import sys
 import types
 
 import pytest
 
 from fluxlit import FluxLit, streamlit_main_path
-from fluxlit.testing import FluxLitTestClient, _maybe_syspath, _patched_env
+from fluxlit.testing import (
+    FluxLitTestClient,
+    _maybe_syspath,
+    _patched_env,
+    _streamlit_apptest_env,
+    apptest_select_page,
+)
 
 
 def test_fluxlit_test_client_openapi_rejects_non_object(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,6 +106,59 @@ def test_fluxlit_test_client_streamlit_patches_env_and_syspath(
     assert result["syspath0"] == str(tmp_path)
     assert result["qparams"] == {"page": "Home", "token": "abc"}
     assert FakeAppTest.captured_path == str(streamlit_main_path())
+
+
+def test_streamlit_apptest_env_includes_page_overrides() -> None:
+    client = FluxLitTestClient(FluxLit())
+    env = _streamlit_apptest_env(
+        client,
+        target="demo:app",
+        internal_api_base=None,
+        page_overrides={"user_id": 42},
+    )
+    assert '"user_id": 42' in env["FLUXLIT_TEST_PAGE_OVERRIDES"]
+
+
+def test_apptest_select_page_passes_page_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_streamlit = types.SimpleNamespace(__version__="1.30.0")
+    env_snapshots: list[dict[str, str]] = []
+
+    class FakeAppTest:
+        query_params: dict[str, str] = {}
+
+        def run(self) -> dict[str, str]:
+            import os
+
+            return dict(os.environ)
+
+    monkeypatch.setitem(sys.modules, "streamlit", fake_streamlit)
+    monkeypatch.setitem(sys.modules, "streamlit.testing", types.ModuleType("streamlit.testing"))
+    testing_v1 = types.ModuleType("streamlit.testing.v1")
+    testing_v1.AppTest = FakeAppTest
+    monkeypatch.setitem(sys.modules, "streamlit.testing.v1", testing_v1)
+
+    real_patched = _patched_env
+
+    @contextlib.contextmanager
+    def capture_env(values: dict[str, str]):
+        env_snapshots.append(dict(values))
+        with real_patched(values):
+            yield
+
+    monkeypatch.setattr("fluxlit.testing._patched_env", capture_env)
+    client = FluxLitTestClient(FluxLit())
+    at = FakeAppTest()
+    apptest_select_page(
+        at,
+        client,
+        target="demo:app",
+        page="Other",
+        page_overrides={"role": "admin"},
+    )
+    assert env_snapshots
+    assert '"role": "admin"' in env_snapshots[-1]["FLUXLIT_TEST_PAGE_OVERRIDES"]
 
 
 def test_patched_env_restores_existing_values(monkeypatch: pytest.MonkeyPatch) -> None:

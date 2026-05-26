@@ -62,7 +62,10 @@ def parse_query_params(
     *,
     strict: bool = False,
 ) -> ModelT:
-    """Build *model* from ``st.query_params`` (list values → last kept for multi-value keys).
+    """Build *model* from ``st.query_params``.
+
+    For multi-value keys, Streamlit may expose a list: a single-element list is
+    coerced to that element; multiple values are passed through as a list.
 
     On :class:`pydantic.ValidationError`, calls ``st.error`` with a short message unless
     *strict* is true, in which case the exception is re-raised.

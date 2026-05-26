@@ -52,6 +52,25 @@ def assert_no_streamlit_exception(at: Any) -> None:
     apptest_assert_no_errors(at)
 
 
+def _streamlit_apptest_env(
+    client: FluxLitTestClient,
+    *,
+    target: str,
+    internal_api_base: str | None,
+    page_overrides: dict[str, Any] | None,
+) -> dict[str, str]:
+    internal = internal_api_base or f"http://127.0.0.1:1{client._normalized_api_prefix()}"
+    env: dict[str, str] = {
+        "FLUXLIT_APP": target,
+        "FLUXLIT_INTERNAL_API_BASE": internal,
+        "FLUXLIT_API_PREFIX": normalize_api_mount_path(client.api_prefix),
+        "FLUXLIT_TESTS": "1",
+    }
+    if page_overrides is not None:
+        env["FLUXLIT_TEST_PAGE_OVERRIDES"] = json.dumps(page_overrides)
+    return env
+
+
 def apptest_select_page(
     at: Any,
     client: FluxLitTestClient,
@@ -61,6 +80,7 @@ def apptest_select_page(
     internal_api_base: str | None = None,
     extra_sys_path: str | Path | None = None,
     page_key: str = "page",
+    page_overrides: dict[str, Any] | None = None,
 ) -> Any:
     """Set ``page`` query key and ``run()`` with the same ``FLUXLIT_*`` patch as ``streamlit``.
 
@@ -70,16 +90,15 @@ def apptest_select_page(
     again after you change ``at.query_params``.
     """
     _import_streamlit()
-    internal = internal_api_base or f"http://127.0.0.1:1{client._normalized_api_prefix()}"
     at.query_params[page_key] = page
     with (
         _patched_env(
-            {
-                "FLUXLIT_APP": target,
-                "FLUXLIT_INTERNAL_API_BASE": internal,
-                "FLUXLIT_API_PREFIX": normalize_api_mount_path(client.api_prefix),
-                "FLUXLIT_TESTS": "1",
-            }
+            _streamlit_apptest_env(
+                client,
+                target=target,
+                internal_api_base=internal_api_base,
+                page_overrides=page_overrides,
+            )
         ),
         _maybe_syspath(extra_sys_path),
     ):
@@ -227,19 +246,16 @@ class FluxLitTestClient:
         from streamlit.testing.v1 import AppTest
 
         entry = streamlit_main_path()
-        internal = internal_api_base or f"http://127.0.0.1:1{self._normalized_api_prefix()}"
-
-        env: dict[str, str] = {
-            "FLUXLIT_APP": target,
-            "FLUXLIT_INTERNAL_API_BASE": internal,
-            "FLUXLIT_API_PREFIX": normalize_api_mount_path(self.api_prefix),
-            "FLUXLIT_TESTS": "1",
-        }
-        if page_overrides is not None:
-            env["FLUXLIT_TEST_PAGE_OVERRIDES"] = json.dumps(page_overrides)
 
         with (
-            _patched_env(env),
+            _patched_env(
+                _streamlit_apptest_env(
+                    self,
+                    target=target,
+                    internal_api_base=internal_api_base,
+                    page_overrides=page_overrides,
+                )
+            ),
             _maybe_syspath(extra_sys_path),
         ):
             at = AppTest.from_file(str(entry))
@@ -261,6 +277,7 @@ class FluxLitTestClient:
         internal_api_base: str | None = None,
         extra_sys_path: str | Path | None = None,
         page_key: str = "page",
+        page_overrides: dict[str, Any] | None = None,
     ) -> Any:
         """Set query key and ``run()`` again with ``target`` env (same patch as ``streamlit``)."""
         return apptest_select_page(
@@ -271,6 +288,7 @@ class FluxLitTestClient:
             internal_api_base=internal_api_base,
             extra_sys_path=extra_sys_path,
             page_key=page_key,
+            page_overrides=page_overrides,
         )
 
 

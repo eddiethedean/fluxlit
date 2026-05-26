@@ -131,6 +131,41 @@ def test_bearer_headers_from_session_empty_and_set() -> None:
     assert bearer_headers_from_session(st, session_key="other") == {}
 
 
+def test_prepare_streamlit_api_client_closes_bootstrap_on_exchange_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("FLUXLIT_INTERNAL_API_BASE", raising=False)
+    st = MagicMock()
+    st.session_state = {}
+    st.query_params = {"auth_code": "longenoughcodeherexxx"}
+
+    def boom(*_a: object, **_k: object) -> None:
+        raise httpx.HTTPStatusError(
+            "fail",
+            request=httpx.Request("POST", "http://127.0.0.1:8000/api/auth/exchange"),
+            response=httpx.Response(401),
+        )
+
+    monkeypatch.setattr("fluxlit.auth.streamlit.exchange_auth_code_from_query", boom)
+    closed: list[bool] = []
+    real_init = ApiClient.__init__
+
+    def track_init(self: ApiClient, *args: object, **kwargs: object) -> None:
+        real_init(self, *args, **kwargs)
+        orig_close = self.close
+
+        def tracked_close() -> None:
+            closed.append(True)
+            orig_close()
+
+        self.close = tracked_close  # type: ignore[method-assign]
+
+    monkeypatch.setattr(ApiClient, "__init__", track_init)
+    with pytest.raises(httpx.HTTPStatusError):
+        prepare_streamlit_api_client(st, base_url="http://127.0.0.1:8000/api")
+    assert closed == [True]
+
+
 def test_prepare_streamlit_api_client_skips_exchange_when_session_has_token(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

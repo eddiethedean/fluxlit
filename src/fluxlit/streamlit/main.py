@@ -31,6 +31,8 @@ from fluxlit.streamlit.nav_order import navigation_sort_key
 from fluxlit.streamlit.page_config import build_set_page_config_kwargs
 from fluxlit.streamlit.page_runner import run_page_record
 
+_FLUXLIT_API_CLIENT_SESSION_KEY = "_fluxlit_api_client"
+
 
 def run_streamlit_entrypoint() -> None:
     spec = os.environ.get("FLUXLIT_APP")
@@ -48,7 +50,13 @@ def run_streamlit_entrypoint() -> None:
             ),
         )
     )
-    client = fluxlit_app.get_client()
+    session_state = getattr(st, "session_state", None)
+    if session_state is not None:
+        if _FLUXLIT_API_CLIENT_SESSION_KEY not in session_state:
+            session_state[_FLUXLIT_API_CLIENT_SESSION_KEY] = fluxlit_app.get_client()
+        client = session_state[_FLUXLIT_API_CLIENT_SESSION_KEY]
+    else:
+        client = fluxlit_app.get_client()
     nav_model = getattr(fluxlit_app, "_navigation_model", None)
     records = list(fluxlit_app.page_records)
     if nav_model is not None and nav_model.order:

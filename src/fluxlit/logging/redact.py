@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlencode
 
 # URL-bound session continuity (see :mod:`fluxlit.url_session`) and other
 # sensitive query keys to strip from gateway access logs.
-DEFAULT_SENSITIVE_QUERY_KEYS: frozenset[str] = frozenset({"fluxlit_sid"})
+DEFAULT_SENSITIVE_QUERY_KEYS: frozenset[str] = frozenset({"fluxlit_sid", "auth_code"})
 
 
 def redact_authorization(value: str) -> str:
@@ -52,13 +52,14 @@ def redact_query_string(
     if not query_string:
         return ""
     keys = sensitive_keys or DEFAULT_SENSITIVE_QUERY_KEYS
+    keys_lower = {k.lower() for k in keys}
     try:
         pairs = parse_qsl(query_string, keep_blank_values=True, strict_parsing=False)
     except Exception:
         return query_string
     out: list[tuple[str, str]] = []
     for k, v in pairs:
-        if k in keys and v:
+        if k.lower() in keys_lower and v:
             out.append((k, "<redacted>"))
         else:
             out.append((k, v))

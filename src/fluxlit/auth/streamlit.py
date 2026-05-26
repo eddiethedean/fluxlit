@@ -86,17 +86,21 @@ def prepare_streamlit_api_client(
     if existing:
         return ApiClient.for_fluxlit(bearer_token=str(existing), **client_options)
     bootstrap = ApiClient(**client_options)
-    exchange_auth_code_from_query(
-        st_module,
-        bootstrap,
-        exchange_path=exchange_path,
-        session_key=session_key,
-    )
-    raw = st_module.session_state.get(session_key)
-    if not raw:
-        return bootstrap
-    bootstrap.close()
-    return ApiClient.for_fluxlit(bearer_token=str(raw), **client_options)
+    try:
+        exchange_auth_code_from_query(
+            st_module,
+            bootstrap,
+            exchange_path=exchange_path,
+            session_key=session_key,
+        )
+        raw = st_module.session_state.get(session_key)
+        if not raw:
+            return bootstrap
+        bootstrap.close()
+        return ApiClient.for_fluxlit(bearer_token=str(raw), **client_options)
+    except Exception:
+        bootstrap.close()
+        raise
 
 
 __all__ = [

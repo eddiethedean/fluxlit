@@ -279,6 +279,27 @@ def test_jwt_bearer_accepts_lowercase_bearer_prefix(hs256_bearer: JWTBearer) -> 
     assert r.status_code == 200
 
 
+def test_jwt_bearer_accepts_bearer_case_insensitive(hs256_bearer: JWTBearer) -> None:
+    app = FastAPI()
+    bearer = hs256_bearer
+
+    @app.get("/x")
+    async def x(c: StandardClaims = Depends(bearer)):  # noqa: B008
+        return {"sub": c.sub}
+
+    token = issue_hs256_access_token(
+        subject="case",
+        issuer="https://issuer.example",
+        audience="my-api",
+        secret=_HS_SECRET,
+        ttl_seconds=60,
+    )
+    for prefix in ("Bearer", "BEARER", "bEaReR"):
+        r = TestClient(app).get("/x", headers={"authorization": f"{prefix} {token}"})
+        assert r.status_code == 200, r.text
+        assert r.json()["sub"] == "case"
+
+
 def test_jwt_bearer_rejects_expired_token(hs256_bearer: JWTBearer) -> None:
     app = FastAPI()
     bearer = hs256_bearer

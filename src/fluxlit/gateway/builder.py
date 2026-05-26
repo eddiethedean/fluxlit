@@ -88,6 +88,13 @@ def build_gateway(
                 http_client = httpx.AsyncClient(**client_kw)
         return http_client
 
+    async def _close_shared_httpx_client() -> None:
+        nonlocal http_client
+        async with http_client_lock:
+            if http_client is not None:
+                await http_client.aclose()
+                http_client = None
+
     upstream_sem: asyncio.Semaphore | None = None
     if opts.max_concurrent_upstream_http > 0:
         upstream_sem = asyncio.Semaphore(opts.max_concurrent_upstream_http)
@@ -167,4 +174,5 @@ def build_gateway(
         debug_mode=debug_mode,
         debug_snapshot=debug_snapshot,
         debug_path=debug_path,
+        on_lifespan_shutdown=_close_shared_httpx_client,
     )

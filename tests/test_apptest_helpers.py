@@ -60,7 +60,9 @@ def test_fluxlit_test_client_select_page_delegates(monkeypatch: pytest.MonkeyPat
         internal_api_base: str | None = None,
         extra_sys_path: object = None,
         page_key: str = "page",
+        page_overrides: dict[str, object] | None = None,
     ) -> str:
+        del page_overrides
         captured.update(
             {
                 "at": at,
