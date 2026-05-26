@@ -109,7 +109,7 @@ def _terminate_process(proc: subprocess.Popen[bytes], *, timeout_s: float = 5.0)
     if sys.platform.startswith("win"):
         with contextlib.suppress(Exception):
             proc.send_signal(getattr(signal, "CTRL_BREAK_EVENT"))  # noqa: B009
-    else:
+    else:  # pragma: no cover
         with contextlib.suppress(Exception):
             proc.send_signal(signal.SIGINT)
 
