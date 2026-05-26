@@ -11,6 +11,8 @@
 - **Gateway:** Do not forward POST bodies to Streamlit after mid-request client disconnect (HTTP **499**).
 - **Pages:** Register-time error for :class:`~fluxlit.url_session.SessionStore`-annotated parameters even when a default is present; :class:`~fluxlit.pages.di.Depends` honors ``use_cache`` within a single page run.
 - **Runtime:** Emit ``lifespan.startup.failed`` when inner FastAPI lifespan exits during unified startup without completing.
+- **Docs:** Document ``Depends(use_cache=...)`` in {doc}`streamlit-pages-typing`; align {doc}`contributing` and {doc}`testing` with required ``ty check`` and coverage gates.
+- **CI:** Matrix ``test`` job enforces ``--cov-fail-under=100`` on fast tests (same gate as the ``docs`` job).
 
 **Upgrading from 0.13.2:** No intentional breaking changes. GET requests aborted by an early client disconnect now receive **499** instead of being proxied to Streamlit.
 
@@ -23,7 +25,7 @@
 - **Gateway:** Redact ``auth_code`` and match sensitive query keys case-insensitively in access logs; close the shared upstream :class:`httpx.AsyncClient` on ASGI lifespan shutdown.
 - **Streamlit:** Reuse a cached :class:`~fluxlit.client.ApiClient` in ``st.session_state`` across reruns in the managed entrypoint.
 - **URL session:** Default query param from :attr:`~fluxlit.config.FluxlitSettings.url_session_query_param`; :func:`~fluxlit.url_session.hydrate_url_session_typed` validates store payloads before merging into ``session_state``.
-- **Pages:** Register-time error when a page requires :class:`~fluxlit.url_session.SessionStore` but ``FluxLit(session_store=None)``; injected :class:`~fluxlit.pages.flags.FluxlitFeatureFlags` respects settings and env; :func:`~fluxlit.pages.di.Depends` warns when ``use_cache=False`` (not yet implemented).
+- **Pages:** Register-time error when a page requires :class:`~fluxlit.url_session.SessionStore` but ``FluxLit(session_store=None)``; injected :class:`~fluxlit.pages.flags.FluxlitFeatureFlags` respects settings and env; :func:`~fluxlit.pages.di.Depends` accepted ``use_cache=False`` but did not honor it until **0.13.3**.
 - **Testing:** :meth:`~fluxlit.testing.FluxLitTestClient.select_page` and :func:`~fluxlit.testing.apptest_select_page` accept ``page_overrides``.
 - **Docs:** Correct :func:`~fluxlit.pages.query.parse_query_params` multi-value query documentation.
 

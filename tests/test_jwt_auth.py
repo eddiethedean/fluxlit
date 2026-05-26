@@ -189,29 +189,26 @@ def test_require_roles_enforces_roles_claim(hs256_bearer: JWTBearer) -> None:
     assert client.get("/admin", headers={"Authorization": f"Bearer {token}"}).status_code == 200
 
 
+class _ClaimsWithDump:
+    """Minimal stand-in for :class:`StandardClaims` when testing ``model_dump`` edge shapes."""
+
+    def __init__(self, data: dict[str, object]) -> None:
+        self._data = data
+
+    def model_dump(self, mode: str = "python") -> dict[str, object]:
+        del mode
+        return dict(self._data)
+
+
 def test_claim_scope_and_role_helpers_handle_missing_strings_lists_and_other_values() -> None:
     assert _claims_scopes(StandardClaims(sub="s", iss="i", aud="a"), "scope") == set()
-    assert _claims_scopes(
-        StandardClaims.model_construct(sub="s", iss="i", aud="a", scope=["read", 2]), "scope"
-    ) == {"read", "2"}
-    assert (
-        _claims_scopes(
-            StandardClaims.model_construct(sub="s", iss="i", aud="a", scope={"bad": "shape"}),
-            "scope",
-        )
-        == set()
-    )
+    assert _claims_scopes(_ClaimsWithDump({"scope": ["read", 2]}), "scope") == {"read", "2"}
+    assert _claims_scopes(_ClaimsWithDump({"scope": {"bad": "shape"}}), "scope") == set()
     assert _claims_roles(StandardClaims(sub="s", iss="i", aud="a"), "roles") == set()
     assert _claims_roles(
         StandardClaims.model_construct(sub="s", iss="i", aud="a", roles="admin"), "roles"
     ) == {"admin"}
-    assert (
-        _claims_roles(
-            StandardClaims.model_construct(sub="s", iss="i", aud="a", roles={"bad": "shape"}),
-            "roles",
-        )
-        == set()
-    )
+    assert _claims_roles(_ClaimsWithDump({"roles": {"bad": "shape"}}), "roles") == set()
 
 
 def test_issue_hs256_requires_auth_extra(monkeypatch: pytest.MonkeyPatch) -> None:

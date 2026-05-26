@@ -30,7 +30,9 @@ jobs:
           ruff format --check src tests
 
       - name: Tests
-        run: python -m pytest -n auto -m "not slow"
+        run: |
+          python -m pytest -n auto -m "not slow" \
+            --cov=fluxlit --cov-report=term-missing --cov-fail-under=100
 
       - name: Mypy
         run: python -m mypy src/fluxlit

@@ -298,8 +298,8 @@ python -m pytest -n auto \
 open htmlcov/index.html
 ```
 
-The **`docs`** CI job runs the same measurement with **`--cov-fail-under=100`**
-(alongside Ruff, Mypy, generated-doc snapshots, and Sphinx **`-W`**) so merges cannot silently reduce the package coverage gate for `src/fluxlit`.
+The matrix **`test`** job and the **`docs`** CI job both run fast tests with **`--cov-fail-under=100`**
+on `src/fluxlit`. The **`docs`** job adds release-parity checks (Ruff format, generated-doc snapshots, Sphinx **`-W`**) so merges cannot silently reduce coverage or drift docs.
 Reproduce the gate locally:
 
 ```bash

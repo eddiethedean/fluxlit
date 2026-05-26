@@ -51,6 +51,21 @@ Import {class}`~fluxlit.pages.di.Depends`, {class}`~fluxlit.pages.di.Header`, an
   FluxLit runs the coroutine on a **short-lived side thread** with its own loop (avoiding
   nested-loop errors). Keep async deps **fast** and **thread-safe**; do not assume you are on
   Streamlit’s main thread.
+- **Depends ``use_cache`` (0.13.3+):** default ``True`` resolves each dependency callable once
+  per page run (keyed by callable identity). ``Depends(fn, use_cache=False)`` invokes ``fn``
+  on every injection site in the same run:
+
+  ```python
+  counter = {"n": 0}
+
+  def bump() -> int:
+      counter["n"] += 1
+      return counter["n"]
+
+  @app.page("/")
+  def page(st, client, a: int = Depends(bump), b: int = Depends(bump, use_cache=False)):
+      ...
+  ```
 - **Header:** resolved in order: (1) ``FLUXLIT_TEST_PAGE_OVERRIDES`` / test kwargs,
   (2) the map from {func}`~fluxlit.pages.di.set_page_header_context`, (3) when present,
   ``st.context.headers`` from Streamlit (HTTP requests only). The gateway does **not** put

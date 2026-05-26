@@ -26,9 +26,9 @@ python -m pytest -n auto -m "not slow"
 python -m mypy src/fluxlit
 ```
 
-Optional **[ty](https://docs.astral.sh/ty/)** (Astral static analysis; CI runs it as a non-blocking signal): `pip install ty` and `ty check` from the repo root after `pip install -e ".[metrics]"` if you want optional imports resolved. CI pins `ty` to match local expectations. For **stricter** checking on `tests/` (same rules as `src/`), run `ty check --config-file ty.strict-tests.toml` (may report many diagnostics until tests are tightened).
+**[ty](https://docs.astral.sh/ty/)** (Astral static analysis) is **required in CI** via the `ty-check` workflow job (`ty check`, pinned `ty` version; install `pip install -e ".[dev,metrics]"` locally so optional imports resolve). Run `ty check` from the repo root before pushing when you touch typed code. For **stricter** checking on `tests/` (same rules as `src/`), run `ty check --config-file ty.strict-tests.toml` (may report many diagnostics until tests are tightened).
 
-Coverage (optional): `pytest -n auto --cov=fluxlit --cov-report=term-missing`. See [docs/testing.md](docs/testing.md) for markers, E2E, Docker proxy smoke, and the **`--cov-fail-under`** gate used on CI.
+Coverage: fast CI runs use **`--cov-fail-under=100`** on `src/fluxlit` (see [docs/testing.md](docs/testing.md)). Locally: `pytest -n auto -m "not slow" --cov=fluxlit --cov-report=term-missing --cov-fail-under=100`.
 
 ## Documentation (Sphinx)
 
