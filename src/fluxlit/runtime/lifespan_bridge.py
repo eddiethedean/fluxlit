@@ -80,7 +80,7 @@ def build_unified_fluxlit_asgi_app(
                                 subprocess, "CREATE_NEW_PROCESS_GROUP"
                             )
                         else:
-                            popen_kwargs["start_new_session"] = True
+                            popen_kwargs["start_new_session"] = True  # pragma: no cover
 
                         streamlit_proc = subprocess.Popen(cmd, **popen_kwargs)
                         _invoke_wait_for_tcp(

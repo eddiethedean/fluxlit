@@ -115,7 +115,7 @@ def run_unified(
         # New process group so we can send CTRL_BREAK_EVENT.
         popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP")  # noqa: B009
     else:
-        popen_kwargs["start_new_session"] = True
+        popen_kwargs["start_new_session"] = True  # pragma: no cover
 
     proc_box: list[subprocess.Popen[bytes]] = [subprocess.Popen(cmd, **popen_kwargs)]
     streamlit_restart_lock = threading.Lock()

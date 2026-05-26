@@ -1267,6 +1267,13 @@ def test_pid_running_zombie_is_false(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _pid_running(123) is False
 
 
+def test_pid_running_alive_is_true(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("fluxlit.runtime.process_control.sys.platform", "linux")
+    monkeypatch.setattr("fluxlit.runtime.process_control.os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("fluxlit.runtime.process_control._pid_is_zombie_unix", lambda pid: False)
+    assert _pid_running(123) is True
+
+
 def test_pid_running_windows_active_and_access_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     import ctypes
 
