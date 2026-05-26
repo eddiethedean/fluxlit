@@ -82,6 +82,26 @@ def test_streamlit_main_invalid_app_spec_raises(
         importlib.import_module("fluxlit.streamlit.main")
 
 
+def test_streamlit_main_api_client_without_session_state(
+    tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When ``st.session_state`` is absent, entrypoint calls ``get_client`` directly."""
+    from fluxlit import FluxLit
+
+    app = FluxLit(title="NS")
+    del fake_streamlit.session_state
+    monkeypatch.setenv("FLUXLIT_APP", "unused:app")
+    sys.modules.pop("fluxlit.streamlit.main", None)
+
+    sentinel = object()
+    with (
+        mock.patch("fluxlit.runtime.load_fluxlit", return_value=app),
+        mock.patch.object(app, "get_client", return_value=sentinel) as get_client,
+    ):
+        importlib.import_module("fluxlit.streamlit.main")
+        get_client.assert_called_once()
+
+
 def test_streamlit_main_no_pages_shows_hint(
     tmp_path, fake_streamlit: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
