@@ -46,6 +46,7 @@ def fake_streamlit(monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     st.stop = stop
     st.switch_page = mock.Mock()
     st.query_params = {}
+    st.session_state = {}
     sb = types.SimpleNamespace()
     sb.caption = mock.Mock()
     st.sidebar = sb

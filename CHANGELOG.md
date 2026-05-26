@@ -6,6 +6,7 @@
 
 ## 0.13.2 - 2026-05-26
 
+- **Dependencies:** cap ``fastapi`` below ``0.136.3`` (PyPI advisory ``MAL-2026-4750`` on the ``0.136.3`` release) until upstream resolves the ``fastar`` optional-dependency concern.
 - **Auth:** Case-insensitive ``Bearer`` token extraction in :class:`~fluxlit.auth.jwt.JWTBearer`.
 - **Auth:** :func:`~fluxlit.auth.streamlit.prepare_streamlit_api_client` closes the bootstrap :class:`~fluxlit.client.ApiClient` when the BFF exchange raises.
 - **Auth:** :class:`~fluxlit.auth.oidc.InMemoryOIDCBFFTokenStore` uses a lock for concurrent PKCE / exchange access.
